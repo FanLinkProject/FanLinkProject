@@ -1,0 +1,123 @@
+# ============================================
+# 1. OS 및 에디터 관련 (공통)
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDE Settings
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.code-workspace
+.classpath
+.project
+.settings/
+bin/
+
+# ============================================
+# 2. Backend (Spring Boot & Gradle)
+# ============================================
+# Gradle Caching & Build
+.gradle/
+build/
+out/
+gradle-app.setting
+
+# Spring Boot Build Artifacts (빌드 결과물 무시)
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+
+# Wrapper jar는 프로젝트 실행에 필수이므로 무시 목록에서 제외
+!gradle/wrapper/gradle-wrapper.jar
+
+# Exception: 실행 가능한 Jar가 아닌 소스 내의 라이브러리 등은 무시
+!**/src/main/**/lib/
+
+# Local configuration
+**/application-*.yml
+**/application-*.properties
+
+
+# ============================================
+# 3. Frontend (Next.js & Node)
+# ============================================
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js Build Output
+.next/
+dist/
+# build/ 는 위 Backend 섹션에서 이미 처리됨
+
+# Testing Coverage
+coverage/
+
+# Next.js Config
+next-env.d.ts
+*.tsbuildinfo
+
+# Debug Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Vercel
+.vercel
+
+# ============================================
+# 4. 데이터베이스 & Docker
+# ============================================
+# Docker Volume (DB 데이터 저장소)
+mysql-data/
+
+# Docker override files
+docker-compose.override.yml
+
+# ============================================
+# 5. 환경 변수 (보안 필수)
+# ============================================
+.env
+.env.local
+.env.*.local
+*.env
+
+# ============================================
+# 6. 테스트 결과물
+# ============================================
+**/test-results/
+**/test-output/
+**/junit.xml
+**/TEST-*.xml
+**/surefire-reports/
+**/failsafe-reports/
+
+# ============================================
+# 7. 기타
+# ============================================
+*.bak
+*.backup
+*.old
+*.swp
+
+# 로그 폴더
+logs/
+log/
+
+*.mdc
