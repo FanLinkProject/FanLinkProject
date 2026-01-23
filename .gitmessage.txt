@@ -1,0 +1,15 @@
+###################################
+# type(이슈 태그): Title(짧은 한 줄)
+#
+# Body
+#
+# 이슈 태그 종류
+# ✨ feat: 새로운 기능 구현
+# 🛠️ refactor: 코드 리팩토링
+# 📜 comment: 주석 추가(코드 변경 X), 오타 수정, 세미 콜론 누락
+# ⚙️ chore: .env, docker-compose.yml, .gitignore 설정
+# 🐞 fix: 버그, 오류 수정
+# 🎨 design: CSS 등 사용자 UI 디자인 변경
+# 🗑️ remove: `delete.class` 파일 삭제
+# ♻️ rename: 패키지 명 변경, 클래스 명 변경 등등
+#
