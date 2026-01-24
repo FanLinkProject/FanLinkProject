@@ -1,6 +1,7 @@
 package org.example.backend.user.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 @NoArgsConstructor
+@Getter
 public class User {
 
     @Id
