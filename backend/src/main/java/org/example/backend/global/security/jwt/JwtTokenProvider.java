@@ -24,12 +24,12 @@ public class JwtTokenProvider {
 
     private final UserDetailsService userDetailsService;
 
-    @Value("${뭐라해야할까........}")
+    @Value("${fanlink!cheerup!kkkkkkk!fighting}")//이거 나중에.. 32자..써야되요
     private String secretKey;
 
     private SecretKey key;
 
-    private final long tokenValidTime = 60 * 60 * 1000L;
+    private final long tokenValidTime = 60 * 60 * 1000L; // 1시간
 
     @PostConstruct
     protected void init() {
@@ -48,7 +48,7 @@ public class JwtTokenProvider {
                 .signWith(key)
                 .compact();
     }
-
+//프로바이더 에서 파싱하는곳
     public Authentication getAuthentication(String token) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(this.getUserEmail(token));
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());

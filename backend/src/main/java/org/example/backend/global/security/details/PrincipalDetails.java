@@ -1,13 +1,13 @@
 package org.example.backend.global.security.details;
 
 import lombok.Getter;
+import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Getter
@@ -49,6 +49,11 @@ public class PrincipalDetails implements UserDetails {
     public String getNickname() {
         return user.getNickname();
     }
+
+
+
+    @Override
+    public String getEmail() { return user.getEmail(); }
 
     @Override
     public String getUserName() { return user.getName(); }

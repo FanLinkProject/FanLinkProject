@@ -22,6 +22,7 @@ public class User {
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
+    // 유저는 닉네임, 아티스트는 예명 사용
     @Column(name = "nickname", unique = true, nullable = false)
     private String nickname;
 
@@ -51,10 +52,6 @@ public class User {
     @Column(name = "profile_image_url")
     private String profileImageUrl; // TODO : URL주소 추가 필요
 
-    @CreatedDate
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole role;
@@ -65,11 +62,17 @@ public class User {
     @Column(name = "provider_id", nullable = false)
     private String providerId;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     // 유저 활동 상태
     @Enumerated(EnumType.STRING)
     private UserStatus status = UserStatus.ACTIVE;
+
+    // TODO : 글로벌로 생성/수정 설정 오후 스크럼때 확인필요
+    @CreatedDate
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
 
 }
