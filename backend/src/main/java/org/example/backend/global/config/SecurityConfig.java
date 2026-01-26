@@ -27,7 +27,7 @@ public class SecurityConfig {
             .httpBasic(AbstractHttpConfigurer::disable)
             
             // CORS 설정 적용
-            .cors(cors -> cors.configurationSource(corsConfigurationSource))
+            // .cors(cors -> cors.configurationSource(corsConfigurationSource))
             
             // 세션 관리 상태 없음 설정
             .sessionManagement(session -> 

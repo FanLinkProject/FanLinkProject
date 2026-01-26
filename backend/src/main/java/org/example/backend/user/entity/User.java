@@ -59,10 +59,10 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
-    @Column(name = "provider")
+    @Column(name = "provider",  nullable = false)
     private String provider;
 
-    @Column(name = "provider_id")
+    @Column(name = "provider_id", nullable = false)
     private String providerId;
 
     @Column(name = "deleted_at")

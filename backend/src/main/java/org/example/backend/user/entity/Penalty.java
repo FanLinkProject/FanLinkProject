@@ -10,12 +10,18 @@ package org.example.backend.user.entity;
  */
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.example.backend.user.enums.PenaltyType;
-import org.springframework.cglib.core.Local;
+import org.springframework.data.annotation.CreatedDate;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Getter
+@Setter
+@NoArgsConstructor
 public class Penalty {
 
     @Id
@@ -41,9 +47,7 @@ public class Penalty {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
+    @CreatedDate
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-
-
-
 }
