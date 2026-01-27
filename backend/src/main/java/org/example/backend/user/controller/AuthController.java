@@ -1,7 +1,9 @@
 package org.example.backend.user.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.example.backend.user.Service.AuthService;
+import org.example.backend.user.dto.request.LoginRequest;
+import org.example.backend.user.service.AuthService;
 import org.example.backend.user.dto.request.SignupRequest;
 import org.example.backend.user.dto.response.TokenResponse;
 import org.springframework.http.ResponseEntity;
@@ -18,14 +20,15 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<String> signup(@RequestBody SignupRequest request) {
+    public ResponseEntity<String> signup(@Valid @RequestBody SignupRequest request) {
         authService.signup(request);
-        return ResponseEntity.ok().build("회원가입이 완료되었습니다.");
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody loginRequest request) {
-        TokenResponse totken = authService.login(request);
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+        TokenResponse token = authService.login(request);
         return ResponseEntity.ok(token);
-        }
     }
 }
+
