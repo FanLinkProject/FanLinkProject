@@ -41,18 +41,22 @@ public class AuthService {
         }
 
         // User 엔티티 생성
-        User savedUser = userRepository.save(User.of(
+        User user = User.of(
                 request.email(),
                 request.nickname(),
                 passwordEncoder.encode(request.password()),
                 UserRole.USER
-        ));
+        );
 
-        savedUser.setName(request.name());
-        savedUser.setGender(request.gender());
-        savedUser.setBirth(request.birth());
-        savedUser.setPrivacyPolicyAgreed(request.privacyPolicyAgreed() != null ? request.privacyPolicyAgreed() : false);
-        savedUser.setPhoneNumber(request.phoneNumber());
+        // 추가 필드 설정
+        user.setName(request.name());
+        user.setGender(request.gender());
+        user.setBirth(request.birth());
+        user.setPrivacyPolicyAgreed(request.privacyPolicyAgreed() != null ? request.privacyPolicyAgreed() : false);
+        user.setPhoneNumber(request.phoneNumber());
+
+        // User 저장
+        User savedUser = userRepository.save(user);
 
         // JWT 토큰 생성
         String accessToken = jwtTokenProvider.createToken(savedUser.getEmail(), savedUser.getRole().getValue());
@@ -106,7 +110,7 @@ public class AuthService {
     }
 
     // 회원 탈퇴
-    public void deleteAccount() {
+    public void delete() {
         // 사용자 정보
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -122,7 +126,7 @@ public class AuthService {
             throw new RuntimeException("이미 탈퇴한 계정입니다.");
         }
 
-        // 회원 탈퇴 처리 (soft delete)
+        // 회원 탈퇴 처리
         user.delete();
         userRepository.save(user);
 
