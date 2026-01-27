@@ -6,7 +6,7 @@ import org.example.backend.settlement.entity.Settlement;
 import org.example.backend.settlement.entity.SettlementDetail;
 import java.util.List;
 
-/**
+/*
  * Spring Batch 데이터 전달 객체 (Processor -> Writer)
  * 1. ItemProcessor:
  * - 정산 로직을 수행하여 `Settlement`(정산서)와 `SettlementDetail`(상세) 엔티티를 생성
