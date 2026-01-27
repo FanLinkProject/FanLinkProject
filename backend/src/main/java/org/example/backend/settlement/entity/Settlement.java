@@ -61,4 +61,10 @@ public class Settlement extends BaseTimeEntity {
         this.status = SettlementStatus.COMPLETE;
         this.settledAt = LocalDateTime.now();
     }
+
+    public void updateTotals(Long totalSalesAmount, Long feeAmount, Long finalAmount) {
+        this.totalSalesAmount = totalSalesAmount;
+        this.feeAmount = feeAmount;
+        this.finalAmount = finalAmount;
+    }
 }
