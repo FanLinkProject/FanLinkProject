@@ -7,7 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.example.backend.chat.dto.ChatMessageEvent;
+import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -62,7 +62,7 @@ public class KafkaConfig {
 	 * - Key로 roomId를 사용하여 같은 방의 메시지는 같은 파티션으로 라우팅
 	 */
 	@Bean
-	public ProducerFactory<String, ChatMessageEvent> producerFactory() {
+	public ProducerFactory<String, ChatMessageResponse> producerFactory() {
 		Map<String, Object> config = new HashMap<>();
 		config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
 		config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -78,7 +78,7 @@ public class KafkaConfig {
 	 * - kafkaTemplate.send(topic, key, message) 형태로 사용
 	 */
 	@Bean
-	public KafkaTemplate<String, ChatMessageEvent> kafkaTemplate() {
+	public KafkaTemplate<String, ChatMessageResponse> kafkaTemplate() {
 		return new KafkaTemplate<>(producerFactory());
 	}
 
@@ -101,7 +101,7 @@ public class KafkaConfig {
 	 * - JsonDeserializer의 두 번째 파라미터 false: 헤더에 타입 정보가 없어도 역직렬화 가능
 	 */
 	@Bean
-	public ConsumerFactory<String, ChatMessageEvent> consumerFactory() {
+	public ConsumerFactory<String, ChatMessageResponse> consumerFactory() {
 		Map<String, Object> config = new HashMap<>();
 		config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
 		config.put(ConsumerConfig.GROUP_ID_CONFIG, "chat-server");
@@ -109,12 +109,12 @@ public class KafkaConfig {
 		config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
 		config.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
 
-		config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, ChatMessageEvent.class.getName());
+		config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, ChatMessageResponse.class.getName());
 
 		return new DefaultKafkaConsumerFactory<>(
 			config,
 			new StringDeserializer(),
-			new JsonDeserializer<>(ChatMessageEvent.class, false));
+			new JsonDeserializer<>(ChatMessageResponse.class, false));
 	}
 
 	/**
@@ -129,8 +129,8 @@ public class KafkaConfig {
 	 * - 이 팩토리를 사용하지 않으면 기본 StringDeserializer 컨테이너를 사용하여 에러 발생
 	 */
 	@Bean(name = "kafkaListenerContainerFactory")
-	public ConcurrentKafkaListenerContainerFactory<String, ChatMessageEvent> kafkaListenerContainerFactory() {
-		ConcurrentKafkaListenerContainerFactory<String, ChatMessageEvent> factory =
+	public ConcurrentKafkaListenerContainerFactory<String, ChatMessageResponse> kafkaListenerContainerFactory() {
+		ConcurrentKafkaListenerContainerFactory<String, ChatMessageResponse> factory =
 			new ConcurrentKafkaListenerContainerFactory<>();
 		factory.setConsumerFactory(consumerFactory());
 		return factory;

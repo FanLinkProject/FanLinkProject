@@ -1,9 +1,7 @@
-package org.example.backend.chat.dto;
+package org.example.backend.chat.dto.request;
 
 
 
-
-import org.antlr.v4.runtime.misc.NotNull;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

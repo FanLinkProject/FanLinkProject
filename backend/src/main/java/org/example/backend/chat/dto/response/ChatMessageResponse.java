@@ -1,4 +1,4 @@
-package org.example.backend.chat.dto;
+package org.example.backend.chat.dto.response;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +16,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ChatMessageEvent {
+public class ChatMessageResponse {
 
 	private Long messageId;
 	private Long roomId;
@@ -25,8 +25,8 @@ public class ChatMessageEvent {
 	private String content;
 	private LocalDateTime createdAt;
 
-	public static ChatMessageEvent from(ChatMessage message) {
-		return ChatMessageEvent.builder()
+	public static ChatMessageResponse from(ChatMessage message) {
+		return ChatMessageResponse.builder()
 			.messageId(message.getId())
 			.roomId(message.getChatRoom().getId())
 			.senderId(message.getSender().getId())

@@ -1,7 +1,7 @@
 package org.example.backend.chat.service;
 
-import org.example.backend.chat.dto.ChatMessageEvent;
-import org.example.backend.chat.dto.ChatMessageRequest;
+import org.example.backend.chat.dto.response.ChatMessageResponse;
+import org.example.backend.chat.dto.request.ChatMessageRequest;
 import org.example.backend.chat.entity.ChatMessage;
 import org.example.backend.chat.entity.ChatRoom;
 import org.example.backend.chat.enums.MessageType;
@@ -36,7 +36,7 @@ import lombok.RequiredArgsConstructor;
 public class ChatService {
 
 	private final ChatMessageRepository chatMessageRepository;
-	private final KafkaTemplate<String, ChatMessageEvent> kafkaTemplate;
+	private final KafkaTemplate<String, ChatMessageResponse> kafkaTemplate;
 
 	private final ChatRoomRepository chatRoomRepository;
 	private final UserRepository userRepository;
@@ -70,7 +70,7 @@ public class ChatService {
 		ChatMessage saved = chatMessageRepository.save(message);
 
 		// 5) Kafka 발행 (roomId를 key로 사용해 같은 방 메시지 파티션 정렬 유지)
-		ChatMessageEvent event = ChatMessageEvent.from(saved);
+		ChatMessageResponse event = ChatMessageResponse.from(saved);
 		kafkaTemplate.send(
 			"chat-room",
 			room.getId().toString(),

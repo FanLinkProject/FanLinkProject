@@ -1,4 +1,4 @@
-package org.example.backend.chat.dto;
+package org.example.backend.chat.dto.request;
 
 import lombok.*;
 
@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LiveChatMessageDto {
+public class LiveChatMessageRequest {
 
 	/**
 	 * 라이브 채팅방 식별자 (ChatRoom.id 또는 별도 liveId)

@@ -1,6 +1,6 @@
 package org.example.backend.chat.controller;
 
-import org.example.backend.chat.dto.ChatMessageRequest;
+import org.example.backend.chat.dto.request.ChatMessageRequest;
 import org.example.backend.chat.service.ChatService;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.stereotype.Controller;

@@ -1,6 +1,6 @@
 package org.example.backend.chat.config;
 
-import org.example.backend.chat.dto.ChatMessageEvent;
+import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Component;
@@ -54,7 +54,7 @@ public class ChatMessageConsumer {
 		groupId = "chat-server",
 		containerFactory = "kafkaListenerContainerFactory"
 	)
-	public void consume(ChatMessageEvent event) {
+	public void consume(ChatMessageResponse event) {
 		// ✅ WebSocket 브로드캐스트도 DTO로 (엔티티 X)
 		messagingTemplate.convertAndSend(
 			"/sub/chat/room/" + event.getRoomId(),
