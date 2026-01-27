@@ -68,8 +68,8 @@ public class AuthService {
     @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest request) {
         // 이메일로 사용자 조회
-        User user = userRepository.findByEmail(request.Email())
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + request.Email()));
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + request.email()));
 
         // 비밀번호 검증
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
@@ -83,12 +83,12 @@ public class AuthService {
 
         // JWT 토큰 생성
         String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
-        String refreshToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
+        //String refreshToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
 
         // RefreshToken 저장
-        refreshTokenStore.save(user.getEmail(), refreshToken);
-
-        return TokenResponse.from(accessToken, refreshToken);
+        //refreshTokenStore.save(user.getEmail(), refreshToken);
+        return new TokenResponse("bearer", accessToken, 3600000L);
+        //return TokenResponse(accessToken);//, refreshToken);
     }
 
     // 로그아웃
