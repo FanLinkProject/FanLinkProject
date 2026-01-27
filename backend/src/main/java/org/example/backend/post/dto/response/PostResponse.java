@@ -1,4 +1,4 @@
-package org.example.backend.post.dto;
+package org.example.backend.post.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Builder
-public class PostResponseDto {
+public class PostResponse {
     private Long id;
     private String title;
     private String content;
@@ -17,8 +17,8 @@ public class PostResponseDto {
     private Long likeCount;
     private LocalDateTime createdAt;
 
-    public static PostResponseDto from(Post post) {
-        return PostResponseDto.builder()
+    public static PostResponse from(Post post) {
+        return PostResponse.builder()
                 .id(post.getId())
                 .title(post.getTitle())
                 .content(post.getContent())

@@ -1,8 +1,8 @@
 package org.example.backend.comment.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.comment.dto.CommentRequestDto;
-import org.example.backend.comment.dto.CommentResponseDto;
+import org.example.backend.comment.dto.request.CommentRequest;
+import org.example.backend.comment.dto.response.CommentResponse;
 import org.example.backend.comment.entity.Comment;
 import org.example.backend.comment.repository.CommentRepository;
 import org.example.backend.post.entity.Post;
@@ -24,7 +24,7 @@ public class CommentService {
 
     // --- Create ---
     @Transactional
-    public Long createComment(Long postId, Long writerId, WriterType writerType, CommentRequestDto request) {
+    public Long createComment(Long postId, Long writerId, WriterType writerType, CommentRequest request) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다."));
 
@@ -47,7 +47,7 @@ public class CommentService {
     }
 
     // --- Read (계층형 구조 변환) ---
-    public List<CommentResponseDto> getComments(Long postId) {
+    public List<CommentResponse> getComments(Long postId) {
         // 1. 해당 게시글의 모든 댓글 조회 (QueryDSL 등을 쓰면 더 최적화 가능)
         List<Comment> comments = commentRepository.findAllByPostId(postId);
 
@@ -60,11 +60,11 @@ public class CommentService {
     }
 
     // 재귀적으로 자식 댓글 매핑
-    private CommentResponseDto mapToDto(Comment comment) {
-        CommentResponseDto dto = CommentResponseDto.from(comment);
+    private CommentResponse mapToDto(Comment comment) {
+        CommentResponse dto = CommentResponse.from(comment);
 
         // 자식 댓글들이 있다면 재귀 호출하여 DTO 리스트에 추가
-        List<CommentResponseDto> childDtos = comment.getChildren().stream()
+        List<CommentResponse> childDtos = comment.getChildren().stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
 

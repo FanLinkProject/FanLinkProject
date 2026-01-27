@@ -1,4 +1,4 @@
-package org.example.backend.comment.dto;
+package org.example.backend.comment.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -10,17 +10,17 @@ import java.util.List;
 
 @Getter
 @Builder
-public class CommentResponseDto {
+public class CommentResponse {
     private Long id;
     private String content;
     private Long writerId;
     private String writerType;
     private boolean isDeleted;
     private LocalDateTime createdAt;
-    private List<CommentResponseDto> children; // 대댓글 리스트
+    private List<CommentResponse> children; // 대댓글 리스트
 
-    public static CommentResponseDto from(Comment comment) {
-        return CommentResponseDto.builder()
+    public static CommentResponse from(Comment comment) {
+        return CommentResponse.builder()
                 .id(comment.getId())
                 .content(comment.getContent())
                 .writerId(comment.getWriterId())

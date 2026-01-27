@@ -1,4 +1,4 @@
-package org.example.backend.post.dto;
+package org.example.backend.post.dto.request;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 // PostRequest.java (생성/수정 요청)
 @Getter
 @NoArgsConstructor
-public class PostRequestDto {
+public class PostRequest {
     private String title;
     private String content;
     private Long channelArtistId; // 어느 아티스트 채널에 쓸 것인지

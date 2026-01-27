@@ -1,8 +1,8 @@
 package org.example.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.post.dto.PostRequestDto;
-import org.example.backend.post.dto.PostResponseDto;
+import org.example.backend.post.dto.request.PostRequest;
+import org.example.backend.post.dto.response.PostResponse;
 import org.example.backend.post.entity.Post;
 import org.example.backend.post.enums.WriterType;
 import org.example.backend.post.repository.PostRepository;
@@ -20,7 +20,7 @@ public class PostService {
 
     // --- Create ---
     @Transactional // 쓰기 허용
-    public Long createPost(Long writerId, WriterType writerType, PostRequestDto request) {
+    public Long createPost(Long writerId, WriterType writerType, PostRequest request) {
         Post post = Post.builder()
                 .channelArtistId(request.getChannelArtistId()) // 어느 아티스트 채널에?
                 .writerId(writerId)
@@ -33,21 +33,21 @@ public class PostService {
     }
 
     // --- Read (Single) ---
-    public PostResponseDto getPost(Long postId) {
+    public PostResponse getPost(Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다.")); // 추후 Custom Exception 권장
-        return PostResponseDto.from(post);
+        return PostResponse.from(post);
     }
 
     // --- Read (List) ---
-    public Page<PostResponseDto> getPostList(Long channelArtistId, Pageable pageable) {
+    public Page<PostResponse> getPostList(Long channelArtistId, Pageable pageable) {
         return postRepository.findAllByChannelArtistId(channelArtistId, pageable)
-                .map(PostResponseDto::from);
+                .map(PostResponse::from);
     }
 
     // --- Update ---
     @Transactional
-    public void updatePost(Long postId, Long currentUserId, WriterType currentUserType, PostRequestDto request) {
+    public void updatePost(Long postId, Long currentUserId, WriterType currentUserType, PostRequest request) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다."));
 
