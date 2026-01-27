@@ -1,11 +1,7 @@
 package org.example.backend.user.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.springframework.data.annotation.CreatedDate;
@@ -14,7 +10,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 @Getter
