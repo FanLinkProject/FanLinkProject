@@ -2,19 +2,20 @@ package org.example.backend.user.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.LoginRequest;
 import org.example.backend.user.service.AuthService;
 import org.example.backend.user.dto.request.SignupRequest;
 import org.example.backend.user.dto.response.SignupResponse;
 import org.example.backend.user.dto.response.TokenResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
-
     private final AuthService authService;
 
     // 회원가입
@@ -29,6 +30,23 @@ public class AuthController {
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse token = authService.login(request);
         return ResponseEntity.ok(token);
+    }
+
+    // 로그아웃
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestParam("refreshToken") String refreshToken) {
+        authService.logout(refreshToken);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 회원 탈퇴
+    @DeleteMapping
+    public ResponseEntity<?> signout(
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+            ) {
+        authService.signout(principalDetails.getUserId());
+
+        return ResponseEntity.noContent().build();
     }
 }
 

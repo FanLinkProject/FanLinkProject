@@ -110,7 +110,7 @@ public class AuthService {
     }
 
     // 회원 탈퇴
-    public void delete() {
+    public void signout(Long userId) {
         // 사용자 정보
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
