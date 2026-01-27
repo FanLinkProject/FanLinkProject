@@ -50,7 +50,8 @@ public class SettlementBatchConfig {
     @Bean
     public Step settlementStep() {
         return new StepBuilder("settlementStep", jobRepository)
-                .<Artist, SettlementItemDto>chunk(10, transactionManager)
+                // [변경] 제네릭 타입: SettlementItemDto -> SettlementBatchData
+                .<Artist, SettlementBatchData>chunk(10, transactionManager)
                 .reader(artistReader())
                 .processor(settlementProcessor(null, null))
                 .writer(settlementWriter())
@@ -69,7 +70,8 @@ public class SettlementBatchConfig {
 
     @Bean
     @StepScope
-    public ItemProcessor<Artist, SettlementItemDto> settlementProcessor(
+    // 반환 타입: SettlementBatchData
+    public ItemProcessor<Artist, SettlementBatchData> settlementProcessor(
             @Value("#{jobParameters['startDate']}") String startDateStr,
             @Value("#{jobParameters['endDate']}") String endDateStr
     ) {
@@ -126,7 +128,8 @@ public class SettlementBatchConfig {
             settlement.updateTotals(totalSales, totalSales - finalAmount, finalAmount);
             List<Long> pendingIds = pendings.stream().map(SettlementPending::getId).collect(Collectors.toList());
 
-            return SettlementItemDto.builder()
+            // 반환 객체 빌더: SettlementBatchData
+            return SettlementBatchData.builder()
                     .settlement(settlement)
                     .details(details)
                     .pendingIds(pendingIds)
@@ -135,9 +138,10 @@ public class SettlementBatchConfig {
     }
 
     @Bean
-    public ItemWriter<SettlementItemDto> settlementWriter() {
+    // 입력 타입: SettlementBatchData
+    public ItemWriter<SettlementBatchData> settlementWriter() {
         return items -> {
-            for (SettlementItemDto item : items) {
+            for (SettlementBatchData item : items) {
                 settlementRepository.save(item.getSettlement());
                 detailRepository.saveAll(item.getDetails());
                 pendingRepository.deleteAllByIdIn(item.getPendingIds());

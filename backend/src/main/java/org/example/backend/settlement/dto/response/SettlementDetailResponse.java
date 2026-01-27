@@ -1,4 +1,4 @@
-package org.example.backend.settlement.dto;
+package org.example.backend.settlement.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -8,7 +8,7 @@ import org.example.backend.settlement.entity.SettlementDetail;
 
 @Getter
 @Builder
-public class SettlementDetailResponseDto {
+public class SettlementDetailResponse {
     private Long id;
     private String orderName;      // 상품명 (스냅샷)
     private String sourceType;     // "일반 상품", "캔디 후원" (한글)
@@ -16,8 +16,8 @@ public class SettlementDetailResponseDto {
     private double shareRatio;     // 적용된 비율 (0.9 or 0.2)
     private Long settlementAmount; // 최종 인정액
 
-    public static SettlementDetailResponseDto from(SettlementDetail entity) {
-        return SettlementDetailResponseDto.builder()
+    public static SettlementDetailResponse from(SettlementDetail entity) {
+        return SettlementDetailResponse.builder()
                 .id(entity.getId())
                 .orderName(entity.getTitleSnapshot())
                 .sourceType(entity.getSourceType().getDescription()) // Enum 설명 활용

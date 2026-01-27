@@ -1,9 +1,9 @@
 package org.example.backend.settlement.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.settlement.dto.SettlementDetailResponseDto;
-import org.example.backend.settlement.dto.SettlementEstimateResponseDto;
-import org.example.backend.settlement.dto.SettlementHistoryResponseDto;
+import org.example.backend.settlement.dto.response.SettlementDetailResponse;
+import org.example.backend.settlement.dto.response.SettlementEstimateResponse;
+import org.example.backend.settlement.dto.response.SettlementHistoryResponse;
 import org.example.backend.settlement.service.SettlementDashboardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,7 +25,7 @@ public class SettlementController {
      * GET /api/v1/settlements/estimated
      */
     @GetMapping("/estimated")
-    public ResponseEntity<SettlementEstimateResponseDto> getEstimatedAmount(
+    public ResponseEntity<SettlementEstimateResponse> getEstimatedAmount(
             // @AuthenticationPrincipal UserPrincipal user // 실제 적용 시 주석 해제
             @RequestAttribute("artistId") Long artistId // 테스트용 임시
     ) {
@@ -38,7 +38,7 @@ public class SettlementController {
      * GET /api/v1/settlements/history
      */
     @GetMapping("/history")
-    public ResponseEntity<List<SettlementHistoryResponseDto>> getHistory(
+    public ResponseEntity<List<SettlementHistoryResponse>> getHistory(
             // @AuthenticationPrincipal UserPrincipal user
             @RequestAttribute("artistId") Long artistId
     ) {
@@ -50,7 +50,7 @@ public class SettlementController {
      * GET /api/v1/settlements/{settlementId}/details
      */
     @GetMapping("/{settlementId}/details")
-    public ResponseEntity<List<SettlementDetailResponseDto>> getDetails(
+    public ResponseEntity<List<SettlementDetailResponse>> getDetails(
             // @AuthenticationPrincipal UserPrincipal user,
             @RequestAttribute("artistId") Long artistId,
             @PathVariable Long settlementId

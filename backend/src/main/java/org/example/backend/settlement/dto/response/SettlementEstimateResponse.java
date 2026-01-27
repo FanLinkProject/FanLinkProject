@@ -1,4 +1,4 @@
-package org.example.backend.settlement.dto;
+package org.example.backend.settlement.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -7,13 +7,13 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class SettlementEstimateResponseDto {
+public class SettlementEstimateResponse {
 
     private Long estimatedAmount; // 예상 정산금
     private String currency;      // "KRW"
 
-    public static SettlementEstimateResponseDto of(Long amount) {
-        return SettlementEstimateResponseDto.builder()
+    public static SettlementEstimateResponse of(Long amount) {
+        return SettlementEstimateResponse.builder()
                 .estimatedAmount(amount)
                 .currency("KRW")
                 .build();

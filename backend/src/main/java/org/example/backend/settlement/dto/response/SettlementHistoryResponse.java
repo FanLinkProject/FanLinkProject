@@ -1,4 +1,4 @@
-package org.example.backend.settlement.dto;
+package org.example.backend.settlement.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Builder
-public class SettlementHistoryResponseDto {
+public class SettlementHistoryResponse {
     private Long id;                // 정산서 ID
     private String period;          // "2026-01-01 ~ 2026-01-31"
     private Long totalSalesAmount;  // 총 매출
@@ -21,8 +21,8 @@ public class SettlementHistoryResponseDto {
     private SettlementStatus status;// 상태 (COMPLETE)
     private LocalDateTime settledAt;// 지급 완료일
 
-    public static SettlementHistoryResponseDto from(Settlement entity) {
-        return SettlementHistoryResponseDto.builder()
+    public static SettlementHistoryResponse from(Settlement entity) {
+        return SettlementHistoryResponse.builder()
                 .id(entity.getId())
                 .period(entity.getStartDate() + " ~ " + entity.getEndDate())
                 .totalSalesAmount(entity.getTotalSalesAmount())
