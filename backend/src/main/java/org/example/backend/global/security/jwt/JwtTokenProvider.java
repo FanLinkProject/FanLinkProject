@@ -6,11 +6,11 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.security.service.PrincipalDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -22,9 +22,9 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    private final UserDetailsService userDetailsService;
+    private final PrincipalDetailsService principalDetailsService;
 
-    @Value("${fanlink!cheerup!kkkkkkk!fighting}")//이거 나중에.. 32자..써야되요
+    @Value("${jwt.secret:fanlink!cheerup!kkkkkkk!fighting}")//이거 나중에.. 32자..써야되요
     private String secretKey;
 
     private SecretKey key;
@@ -50,7 +50,8 @@ public class JwtTokenProvider {
     }
 //프로바이더 에서 파싱하는곳
     public Authentication getAuthentication(String token) {
-        UserDetails userDetails = userDetailsService.loadUserByUsername(this.getUserEmail(token));
+        String email = this.getUserEmail(token);
+        UserDetails userDetails = principalDetailsService.loadUserByUsername(email);
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
 
@@ -65,7 +66,10 @@ public class JwtTokenProvider {
 
     public boolean validateToken(String jwtToken) {
         try {
-            Jws<Claims> claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(jwtToken);
+            Jws<Claims> claims = Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(jwtToken);
             return !claims.getPayload().getExpiration().before(new Date());
         } catch (Exception e) {
             return false;
