@@ -2,13 +2,13 @@ package org.example.backend.global.security.details;
 
 import lombok.Getter;
 import org.example.backend.user.entity.User;
-import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.enums.UserStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collection;
 
 @Getter
 public class PrincipalDetails implements UserDetails {
@@ -33,9 +33,9 @@ public class PrincipalDetails implements UserDetails {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         Collection<GrantedAuthority> authorities = new ArrayList<>();
 
-        authorities.add(new SimpleGrantedAuthority("ROLE_"+user.getRole().name()));
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
         return authorities;
-
+    }
 
     //컨트롤러 - 유저 도메인 객체 변환
     public User getUser() {
@@ -50,45 +50,24 @@ public class PrincipalDetails implements UserDetails {
         return user.getNickname();
     }
 
-
-
-    @Override
-    public String getEmail() { return user.getEmail(); }
-
-    @Override
-    public String getUserName() { return user.getName(); }
+    public String getName() {
+        return user.getName();
+    }
 
     @Override
-    public String getPassword() { return user.getPassword(); }
+    public String getPassword() {
+        return user.getPassword();
+    }
 
     @Override
-    public String getGender() { return user.getGender(); }
-
-    @Override
-    public String getBirth() { return user.getBirth(); }
-
-    @Override
-    public Boolean getPrivacyPolicyAgreed() { return user.getPrivacyPolicyAgreed(); }
-
-    @Override
-    public String getPhoneNumber() { return user.getPhoneNumber(); }
-
-    //
-    // public CustomUserDetails(Long userId, String email, String password, List<UserRole> roles, boolean enabled) {
-    //     this.userId = userId;
-    //     this.email = email;
-    //     this.password = password;
-    //     this.roles = roles;
-    //     this.enabled = enabled;
-    // }
-
-
-
+    public String getUsername(){
+        return user.getEmail();
+    }
 
     @Override
     public boolean isAccountNonExpired() {
-        return true;
-    }
+            return true;
+        }
 
     @Override
     public boolean isAccountNonLocked() {
@@ -97,11 +76,11 @@ public class PrincipalDetails implements UserDetails {
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return true;
+         return true;
     }
 
     @Override
     public boolean isEnabled() {
-        return enabled;
+        return user.getStatus() == UserStatus.ACTIVE;
     }
 }
