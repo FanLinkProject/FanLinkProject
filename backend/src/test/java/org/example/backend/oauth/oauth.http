@@ -10,7 +10,7 @@ Content-Type: application/json
   "password": "qwer@123",
   "nickname": "11cm",
   "name": "팽하나",
-  "phoneNumber": "010-1234-5678",
+  "phoneNumber": "01012345678",
   "birth": "19990101",
   "gender": "M",
   "privacyPolicyAgreed": true
