@@ -3,6 +3,7 @@ package org.example.backend.user.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.springframework.data.annotation.CreatedDate;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 @Table(name = "users")
 @NoArgsConstructor
 @Getter
+@Setter
 public class User {
 
     @Id
@@ -74,5 +76,30 @@ public class User {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // 정적 팩토리 메서드
+    public static User of(
+            String email,
+            String nickname,
+            String encodedPassword,
+            UserRole role
+    ) {
+        User user = new User();
+        user.setEmail(email);
+        user.setNickname(nickname);
+        user.setPassword(encodedPassword);
+        user.setRole(role);
+        user.setProvider("local");
+        user.setProviderId(email);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setCandy(0);
+        return user;
+    }
+
+    // 회원 탈퇴 (soft delete)
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
+        this.status = UserStatus.BANNED; // 탈퇴 시 상태를 BANNED로 변경
+    }
 
 }
