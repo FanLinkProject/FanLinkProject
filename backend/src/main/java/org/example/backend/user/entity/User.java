@@ -5,6 +5,7 @@ import lombok.*;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 @Getter
 @Setter
+@EntityListeners(AuditingEntityListener.class)
 public class User {
 
     @Id
@@ -81,19 +83,29 @@ public class User {
     public static User of(
             String email,
             String nickname,
+            String name,
             String encodedPassword,
+            String gender,
+            String birth,
+            String phoneNumber,
+            Boolean privacyPolicyAgreed,
             UserRole role
     ) {
         User user = new User();
         user.setEmail(email);
         user.setNickname(nickname);
+        user.setName(name);
         user.setPassword(encodedPassword);
+        user.setGender(gender);
+        user.setBirth(birth);
+        user.setPhoneNumber(phoneNumber);
+        user.setPrivacyPolicyAgreed(privacyPolicyAgreed != null ? privacyPolicyAgreed : false);
         user.setRole(role);
-        user.setProvider("local");
-        user.setProviderId(email);
+        user.setProvider("LOCAL");
+        user.setProviderId("NONE");
         user.setStatus(UserStatus.ACTIVE);
-        user.setCreatedAt(LocalDateTime.now());
         user.setCandy(0L);
+
         return user;
     }
 
@@ -102,6 +114,7 @@ public class User {
         this.deletedAt = LocalDateTime.now();
         this.status = UserStatus.BANNED; // 탈퇴 시 상태를 BANNED로 변경
     }
+
     public void chargeCandy(Long amount) {
         if (this.candy == null) {
             this.candy = 0L;
