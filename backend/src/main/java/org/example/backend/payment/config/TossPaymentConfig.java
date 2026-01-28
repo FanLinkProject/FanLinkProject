@@ -14,6 +14,6 @@ public class TossPaymentConfig {
     @Value("${payment.toss.secret-key}")
     private String secretKey;
 
-    @Value("${payment.toss.url}")
+    @Value("${payment.toss.base-url}")
     private String baseUrl;
 }
