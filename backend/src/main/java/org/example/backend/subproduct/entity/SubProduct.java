@@ -26,14 +26,18 @@ public class SubProduct {
     @Column(name = "duration_days", nullable = false)
     private Integer durationDays;
 
-    public SubProduct(String name, Long price, Integer durationDays) {
+    @Column(name = "candy_amount")
+    private Long candyAmount; // 0 or null if not a candy product
+
+    public SubProduct(String name, Long price, Integer durationDays, Long candyAmount) {
         this.name = name;
         this.price = price;
         this.durationDays = durationDays;
+        this.candyAmount = candyAmount;
     }
 
     // 30일 구독 상품 생성 시 사용
-    public static SubProduct createMonthlySubscription(String name, Long price) {
-        return new SubProduct(name, price, 30);
+    public static SubProduct createMonthlySubscription(String name, Long price, Long candyAmount) {
+        return new SubProduct(name, price, 30, candyAmount);
     }
 }

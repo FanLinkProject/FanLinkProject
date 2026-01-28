@@ -27,7 +27,7 @@ public class SubProductService {
 
     @Transactional
     public SubProduct create(SubProductRequest req) {
-        SubProduct subProduct = new SubProduct(req.name(), req.price(), req.durationDays());
+        SubProduct subProduct = new SubProduct(req.name(), req.price(), req.durationDays(), req.candyAmount());
         return subProductRepository.save(subProduct);
     }
 
@@ -38,6 +38,7 @@ public class SubProductService {
         subProduct.setName(req.name());
         subProduct.setPrice(req.price());
         subProduct.setDurationDays(req.durationDays());
+        subProduct.setCandyAmount(req.candyAmount());
         return subProductRepository.save(subProduct);
     }
 
