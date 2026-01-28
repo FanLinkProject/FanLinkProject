@@ -7,6 +7,7 @@ import lombok.Builder;
 public record TokenResponse(
     String grantType,// Bearer 설정
     String accessToken,
+    String refreshToken,
     Long accessTokenExpiresIn
     ) {
 }
