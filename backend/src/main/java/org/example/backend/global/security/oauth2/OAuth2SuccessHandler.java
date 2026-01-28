@@ -23,27 +23,37 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Value("http://localhost:3000/oauth2/login/success")
+    @Value("${oauth2.redirect-uri:http://localhost:3000/oauth2/login/success}")
     private String redirectUri;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
 
-        PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
-        User user = principalDetails.getUser();
-        //1. jwt 토큰 생성
-        String token = jwtTokenProvider.createToken(user.getEmail(), user.getRole().name());
+        try {
+            PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
+            User user = principalDetails.getUser();
+            
+            //1. jwt 토큰 생성
+            String token = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
 
-        log.info("OAuth2 로그인 성공 - Email: {}, Role: {}", user.getEmail(), user.getRole());
+            log.info("OAuth2 로그인 성공 - Email: {}, Role: {}", user.getEmail(), user.getRole());
 
-        // 2. 프론트엔드로 리다이렉트 (쿼리 스트링에 토큰 포함)
-        // UriComponentsBuilder를 사용하면 URL 파라미터 생성
-        String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
-                .queryParam("token", token)
-                .queryParam("tokenType", "Bearer")
-                .build().toUriString();
+            // 2. 프론트엔드로 리다이렉트 (쿼리 스트링에 토큰 포함)
+            // UriComponentsBuilder를 사용하면 URL 파라미터 생성
+            String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
+                    .queryParam("token", token)
+                    .queryParam("tokenType", "Bearer")
+                    .build()
+                    .encode() // URL 인코딩 처리
+                    .toUriString();
 
-        getRedirectStrategy().sendRedirect(request, response, targetUrl);
+            log.info("OAuth2 리다이렉트 URL: {}", targetUrl);
+            getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        } catch (Exception e) {
+            log.error("OAuth2 로그인 성공 처리 중 오류 발생", e);
+            // 에러 발생 시 기본 페이지로 리다이렉트
+            response.sendRedirect("http://localhost:3000?error=oauth2_failed");
+        }
     }
 }
