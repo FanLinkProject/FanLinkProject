@@ -1,6 +1,8 @@
 package org.example.backend.comment.entity;
 
-import org.example.backend.global.entity.BaseTimeEntity;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.example.backend.post.entity.Post;
 import org.example.backend.post.enums.WriterType;
 import jakarta.persistence.*;
@@ -11,6 +13,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,8 +21,10 @@ import java.util.List;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "comments")
-@SQLDelete(sql = "UPDATE comments SET is_deleted = true WHERE id = ?")
-public class Comment extends BaseTimeEntity {
+@SQLDelete(sql = "UPDATE comments SET deleted_at = NOW() WHERE id = ?")
+@Where(clause = "deleted_at IS NULL")
+@EntityListeners(AuditingEntityListener.class)
+public class Comment {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -37,7 +42,7 @@ public class Comment extends BaseTimeEntity {
     @Column(name = "writer_type", nullable = false)
     private WriterType writerType;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     // 대댓글 (Self Reference)
@@ -48,9 +53,17 @@ public class Comment extends BaseTimeEntity {
     @OneToMany(mappedBy = "parent", orphanRemoval = false)
     private List<Comment> children = new ArrayList<>();
 
-    // "삭제된 댓글입니다" 표시를 위한 플래그
-    @Column(name = "is_deleted", nullable = false)
-    private boolean isDeleted;
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    // Soft delete를 위한 삭제 시간 기록
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Builder
     public Comment(Post post, Long writerId, WriterType writerType, String content, Comment parent) {
@@ -59,7 +72,6 @@ public class Comment extends BaseTimeEntity {
         this.writerType = writerType;
         this.content = content;
         this.parent = parent;
-        this.isDeleted = false;
     }
 
     public void updateContent(String content) {
@@ -67,6 +79,6 @@ public class Comment extends BaseTimeEntity {
     }
 
     public void delete() {
-        this.isDeleted = true; // 삭제 플래그만 true로 변경
+        this.deletedAt = LocalDateTime.now(); // 삭제 시간 기록
     }
 }

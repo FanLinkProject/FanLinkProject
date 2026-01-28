@@ -1,6 +1,8 @@
 package org.example.backend.post.entity;
 
-import org.example.backend.global.entity.BaseTimeEntity;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.example.backend.post.enums.PostStatus;
 import org.example.backend.post.enums.WriterType;
 import jakarta.persistence.*;
@@ -19,7 +21,16 @@ import java.time.LocalDateTime;
 @Table(name = "posts")
 @SQLDelete(sql = "UPDATE posts SET deleted_at = NOW(), status = 'DELETED' WHERE id = ?")
 @Where(clause = "deleted_at IS NULL")
-public class Post extends BaseTimeEntity {
+@EntityListeners(AuditingEntityListener.class)
+public class Post {
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -37,11 +48,11 @@ public class Post extends BaseTimeEntity {
     private WriterType writerType; // USER or ARTIST
 
     // 3. 게시글 정보
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100) // DB 컬럼 길이 제한
     private String title;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)

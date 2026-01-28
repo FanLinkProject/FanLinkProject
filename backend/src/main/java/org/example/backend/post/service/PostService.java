@@ -1,30 +1,44 @@
 package org.example.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.post.dto.request.PostRequest;
+import org.example.backend.comment.entity.Comment;
+import org.example.backend.comment.repository.CommentRepository;
+import org.example.backend.post.dto.request.PostCreateRequest;
+import org.example.backend.post.dto.request.PostUpdateRequest;
 import org.example.backend.post.dto.response.PostResponse;
 import org.example.backend.post.entity.Post;
 import org.example.backend.post.enums.WriterType;
+import org.example.backend.post.exception.PostErrorCode;
+import org.example.backend.post.exception.PostException;
 import org.example.backend.post.repository.PostRepository;
+import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // 기본적으로 읽기 전용 (성능 최적화)
+@Transactional(readOnly = true)
 public class PostService {
 
     private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
 
     // --- Create ---
-    @Transactional // 쓰기 허용
-    public Long createPost(Long writerId, WriterType writerType, PostRequest request) {
+    @Transactional
+    public Long createPost(User user, PostCreateRequest request) {
+
+        // WriterType 결정 로직 (서비스 내부로 이동)
+        WriterType writerType = resolveWriterType(user.getRole());
+
         Post post = Post.builder()
-                .channelArtistId(request.getChannelArtistId()) // 어느 아티스트 채널에?
-                .writerId(writerId)
-                .writerType(writerType)
+                .channelArtistId(request.getChannelArtistId())
+                .writerId(user.getId())
+                .writerType(writerType)      // 결정된 Type 사용
                 .title(request.getTitle())
                 .content(request.getContent())
                 .build();
@@ -35,7 +49,7 @@ public class PostService {
     // --- Read (Single) ---
     public PostResponse getPost(Long postId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다.")); // 추후 Custom Exception 권장
+                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
         return PostResponse.from(post);
     }
 
@@ -47,33 +61,42 @@ public class PostService {
 
     // --- Update ---
     @Transactional
-    public void updatePost(Long postId, Long currentUserId, WriterType currentUserType, PostRequest request) {
+    public void updatePost(Long postId, User user, PostUpdateRequest request) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다."));
+                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
 
-        // 작성자 본인 확인
-        validateWriter(post, currentUserId, currentUserType);
+        validateWriter(post, user);
 
-        // 객체 값만 바꾸면 트랜잭션 종료 시 자동 UPDATE 쿼리 발생
         post.update(request.getTitle(), request.getContent());
     }
 
     // --- Delete ---
     @Transactional
-    public void deletePost(Long postId, Long currentUserId, WriterType currentUserType) {
+    public void deletePost(Long postId, User user) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게시글입니다."));
+                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
 
-        validateWriter(post, currentUserId, currentUserType);
+        validateWriter(post, user);
 
-        // Soft Delete (Post 엔티티 내부 메서드 호출)
+        List<Comment> comments = commentRepository.findAllByPostId(postId);
+        comments.forEach(Comment::delete);
+
         post.delete();
     }
 
-    // 작성자 검증 내부 메서드
-    private void validateWriter(Post post, Long currentUserId, WriterType currentUserType) {
-        if (!post.getWriterId().equals(currentUserId) || post.getWriterType() != currentUserType) {
-            throw new IllegalStateException("작성자만 수정/삭제할 수 있습니다.");
+    // --- 내부 편의 메서드 ---
+
+    // 1. UserRole -> WriterType 변환
+    private WriterType resolveWriterType(UserRole role) {
+        return (role == UserRole.ARTIST) ? WriterType.ARTIST : WriterType.USER;
+    }
+
+    // 2. 작성자 검증
+    private void validateWriter(Post post, User user) {
+        WriterType currentType = resolveWriterType(user.getRole());
+
+        if (!post.getWriterId().equals(user.getId()) || post.getWriterType() != currentType) {
+            throw new PostException(PostErrorCode.NOT_POST_WRITER);
         }
     }
 }

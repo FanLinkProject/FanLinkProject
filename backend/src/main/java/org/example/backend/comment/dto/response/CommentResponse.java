@@ -25,9 +25,8 @@ public class CommentResponse {
                 .content(comment.getContent())
                 .writerId(comment.getWriterId())
                 .writerType(comment.getWriterType().name())
-                .isDeleted(comment.isDeleted())
+                .isDeleted(comment.getDeletedAt() != null)
                 .createdAt(comment.getCreatedAt())
-                // 대댓글은 Service에서 별도 매핑하거나 여기서 스트림 처리
                 .children(new ArrayList<>())
                 .build();
     }
