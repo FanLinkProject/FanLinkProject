@@ -41,7 +41,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
 
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-
+    //OAuth2
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 tasks.named('test') {
