@@ -63,13 +63,18 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
+    @Column(nullable = false, unique = true)
+    private String orderNo; // 결제 요청용 고유 주문 번호 (UUID)
+
     @Builder
-    public Order(Long userId, BigDecimal totalAmount, Long totalCandyAmount, String name, OrderStatus status) {
+    public Order(Long userId, BigDecimal totalAmount, Long totalCandyAmount, String name, OrderStatus status,
+            String orderNo) {
         this.userId = userId;
         this.totalAmount = totalAmount;
         this.totalCandyAmount = totalCandyAmount;
         this.name = name;
         this.status = status;
+        this.orderNo = (orderNo != null) ? orderNo : java.util.UUID.randomUUID().toString();
     }
 
     public void addOrderItem(OrderItem orderItem) {
