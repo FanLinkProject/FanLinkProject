@@ -16,17 +16,17 @@ public class PrincipalDetails implements UserDetails {
     private final User user;
 
     //OAuth2 도입시 사용 예정
-    //Map<String, Object> attributes;
+//    Map<String, Object> attributes;
 
     public PrincipalDetails(User user) {
         this.user = user;
     }
 
     //Oauth2 도입시 사용예정
-    // public PrincipalDetails(User user, Map<String, Object> attributes) {
-    //     this.attributes = attributes;
-    //     this.user = user;
-    // }
+//     public PrincipalDetails(User user, Map<String, Object> attributes) {
+//         this.attributes = attributes;
+//         this.user = user;
+//     }
 
     //시큐리티-권한정보 반환
     @Override
