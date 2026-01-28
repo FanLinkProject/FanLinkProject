@@ -33,7 +33,7 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "order_id", nullable = false)
+    @Column(name = "order_id") // 구독 결제는 Order 없이 가능
     private Long orderId;
 
     @Column(name = "payment_key", unique = true)
