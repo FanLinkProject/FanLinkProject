@@ -29,7 +29,7 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
     @Override
     public TossPaymentDto.PaymentConfirmResponse confirmPayment(String paymentKey, String orderId, Long amount) {
-        String url = tossPaymentConfig.getBaseUrl() + "/v1/payments/confirm";
+        String url = tossPaymentConfig.getBaseUrl() + "/payments/confirm";
 
         TossPaymentDto.PaymentConfirmRequest request = TossPaymentDto.PaymentConfirmRequest.builder()
                 .paymentKey(paymentKey)
@@ -45,7 +45,7 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
     @Override
     public TossPaymentDto.BillingKeyResponse issueBillingKey(String authKey, String customerKey) {
-        String url = tossPaymentConfig.getBaseUrl() + "/v1/billing/authorizations/issue";
+        String url = tossPaymentConfig.getBaseUrl() + "/billing/authorizations/issue";
 
         TossPaymentDto.BillingKeyRequest request = TossPaymentDto.BillingKeyRequest.builder()
                 .authKey(authKey)
@@ -60,7 +60,7 @@ public class TossPaymentAdapter implements PaymentAdapter {
     @Override
     public TossPaymentDto.PaymentConfirmResponse billingPayment(String billingKey, String customerKey, Long amount,
             String orderId, String orderName) {
-        String url = tossPaymentConfig.getBaseUrl() + "/v1/billing/" + billingKey;
+        String url = tossPaymentConfig.getBaseUrl() + "/billing/" + billingKey;
 
         TossPaymentDto.BillingPaymentRequest request = TossPaymentDto.BillingPaymentRequest.builder()
                 .customerKey(customerKey)
