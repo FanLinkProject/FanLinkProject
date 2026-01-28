@@ -103,4 +103,6 @@ public class User {
         this.status = UserStatus.BANNED; // 탈퇴 시 상태를 BANNED로 변경
     }
 
+    public void updateOAuth2Info(String provider, String providerId) {
+    }
 }
