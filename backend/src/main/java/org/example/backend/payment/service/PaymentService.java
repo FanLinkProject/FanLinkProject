@@ -3,7 +3,6 @@ package org.example.backend.payment.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.order.entity.Order;
-import org.example.backend.order.enums.OrderStatus;
 import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.payment.adapter.PaymentAdapter;
 import org.example.backend.payment.dto.TossPaymentDto;
@@ -28,10 +27,9 @@ public class PaymentService {
     private final OrderRepository orderRepository;
 
     @Transactional
-    public Payment confirmPayment(String paymentKey, String orderIdStr, Long amount) {
-        // 1. 주문 조회
-        Long orderId = Long.parseLong(orderIdStr); // 실제로는 orderId 구조에 따라 파싱 로직 상이할 수 있음
-        Order order = orderRepository.findById(orderId)
+    public Payment confirmPayment(String paymentKey, String orderNo, Long amount) {
+        // 1. 주문 조회 (orderNo로 조회)
+        Order order = orderRepository.findByOrderNo(orderNo)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 주문입니다."));
 
         // 2. 금액 검증 (중요)
@@ -40,23 +38,20 @@ public class PaymentService {
         }
 
         // 3. Toss 결제 승인 요청
-        TossPaymentDto.PaymentConfirmResponse response = paymentAdapter.confirmPayment(paymentKey, orderIdStr, amount);
+        TossPaymentDto.PaymentConfirmResponse response = paymentAdapter.confirmPayment(paymentKey, orderNo, amount);
 
         // 4. 결제 정보 저장
         Payment payment = Payment.builder()
-                .orderId(orderId)
+                .orderId(order.getId()) // DB FK는 여전히 ID 사용
                 .paymentKey(paymentKey)
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
                 .status(PaymentStatus.DONE)
-                .method(PaymentMethod.valueOf(response.getMethod())) // "CARD" -> Enum 매핑 필요 (주의: Toss 응답값과 Enum 일치 여부
-                                                                     // 확인)
-                .paidAt(LocalDateTime.parse(response.getApprovedAt())) // ISO_OFFSET_DATE_TIME 파싱 확인 필요
+                .method(convertPaymentMethod(response.getMethod()))
+                .paidAt(LocalDateTime.parse(response.getApprovedAt(),
+                        java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
                 .build();
 
         paymentRepository.save(payment);
-
-        // 5. 주문 상태 업데이트 (추후 OrderService로 위임 가능)
-        // order.complete(); // Order 엔티티에 비즈니스 메서드 추가 필요
 
         return payment;
     }
@@ -94,5 +89,18 @@ public class PaymentService {
                 .build();
 
         return paymentRepository.save(payment);
+    }
+
+    // Toss Payments 한글 응답값을 Enum으로 변환
+    private PaymentMethod convertPaymentMethod(String tossMethod) {
+        return switch (tossMethod) {
+            case "카드" -> PaymentMethod.CARD;
+            case "가상계좌" -> PaymentMethod.VIRTUAL_ACCOUNT;
+            case "토스페이" -> PaymentMethod.TOSS_PAY;
+            default -> {
+                log.warn("알 수 없는 결제 수단: {}", tossMethod);
+                yield PaymentMethod.CARD; // 기본값
+            }
+        };
     }
 }
