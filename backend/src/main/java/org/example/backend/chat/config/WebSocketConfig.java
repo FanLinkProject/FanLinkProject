@@ -43,7 +43,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		registry.addEndpoint("/ws-chat")
-			.setAllowedOrigins("*");// CORS 허용
+                .setAllowedOriginPatterns("*") // CORS 허용(모든 도메인)
+                .withSockJS(); // SockJS 활성화
 	}
 
 	/**
