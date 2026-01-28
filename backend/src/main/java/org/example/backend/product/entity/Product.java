@@ -38,7 +38,7 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column
     private Long price; // 현금 결제 가격 (원 단위)
 
     @Column(name = "candy_price")
