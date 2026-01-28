@@ -3,6 +3,7 @@ package org.example.backend.payment.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.order.entity.Order;
+import org.example.backend.order.entity.OrderItem;
 import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.payment.adapter.PaymentAdapter;
 import org.example.backend.payment.dto.TossPaymentDto;
@@ -10,6 +11,11 @@ import org.example.backend.payment.entity.Payment;
 import org.example.backend.payment.enums.PaymentMethod;
 import org.example.backend.payment.enums.PaymentStatus;
 import org.example.backend.payment.repository.PaymentRepository;
+import org.example.backend.product.entity.Product;
+import org.example.backend.product.enums.ProductType;
+import org.example.backend.settlement.entity.SettlementPending;
+import org.example.backend.settlement.enums.SettlementSourceType;
+import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +31,7 @@ public class PaymentService {
     private final PaymentAdapter paymentAdapter;
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final SettlementPendingRepository settlementPendingRepository;
 
     @Transactional
     public Payment confirmPayment(String paymentKey, String orderNo, Long amount) {
@@ -51,9 +58,12 @@ public class PaymentService {
                         java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
                 .build();
 
-        paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
 
-        return payment;
+        // 5. 정산 대기 데이터 생성 (캔디 충전 제외)
+        createSettlementPendingIfNeeded(order, savedPayment);
+
+        return savedPayment;
     }
 
     @Transactional
@@ -89,6 +99,54 @@ public class PaymentService {
                 .build();
 
         return paymentRepository.save(payment);
+    }
+
+    // 정산 대기 데이터 생성 (캔디 충전 제외)
+    private void createSettlementPendingIfNeeded(Order order, Payment payment) {
+        for (OrderItem item : order.getOrderItems()) {
+            Product product = item.getProduct();
+
+            // 캔디 충전 상품은 정산 대상이 아님
+            if (product.getType() == ProductType.CANDY_CHARGE) {
+                log.debug("캔디 충전 상품이므로 정산 대기열 생성 생략: {}", product.getName());
+                continue;
+            }
+
+            // artistId가 없는 경우 (플랫폼 상품) 처리
+            if (product.getArtistId() == null) {
+                log.warn("아티스트 ID가 없는 상품: {}", product.getName());
+                continue;
+            }
+
+            // 정산 소스 타입 결정
+            SettlementSourceType sourceType = determineSourceType(product.getType());
+
+            // 정산 금액 계산 (단가 * 수량)
+            Long settlementAmount = item.getPrice().longValue() * item.getQuantity();
+
+            // SettlementPending 생성
+            SettlementPending pending = SettlementPending.builder()
+                    .paymentId(payment.getId())
+                    .artistId(product.getArtistId())
+                    .amount(settlementAmount)
+                    .orderName(product.getName())
+                    .sourceType(sourceType)
+                    .build();
+
+            settlementPendingRepository.save(pending);
+
+            log.info("정산 대기열 생성: artistId={}, amount={}, product={}",
+                    product.getArtistId(), settlementAmount, product.getName());
+        }
+    }
+
+    // ProductType -> SettlementSourceType 변환
+    private SettlementSourceType determineSourceType(ProductType productType) {
+        return switch (productType) {
+            case GOODS -> SettlementSourceType.PRODUCT;
+            case MEMBERSHIP -> SettlementSourceType.SUBSCRIPTION;
+            case CANDY_CHARGE -> SettlementSourceType.CANDY; // 실제로는 호출되지 않음
+        };
     }
 
     // Toss Payments 한글 응답값을 Enum으로 변환
