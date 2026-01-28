@@ -6,27 +6,29 @@ import org.example.backend.user.enums.UserStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 
 @Getter
-public class PrincipalDetails implements UserDetails {
+public class PrincipalDetails implements UserDetails, OAuth2User {
 
     private final User user;
 
     //OAuth2 도입시 사용 예정
-    //Map<String, Object> attributes;
+    Map<String, Object> attributes;
 
     public PrincipalDetails(User user) {
         this.user = user;
     }
 
     //Oauth2 도입시 사용예정
-    // public PrincipalDetails(User user, Map<String, Object> attributes) {
-    //     this.attributes = attributes;
-    //     this.user = user;
-    // }
+     public PrincipalDetails(User user, Map<String, Object> attributes) {
+         this.attributes = attributes;
+         this.user = user;
+     }
 
     //시큐리티-권한정보 반환
     @Override
