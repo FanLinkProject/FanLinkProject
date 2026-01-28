@@ -63,6 +63,10 @@ public class SecurityConfig {
                     "/error"                  // 에러 페이지(인증안된 경로 일때 )
                 ).permitAll()
 
+                .requestMatchers(
+					"/ws-chat/**"
+                ).permitAll()
+
                 // 관리자
                 .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
