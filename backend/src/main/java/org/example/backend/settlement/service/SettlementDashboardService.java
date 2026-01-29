@@ -7,6 +7,8 @@ import org.example.backend.settlement.dto.response.SettlementEstimateResponse;
 import org.example.backend.settlement.dto.response.SettlementHistoryResponse;
 import org.example.backend.settlement.entity.Settlement;
 import org.example.backend.settlement.enums.SettlementSourceType;
+import org.example.backend.settlement.exception.SettlementErrorCode;
+import org.example.backend.settlement.exception.SettlementException;
 import org.example.backend.settlement.repository.SettlementDetailRepository;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.example.backend.settlement.repository.SettlementRepository;
@@ -71,11 +73,11 @@ public class SettlementDashboardService {
      */
     public List<SettlementDetailResponse> getSettlementDetails(Long artistId, Long settlementId) {
         Settlement settlement = settlementRepository.findById(settlementId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않은 정산 내역입니다."));
+                .orElseThrow(() -> new SettlementException(SettlementErrorCode.SETTLEMENT_NOT_FOUND));
 
         // 보안 검증
         if (!settlement.getArtistId().equals(artistId)) {
-            throw new SecurityException("해당 정산 내역에 접근할 권한이 없습니다.");
+            throw new SettlementException(SettlementErrorCode.SETTLEMENT_ACCESS_DENIED);
         }
 
         return detailRepository.findAllBySettlementId(settlementId)
