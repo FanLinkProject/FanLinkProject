@@ -1,23 +1,26 @@
 package org.example.backend.settlement.entity;
 
-import org.example.backend.global.entity.BaseTimeEntity;
 import org.example.backend.settlement.enums.SettlementStatus;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
+@EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "settlements", indexes = {
         @Index(name = "idx_settlement_artist", columnList = "artist_id") // 조회 성능 최적화
 })
-public class Settlement extends BaseTimeEntity {
+public class Settlement {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -43,6 +46,15 @@ public class Settlement extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SettlementStatus status;
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private java.time.LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(nullable = false)
+    private java.time.LocalDateTime updatedAt;
+
 
     @Column(nullable = false)
     private LocalDateTime settledAt; //지급 일시 : 정산 배치 이후 바로 지급 가정(테스트 결제이므로 실제 송금 로직 구현 x)

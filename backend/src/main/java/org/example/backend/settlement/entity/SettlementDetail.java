@@ -3,6 +3,8 @@ package org.example.backend.settlement.entity;
 import org.example.backend.settlement.enums.SettlementSourceType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 
@@ -14,6 +16,7 @@ import java.math.BigDecimal;
 
 @Entity
 @Getter
+@EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "settlement_details", indexes = {
         @Index(name = "idx_detail_settlement", columnList = "settlement_id") // 조회 성능 최적화
@@ -46,6 +49,11 @@ public class SettlementDetail {
 
     @Column(nullable = false)
     private Long settlementAmount; // 아티스트 지급 인정액 (매출 * 비율)
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private java.time.LocalDateTime createdAt;
+
 
     @Builder
     public SettlementDetail(Settlement settlement, Long paymentId, SettlementSourceType sourceType,
