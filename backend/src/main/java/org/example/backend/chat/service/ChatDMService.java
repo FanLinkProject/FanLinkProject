@@ -30,6 +30,11 @@ public class ChatDMService {
     private final UserRepository userRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
 
+	@Transactional
+	public Long getCurrentUserId(String email) {
+		User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
+		return user.getId();
+	}
 
     //chatroom 생성
     @Transactional

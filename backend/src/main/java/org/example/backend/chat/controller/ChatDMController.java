@@ -2,6 +2,8 @@ package org.example.backend.chat.controller;
 
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.example.backend.chat.dto.request.ChatRoomRequest;
 import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.example.backend.chat.dto.response.ChatRoomResponse;
@@ -10,16 +12,27 @@ import org.example.backend.global.security.details.PrincipalDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/chat/DM")
+@Slf4j
 public class ChatDMController {
 	private final ChatDMService chatDMService;
+
+	// -----------------------------------
+	// 0. 프론트에서 userId 조회하기 위한 API
+	// POST /api/chat/DM/userId
+	// -----------------------------------
+	@PostMapping("/userId")
+	public Long getCurrentUserId(@RequestBody Map<String, String> body) {
+		String email = body.get("email");
+		return chatDMService.getCurrentUserId(email);
+	}
 
 	// -----------------------------------
 	// 1. 채팅방 생성
@@ -38,6 +51,7 @@ public class ChatDMController {
 	// -----------------------------------
 	@GetMapping("/rooms")
 	public ResponseEntity<List<ChatRoomResponse>> getChatRoomList(@AuthenticationPrincipal PrincipalDetails principal) {
+		log.info("senderId={}", principal.getUserId());
 		List<ChatRoomResponse> responses = chatDMService.findChatDMRoomList(principal.getUserId());
 		return ResponseEntity.ok().body(responses);
 	}

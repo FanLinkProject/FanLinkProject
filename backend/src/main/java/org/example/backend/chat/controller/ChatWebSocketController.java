@@ -1,8 +1,12 @@
 package org.example.backend.chat.controller;
 
+import java.security.Principal;
+
 import org.example.backend.chat.dto.request.ChatMessageRequest;
 import org.example.backend.chat.service.ChatService;
+import org.example.backend.global.security.details.PrincipalDetails;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
 
 import lombok.RequiredArgsConstructor;
@@ -50,7 +54,8 @@ public class ChatWebSocketController {
 	 * - ChatService에서 getCurrentUser()로 실제 발신자 확인
 	 */
 	@MessageMapping("/chat/send")
-	public void send(ChatMessageRequest request) {
-		chatService.handleMessage(request);
+	public void send(@Payload ChatMessageRequest request, Principal principal) {
+		PrincipalDetails loginUser = (PrincipalDetails) ((org.springframework.security.core.Authentication) principal).getPrincipal();
+		chatService.handleMessage(loginUser.getUser(), request);
 	}
 }

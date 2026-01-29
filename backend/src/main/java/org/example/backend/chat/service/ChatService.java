@@ -49,10 +49,10 @@ public class ChatService {
 	 * - 실제 운영에서는 WebSocket 세션/JWT(SecurityContext)에서 사용자 식별해야 함
 	 */
 	@Transactional
-	public void handleMessage(ChatMessageRequest request) {
+	public void handleMessage(User user, ChatMessageRequest request) {
 
 		// 1) 발신자 조회(현재는 senderId로 임시 조회)
-		User sender = getCurrentUser(request.getSenderId());
+		User sender = getCurrentUser(user.getId());
 
 		// 2) 채팅방 조회
 		ChatRoom room = chatRoomRepository.findById(request.getRoomId())
