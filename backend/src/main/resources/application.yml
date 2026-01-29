@@ -1,11 +1,11 @@
-server:
-  port: 8080
-
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE:fanlinkdb}
-    username: ${MYSQL_USER}
-    password: ${MYSQL_PASSWORD}
+    # 한글 깨짐 방지
+    # - characterEncoding은 "utf8mb4"가 아니라 자바 charset 이름인 "UTF-8"을 써야 합니다.
+    # - 실제 저장/정렬은 서버/테이블의 utf8mb4 + connectionCollation으로 처리됩니다.
+    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE:fanlink}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&useSSL=false&serverTimezone=Asia/Seoul
+    username: ${MYSQL_USER:fanlink_user}
+    password: ${MYSQL_PASSWORD:fanlink_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -15,3 +15,47 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+
+  # OAuth2 클라이언트 설정 (카카오)
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID:4b55ce3a07a0c8d93d310a3c262dec7b}
+            client-secret: ${KAKAO_CLIENT_SECRET:tl2foNydbXZ2GaGFYd7uOgHmagezWiZC}
+            # OAuth2 인증 후 리다이렉트될 백엔드 URI (Spring Security 기본 형식)
+            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+            # 클라이언트 인증 방식: POST 방식으로 Client Secret 전송
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            scope:
+              - profile_nickname  # 프로필 닉네임
+              - profile_image     # 프로필 사진
+              - account_email      # 계정 이메일
+              - name              # 이름
+              - gender            # 성별
+              - age_range         # 연령대
+              - birthday          # 생일
+              - birthyear         # 출생 연도
+              - phone_number      # 전화번호
+            client-name: Kakao
+
+        provider:
+          kakao:
+            # 카카오 OAuth2 인증 서버 URI
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            # 카카오 OAuth2 토큰 발급 URI
+            token-uri: https://kauth.kakao.com/oauth/token
+            # 카카오 사용자 정보 조회 URI
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            # 사용자 이름 속성 (카카오는 "id" 사용)
+            user-name-attribute: id
+
+server:
+  port: 8080
+
+# OAuth2 로그인 성공 후 프론트엔드로 리다이렉트할 URI
+# 환경 변수 OAUTH2_REDIRECT_URI로 설정 가능
+oauth2:
+  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000}

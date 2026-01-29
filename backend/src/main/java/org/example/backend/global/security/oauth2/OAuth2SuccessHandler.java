@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.user.entity.User;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -23,26 +22,26 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Value("${oauth2.redirect-uri:http://localhost:3000/oauth2/login/success}")
+    @Value("${oauth2.redirect-uri:http://localhost:3000}")
     private String redirectUri;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
-
         try {
+            // 1. 인증된 사용자 정보 추출
             PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
             User user = principalDetails.getUser();
             
-            //1. jwt 토큰 생성
-            String token = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
+            // 2. JWT 토큰 생성 (이메일과 역할을 포함)
+            String refreshToken = jwtTokenProvider.createRefreshToken(user.getEmail(), user.getRole().getValue());
+            String accessToken = jwtTokenProvider.createAccessToken(user.getEmail(), user.getRole().getValue());
 
-            log.info("OAuth2 로그인 성공 - Email: {}, Role: {}", user.getEmail(), user.getRole());
 
-            // 2. 프론트엔드로 리다이렉트 (쿼리 스트링에 토큰 포함)
-            // UriComponentsBuilder를 사용하면 URL 파라미터 생성
+            // 3. 프론트엔드로 리다이렉트 (토큰을 쿼리 파라미터로 전달)
             String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
-                    .queryParam("token", token)
+                    .queryParam("refreshToken", refreshToken)
+                    .queryParam("accessToken", accessToken)
                     .queryParam("tokenType", "Bearer")
                     .build()
                     .encode() // URL 인코딩 처리
