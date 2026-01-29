@@ -40,29 +40,27 @@ public class AuthService {
             throw new RuntimeException("이미 존재하는 닉네임입니다: " + request.nickname());
         }
 
-        // User 엔티티 생성
+        // User 엔티티 생성(정적 팩토리 메서드 활용)
         User user = User.of(
                 request.email(),
                 request.nickname(),
+                request.name(),
                 passwordEncoder.encode(request.password()),
+                request.gender(),
+                request.birth(),
+                request.phoneNumber(),
+                request.privacyPolicyAgreed(),
                 UserRole.USER
         );
-
-        // 추가 필드 설정
-        user.setName(request.name());
-        user.setGender(request.gender());
-        user.setBirth(request.birth());
-        user.setPrivacyPolicyAgreed(request.privacyPolicyAgreed() != null ? request.privacyPolicyAgreed() : false);
-        user.setPhoneNumber(request.phoneNumber());
 
         // User 저장
         User savedUser = userRepository.save(user);
 
         // JWT 토큰 생성
-        String accessToken = jwtTokenProvider.createToken(savedUser.getEmail(), savedUser.getRole().getValue());
-        String refreshToken = jwtTokenProvider.createToken(savedUser.getEmail(), savedUser.getRole().getValue());
+        String accessToken = jwtTokenProvider.createAccessToken(savedUser.getEmail(), savedUser.getRole().getValue());
+        String refreshToken = jwtTokenProvider.createRefreshToken(savedUser.getEmail(), savedUser.getRole().getValue());
 
-        // RefreshToken 저장
+        // Redis-RefreshToken 저장
         refreshTokenStore.save(savedUser.getEmail(), refreshToken);
 
         return SignupResponse.from(savedUser, accessToken, refreshToken);
@@ -86,13 +84,13 @@ public class AuthService {
         }
 
         // JWT 토큰 생성
-        String accessToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
-        //String refreshToken = jwtTokenProvider.createToken(user.getEmail(), user.getRole().getValue());
+        String accessToken = jwtTokenProvider.createAccessToken(user.getEmail(), user.getRole().getValue());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getEmail(), user.getRole().getValue());
 
-        // RefreshToken 저장
-        //refreshTokenStore.save(user.getEmail(), refreshToken);
-        return new TokenResponse("bearer", accessToken, 3600000L);
-        //return TokenResponse(accessToken);//, refreshToken);
+        // Redis-RefreshToken 저장
+        refreshTokenStore.save(user.getEmail(), refreshToken);
+
+        return new TokenResponse("bearer", accessToken, refreshToken, 3600000L);
     }
 
     // 로그아웃
@@ -104,13 +102,13 @@ public class AuthService {
 
         String email = jwtTokenProvider.getUserEmail(refreshToken);
 
-        // RefreshToken 삭제
+        // Redis에서 삭제
         refreshTokenStore.delete(email);
         SecurityContextHolder.clearContext();
     }
 
     // 회원 탈퇴
-    public void delete() {
+    public void signout(Long userId) {
         // 사용자 정보
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -121,14 +119,18 @@ public class AuthService {
         PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
         User user = principalDetails.getUser();
 
+
         // 이미 탈퇴한 사용자인지 확인
-        if (user.getDeletedAt() != null) {
+        User currentUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
+        if (currentUser.getDeletedAt() != null) {
             throw new RuntimeException("이미 탈퇴한 계정입니다.");
         }
 
-        // 회원 탈퇴 처리
-        user.delete();
-        userRepository.save(user);
+        // 회원 탈퇴 처리(소프트삭제)
+        currentUser.delete();
+        //Redis 토큰 삭제
+        refreshTokenStore.delete(user.getEmail());
 
         SecurityContextHolder.clearContext();
     }

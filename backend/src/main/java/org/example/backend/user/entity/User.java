@@ -5,6 +5,7 @@ import lombok.*;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 @Getter
 @Setter
+@EntityListeners(AuditingEntityListener.class)
 public class User {
 
     @Id
@@ -32,7 +34,7 @@ public class User {
     @Column(name="name", nullable = false)
     private String name;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password", nullable = true)
     private String password; // TODO : 암호화
 
     @Column(name = "gender", nullable = false)
@@ -49,7 +51,7 @@ public class User {
     private String phoneNumber; // TODO : 암호화
 
     @Column(name = "candy")
-    private Integer candy;
+    private Long candy;
 
     @Column(name = "profile_image_url")
     private String profileImageUrl; // TODO : URL주소 추가 필요
@@ -81,19 +83,29 @@ public class User {
     public static User of(
             String email,
             String nickname,
+            String name,
             String encodedPassword,
+            String gender,
+            String birth,
+            String phoneNumber,
+            Boolean privacyPolicyAgreed,
             UserRole role
     ) {
         User user = new User();
         user.setEmail(email);
         user.setNickname(nickname);
+        user.setName(name);
         user.setPassword(encodedPassword);
+        user.setGender(gender);
+        user.setBirth(birth);
+        user.setPhoneNumber(phoneNumber);
+        user.setPrivacyPolicyAgreed(privacyPolicyAgreed != null ? privacyPolicyAgreed : false);
         user.setRole(role);
-        user.setProvider("local");
-        user.setProviderId(email);
+        user.setProvider("LOCAL");
+        user.setProviderId("NONE");
         user.setStatus(UserStatus.ACTIVE);
-        user.setCreatedAt(LocalDateTime.now());
-        user.setCandy(0);
+        user.setCandy(0L);
+
         return user;
     }
 
@@ -101,6 +113,24 @@ public class User {
     public void delete() {
         this.deletedAt = LocalDateTime.now();
         this.status = UserStatus.BANNED; // 탈퇴 시 상태를 BANNED로 변경
+    }
+
+    public void chargeCandy(Long amount) {
+        if (this.candy == null) {
+            this.candy = 0L;
+        }
+        this.candy += amount;
+    }
+
+    // 캔디사용 로직 추가-결제팀
+    public void useCandy(Long amount) {
+        if (this.candy == null) {
+            this.candy = 0L;
+        }
+        if (this.candy < amount) {
+            throw new IllegalArgumentException("Not enough candy");
+        }
+        this.candy -= amount;
     }
 
 }
