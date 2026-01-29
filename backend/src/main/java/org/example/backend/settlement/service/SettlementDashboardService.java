@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,6 +51,7 @@ public class SettlementDashboardService {
             // 예: 캔디 100개(개당 100원) 사용 -> DB amount: 10,000원 -> 정산금: 10,000 * 0.2 = 2,000원
             long settlementAmount = BigDecimal.valueOf(totalSales)
                     .multiply(type.getDefaultShareRatio())
+                    .setScale(0, RoundingMode.FLOOR)
                     .longValue();
 
             totalEstimatedAmount += settlementAmount;

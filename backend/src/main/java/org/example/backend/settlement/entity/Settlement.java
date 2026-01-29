@@ -13,6 +13,13 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/*
+ * 정산서 (Settlement Statement)
+ * - 역할: 특정 기간(startDate ~ endDate) 동안의 정산 집계 결과입니다.
+ * - 상태: 생성 시점(COMPLETE) 이후에는 원칙적으로 데이터가 변경되지 않아야 합니다.
+ * - 관계: 하나의 정산서는 여러 개의 상세 내역(SettlementDetail)을 가집니다.
+ */
+
 @Entity
 @Getter
 @EntityListeners(AuditingEntityListener.class)
@@ -38,10 +45,10 @@ public class Settlement {
     private Long totalSalesAmount; // 총 매출
 
     @Column(nullable = false)
-    private Long feeAmount;        // 수수료
+    private Long feeAmount;        // 플랫폼 수수료 (총 매출 - 최종 지급액)
 
     @Column(nullable = false)
-    private Long finalAmount;      // 최종 지급액
+    private Long finalAmount;      // 실 지급액 (Artist Wallet으로 송금될 금액)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -73,7 +80,8 @@ public class Settlement {
         this.status = SettlementStatus.COMPLETE;
         this.settledAt = LocalDateTime.now();
     }
-
+    // 기본적으로 정산서는 생성후 수정 x
+    // 해당 메서드는 재정산 로직 구현부 사용
     public void updateTotals(Long totalSalesAmount, Long feeAmount, Long finalAmount) {
         this.totalSalesAmount = totalSalesAmount;
         this.feeAmount = feeAmount;

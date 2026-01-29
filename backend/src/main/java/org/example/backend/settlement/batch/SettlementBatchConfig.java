@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.settlement.entity.*;
 import org.example.backend.settlement.repository.*;
 import org.example.backend.user.entity.User;
-import org.example.backend.user.enums.UserRole;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -27,6 +26,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+/**
+ * [정산 배치 설정]
+ * - 흐름: Reader(아티스트 조회) -> Processor(집계 및 계산) -> Writer(저장 및 정리)
+ */
 
 @Slf4j
 @Configuration
@@ -63,7 +67,7 @@ public class SettlementBatchConfig {
         return new JpaPagingItemReaderBuilder<User>()
                 .name("artistReader")
                 .entityManagerFactory(entityManagerFactory)
-                // User 엔티티에서 role이 ARTIST인 사람만 조회
+                // User 엔티티에서 role이 ARTIST인 사람만 조회 (ID순 정렬 필수)
                 .queryString("SELECT u FROM User u WHERE u.role = 'ARTIST' ORDER BY u.id ASC")
                 .pageSize(10)
                 .build();
@@ -96,11 +100,12 @@ public class SettlementBatchConfig {
             // [안전장치 2] 정산할 내역이 없으면 스킵
             if (pendings.isEmpty()) return null;
 
-            // 정산 계산 로직
+            // 정산 집계 변수 초기화
             long totalSales = 0;
             long finalAmount = 0;
             List<SettlementDetail> details = new ArrayList<>();
 
+            // 정산서 객체 생성 (금액은 0원으로 초기화해두고 아래에서 update)
             Settlement settlement = Settlement.builder()
                     .artistId(user.getId())
                     .startDate(startDate)
@@ -112,24 +117,35 @@ public class SettlementBatchConfig {
             for (SettlementPending pending : pendings) {
                 BigDecimal ratio = pending.getSourceType().getDefaultShareRatio();
 
+
+                // SettlementDetail의 @Builder(생성자) 내부에서
+                // .setScale(0, RoundingMode.FLOOR)가 실행되어 '버림' 처리된 금액이 생성됩니다.
                 SettlementDetail detail = SettlementDetail.builder()
                         .settlement(settlement)
                         .paymentId(pending.getPaymentId())
                         .sourceType(pending.getSourceType())
                         .titleSnapshot(pending.getOrderName())
-                        .salesAmount(pending.getAmount())
+                        .salesAmount(pending.getAmount()) // 원금 전달
                         .shareRatio(ratio)
                         .build();
 
                 details.add(detail);
+
                 totalSales += pending.getAmount();
+
+                // finalAmount는 배치에서 별도로 계산하지 않고,
+                // Entity가 계산 완료한 값(detail.getSettlementAmount)을 신뢰하여 합산합니다.
+                // 이를 통해 Entity와 Batch 간의 계산 로직 불일치 가능성을 0%로 만듭니다.
                 finalAmount += detail.getSettlementAmount();
             }
 
+            // 집계된 총액을 정산서에 반영 (매출액, 수수료, 실지급액)
             settlement.updateTotals(totalSales, totalSales - finalAmount, finalAmount);
+
+            // 처리 완료된 대기열 ID 리스트 추출
             List<Long> pendingIds = pendings.stream().map(SettlementPending::getId).collect(Collectors.toList());
 
-            // 반환 객체 빌더: SettlementBatchData
+            // Writer로 전달
             return SettlementBatchData.builder()
                     .settlement(settlement)
                     .details(details)
@@ -139,12 +155,16 @@ public class SettlementBatchConfig {
     }
 
     @Bean
-    // 입력 타입: SettlementBatchData
     public ItemWriter<SettlementBatchData> settlementWriter() {
         return items -> {
             for (SettlementBatchData item : items) {
+                // 1. 정산서 저장 (ID 생성)
                 settlementRepository.save(item.getSettlement());
+
+                // 2. 상세 내역 저장
                 detailRepository.saveAll(item.getDetails());
+
+                // 3. 처리된 대기열 삭제 (Clean up)
                 pendingRepository.deleteAllByIdIn(item.getPendingIds());
             }
         };

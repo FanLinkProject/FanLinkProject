@@ -11,6 +11,14 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
+/**
+ * [정산 스케줄러]
+ * 배치를 트리거하는 역할을 수행합니다.
+ * - 일정: 매월 15일 새벽 4시 실행.
+ * - 기능: 실행 시점의 날짜를 계산하여 JobParameter로 주입하며,
+ * Spring Batch의 중복 실행 방지 메커니즘을 활용.
+ */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

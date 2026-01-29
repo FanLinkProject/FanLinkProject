@@ -12,7 +12,7 @@ public enum SettlementSourceType {
     SUBSCRIPTION("구독 멤버십", BigDecimal.valueOf(0.9)),
 
     // 캔디: 아티스트 20% (서비스 80%)
-    CANDY("캔디 후원", BigDecimal.valueOf(0.2));
+    CANDY("캔디", BigDecimal.valueOf(0.2));
 
     private final String description;
     private final BigDecimal defaultShareRatio; // 기본 정산 비율 (계산 로직 참조용)
