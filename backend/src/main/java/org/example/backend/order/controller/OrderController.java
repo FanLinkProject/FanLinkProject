@@ -18,6 +18,10 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    /**
+     * 테스트용 PENDING 주문 정보를 반환합니다.
+     * 프론트엔드에서 결제 테스트를 위해 임시로 사용됩니다.
+     */
     @GetMapping("/test-pending")
     public ResponseEntity<Map<String, Object>> getTestPendingOrder() {
         String orderNo = orderService.getTestPendingOrderNo();

@@ -27,6 +27,10 @@ public class TossPaymentAdapter implements PaymentAdapter {
         return headers;
     }
 
+    /**
+     * Toss Payments API에 결제 승인을 요청합니다.
+     * 프론트엔드에서 성공적으로 결제 인증을 마친 후 호출됩니다.
+     */
     @Override
     public TossPaymentDto.PaymentConfirmResponse confirmPayment(String paymentKey, String orderId, Long amount) {
         String url = tossPaymentConfig.getBaseUrl() + "/payments/confirm";
@@ -43,6 +47,10 @@ public class TossPaymentAdapter implements PaymentAdapter {
         return restTemplate.postForObject(url, entity, TossPaymentDto.PaymentConfirmResponse.class);
     }
 
+    /**
+     * Toss Payments API에 빌링키 발급을 요청합니다.
+     * 카드 정보를 등록하고 나중에 자동 결제를 수행하기 위해 사용됩니다.
+     */
     @Override
     public TossPaymentDto.BillingKeyResponse issueBillingKey(String authKey, String customerKey) {
         String url = tossPaymentConfig.getBaseUrl() + "/billing/authorizations/issue";
@@ -57,6 +65,10 @@ public class TossPaymentAdapter implements PaymentAdapter {
         return restTemplate.postForObject(url, entity, TossPaymentDto.BillingKeyResponse.class);
     }
 
+    /**
+     * 발급받은 빌링키를 사용하여 결제 승인을 요청합니다.
+     * 정기 결제(구독) 시 스케줄러에 의해 호출됩니다.
+     */
     @Override
     public TossPaymentDto.PaymentConfirmResponse billingPayment(String billingKey, String customerKey, Long amount,
             String orderId, String orderName) {

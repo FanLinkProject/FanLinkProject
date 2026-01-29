@@ -16,6 +16,14 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
 
+    /**
+     * 테스트를 위한 PENDING 상태의 주문 번호를 조회합니다.
+     * 실제 운영 환경에서는 사용되지 않으며, 결제 테스트 시 유효한 orderNo를 제공하기 위함입니다.
+     *
+     * @return 테스트용 주문 번호 (PENDING 상태)
+     * @throws IllegalArgumentException 테스트 데이터가 없을 경우
+     * @throws IllegalStateException    주문이 이미 결제 완료된 경우
+     */
     public String getTestPendingOrderNo() {
         // PENDING 상태의 첫 번째 주문 조회 (테스트용)
         Order order = orderRepository.findById(3L)

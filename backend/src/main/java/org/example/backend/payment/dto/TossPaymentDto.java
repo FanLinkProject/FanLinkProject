@@ -7,6 +7,10 @@ import lombok.AllArgsConstructor;
 
 public class TossPaymentDto {
 
+    /**
+     * 결제 승인 요청 DTO
+     * (프론트엔드 -> 백엔드 -> Toss API)
+     */
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -17,6 +21,10 @@ public class TossPaymentDto {
         private Long amount;
     }
 
+    /**
+     * 결제 승인 응답 DTO
+     * (Toss API -> 백엔드 -> 서비스 로직)
+     */
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -35,6 +43,10 @@ public class TossPaymentDto {
         private Long totalAmount;
     }
 
+    /**
+     * 빌링키 발급 요청 DTO
+     * authKey는 위젯에서 받은 1회용 인증 키입니다.
+     */
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -57,6 +69,10 @@ public class TossPaymentDto {
         private Card card;
     }
 
+    /**
+     * 빌링키 결제 요청 DTO (자동 결제)
+     * billingKey는 URL Path Variable로 전달되므로 여기에 포함되지 않습니다.
+     */
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor

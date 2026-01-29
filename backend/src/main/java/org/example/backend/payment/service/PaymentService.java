@@ -33,6 +33,15 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final SettlementPendingRepository settlementPendingRepository;
 
+    /**
+     * 결제 승인 요청을 처리합니다. (단건 결제)
+     * 가장 중요한 로직은 주문 금액 검증과 결제 승인 후 정산 데이터 생성입니다.
+     *
+     * @param paymentKey Toss Payments 결제 키
+     * @param orderNo    주문 번호
+     * @param amount     결제 금액
+     * @return 저장된 Payment 엔티티
+     */
     @Transactional
     public Payment confirmPayment(String paymentKey, String orderNo, Long amount) {
         // 1. 주문 조회 (orderNo로 조회)
@@ -66,6 +75,15 @@ public class PaymentService {
         return savedPayment;
     }
 
+    /**
+     * 정기 결제를 위한 빌링키를 발급받습니다.
+     * 이 메서드는 빌링키 발급만 수행하며, 실제 결제는 이루어지지 않습니다.
+     *
+     * @param authKey     Toss 위젯에서 받은 인증 키
+     * @param customerKey 고객 식별 키
+     * @param userId      유저 ID
+     * @return 발급된 빌링키
+     */
     @Transactional
     public String issueBillingKey(String authKey, String customerKey, Long userId) {
         // 1. Toss 빌링키 발급 요청
@@ -78,6 +96,16 @@ public class PaymentService {
         return response.getBillingKey();
     }
 
+    /**
+     * 발급된 빌링키를 사용하여 정기 결제를 수행합니다.
+     * 스케줄러에 의해 주기적으로 호출됩니다.
+     *
+     * @param billingKey  발급받은 빌링키
+     * @param customerKey 고객 식별 키
+     * @param amount      결제 금액
+     * @param orderId     주문 ID (구독 갱신 시에는 가상의 ID 사용 가능)
+     * @return 결제 완료된 Payment 정보
+     */
     @Transactional
     public Payment billingPayment(String billingKey, String customerKey, Long amount, Long orderId) {
         // 1. 주문 조회 및 검증
@@ -102,6 +130,8 @@ public class PaymentService {
     }
 
     // 정산 대기 데이터 생성 (캔디 충전 제외)
+    // 캔디 충전은 정산 대상이 아니며, 아티스트 상품(MD, 멤버십 등) 구매 시에만 정산 데이터(SettlementPending)가
+    // 생성됩니다.
     private void createSettlementPendingIfNeeded(Order order, Payment payment) {
         for (OrderItem item : order.getOrderItems()) {
             Product product = item.getProduct();
