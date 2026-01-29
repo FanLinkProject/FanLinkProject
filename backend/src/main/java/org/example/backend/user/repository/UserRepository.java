@@ -26,5 +26,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 상태 조회
     Page<User> findByStatus(UserStatus status, Pageable pageable);
 
-    Optional<User> findByProviderAndProviderId(String provider, String provider1);
+    // OAuth2 사용자 조회
+    Optional<User> findByProviderAndProviderId(String provider, String providerId);
 }
