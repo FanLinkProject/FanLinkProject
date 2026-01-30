@@ -29,14 +29,30 @@ public class JwtTokenProvider {
 
     private SecretKey key;
 
-    private final long tokenValidTime = 60 * 60 * 1000L; // 1시간
+    // Access Token 유효시간: 1시간
+    private final long accessTokenValidTime = 60 * 60 * 1000L;
+
+    // Refresh Token 유효시간: 14일
+    private final long refreshTokenValidTime = 14 * 24 * 60 * 60 * 1000L;
 
     @PostConstruct
     protected void init() {
+
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createToken(String email, String role) {
+    // Access Token 생성
+    public String createAccessToken(String email, String role) {
+        return createTokenInternal(email, role, accessTokenValidTime);
+    }
+
+    // Refresh Token 생성
+    public String createRefreshToken(String email, String role) {
+        return createTokenInternal(email, role, refreshTokenValidTime);
+    }
+
+    //내부토큰생성로직(공통)
+    private String createTokenInternal(String email, String role, long validTime) {
         Claims claims = Jwts.claims().subject(email).build();
         Date now = new Date();
 
@@ -44,17 +60,20 @@ public class JwtTokenProvider {
                 .claims(claims)
                 .claim("role", role)
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + tokenValidTime))
+                .expiration(new Date(now.getTime() + validTime))
                 .signWith(key)
                 .compact();
     }
-//프로바이더 에서 파싱하는곳
+
+
+
+    //토큰에서 인증정보 조회 로직
     public Authentication getAuthentication(String token) {
         String email = this.getUserEmail(token);
         UserDetails userDetails = principalDetailsService.loadUserByUsername(email);
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }
-
+    //토큰에서 회원정보(이메일) 추출
     public String getUserEmail(String token) {
         return Jwts.parser()
                 .verifyWith(key)
@@ -63,7 +82,7 @@ public class JwtTokenProvider {
                 .getPayload()
                 .getSubject();
     }
-
+    // 토큰 유효성 검증
     public boolean validateToken(String jwtToken) {
         try {
             Jws<Claims> claims = Jwts.parser()
