@@ -55,13 +55,17 @@ public class SecurityConfig {
             .sessionManagement(session -> 
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // 요청별 인증/인가 설정
-            .authorizeHttpRequests(auth -> auth
-                // 인증 X
-                .requestMatchers(
-                    "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
-                    "/error"                  // 에러 페이지(인증안된 경로 일때 )
-                ).permitAll()
+                // 요청별 인증/인가 설정
+                .authorizeHttpRequests(auth -> auth
+                        // 인증 X
+                        .requestMatchers(
+                                "/api/**",
+                                "/api/payments/**",
+                                "/api/subscriptions/**",
+                                "/api/orders/**",
+                                "/api/auth/**", // 인증 관련 API (로그인, 회원가입 등)
+                                "/error" // 에러 페이지(인증안된 경로 일때 )
+                        ).permitAll()
 
                 // 관리자
                 .requestMatchers("/api/admin/**")

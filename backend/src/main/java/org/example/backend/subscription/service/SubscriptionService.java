@@ -2,6 +2,10 @@ package org.example.backend.subscription.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.backend.order.entity.Order;
+import org.example.backend.order.entity.OrderItem;
+import org.example.backend.order.enums.OrderStatus;
+import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.payment.adapter.PaymentAdapter;
 import org.example.backend.payment.dto.TossPaymentDto;
 import org.example.backend.payment.entity.Payment;
@@ -33,6 +37,7 @@ public class SubscriptionService {
 
         private final int CANDY_PRICE = 100;
 
+        private final OrderRepository orderRepository;
         private final SubscriptionRepository subscriptionRepository;
         private final UserRepository userRepository;
         private final ProductRepository productRepository;
@@ -166,9 +171,31 @@ public class SubscriptionService {
                                 .build();
                 Subscription savedSubscription = subscriptionRepository.save(subscription);
 
-                // 6. Payment 기록 생성 (이력 관리용)
+                // 6. Order 생성 (Payment에 orderId가 필요함)
+                Order order = Order.builder()
+                                .userId(userId)
+                                .totalAmount(BigDecimal.ZERO)
+                                .totalCandyAmount(product.getCandyPrice())
+                                .name(product.getName() + " (구독)")
+                                .status(OrderStatus.COMPLETED)
+                                .orderNo("CANDY_SUB_" + java.util.UUID.randomUUID().toString())
+                                .build();
+
+                // OrderItem 추가
+                OrderItem orderItem = OrderItem.builder()
+                                .product(product)
+                                .quantity(1)
+                                .price(BigDecimal.ZERO) // 캔디 결제 상품의 현금가는 0으로 처리 (혹은 product.getPrice()가 0이면 그것 사용)
+                                .candyPrice(product.getCandyPrice())
+                                .build();
+
+                order.addOrderItem(orderItem);
+
+                Order savedOrder = orderRepository.save(order);
+
+                // 7. Payment 기록 생성 (이력 관리용)
                 Payment payment = Payment.builder()
-                                .orderId(null)
+                                .orderId(savedOrder.getId()) // Order ID 연결
                                 .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
                                 .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디 = 100원 가치 추산
                                 .status(PaymentStatus.DONE)
@@ -177,7 +204,7 @@ public class SubscriptionService {
                                 .build();
                 paymentRepository.save(payment);
 
-                // 7. 정산 처리 (아티스트 DM 구독인 경우)
+                // 8. 정산 처리 (아티스트 DM 구독인 경우)
                 createSettlementIfNeeded(product, payment);
 
                 log.info("캔디 구독 생성: userId={}, product={}, candyUsed={}",
