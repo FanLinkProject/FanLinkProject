@@ -1,13 +1,20 @@
+server:
+  port: 8080
+
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE}
+    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE:fanlinkdb}
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
-
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+    show-sql: true
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
@@ -24,9 +31,31 @@ spring:
     listener:
       missing-topics-fatal: false
 
-logging:
-  level:
-    org.springframework.web.socket: DEBUG
-    org.springframework.messaging: DEBUG
-    org.springframework.web.socket.messaging: DEBUG
-    org.apache.kafka: INFO
+aws:
+  region: ${AWS_REGION}
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+  cloudfront:
+    domain: ${AWS_CLOUDFRONT_DOMAIN}
+
+media:
+  presign:
+    expire-seconds: ${MEDIA_PRESIGN_EXPIRE_SECONDS}
+  orphan:
+    expires-minutes: ${MEDIA_ORPHAN_EXPIRES_MINUTES}
+  orphan-cleanup:
+    fixed-delay-ms: ${MEDIA_ORPHAN_CLEANUP_FIXED_DELAY_MS}
+  limits:
+    image-bytes: ${MEDIA_LIMITS_IMAGE_BYTES}
+    post-video-bytes: ${MEDIA_LIMITS_POST_VIDEO_BYTES}
+    replay-video-bytes: ${MEDIA_LIMITS_REPLAY_VIDEO_BYTES}
+    post-video-max-duration-seconds: ${MEDIA_LIMITS_POST_VIDEO_MAX_DURATION_SECONDS}
+    replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
+  attachments:
+    max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
+
+payment:
+  toss:
+    base-url: https://api.tosspayments.com/v1
+    client-key: ${PAYMENTS_CLIENT_KEY}
+    secret-key: ${PAYMENTS_SECRET_KEY}

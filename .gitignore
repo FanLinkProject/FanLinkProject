@@ -97,6 +97,8 @@ docker-compose.override.yml
 .env.local
 .env.*.local
 *.env
+backend/src/main/resources/application-test.yml
+backend/src/main/resources/data-test.sql
 
 # ============================================
 # 6. 테스트 결과물
@@ -115,9 +117,12 @@ docker-compose.override.yml
 *.backup
 *.old
 *.swp
+backend/src/main/java/org/example/backend/media_asset/README.md
 
 # 로그 폴더
 logs/
 log/
 
 *.mdc
+**/test.html
+/test.html
