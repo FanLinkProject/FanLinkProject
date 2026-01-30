@@ -4,3 +4,14 @@ spring:
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+
+payment:
+  toss:
+    base-url: https://api.tosspayments.com/v1
+    client-key: ${PAYMENTS_CLIENT_KEY:test_ck_Gv6LjeKD8aKvNweZ4Ol0VwYxAdXy}
+    secret-key: ${PAYMENTS_SECRET_KEY:test_sk_DnyRpQWGrNwdqOLzpn7l8Kwv1M9E}
