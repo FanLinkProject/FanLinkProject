@@ -1,32 +1,48 @@
 package org.example.backend.order.controller;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.example.backend.order.dto.OrderCreateRequest;
+import org.example.backend.order.dto.OrderUpdateRequest;
+import org.example.backend.order.entity.Order;
 import org.example.backend.order.service.OrderService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Map;
+import java.util.List;
 
-@Slf4j
 @RestController
-@RequestMapping("/api/v1/orders")
+@RequestMapping("/api/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
     private final OrderService orderService;
 
-    /**
-     * 테스트용 PENDING 주문 정보를 반환합니다.
-     * 프론트엔드에서 결제 테스트를 위해 임시로 사용됩니다.
-     */
-    @GetMapping("/test-pending")
-    public ResponseEntity<Map<String, Object>> getTestPendingOrder() {
-        String orderNo = orderService.getTestPendingOrderNo();
-        return ResponseEntity.ok(Map.of(
-                "orderNo", orderNo,
-                "amount", 24900));
+    @GetMapping
+    public List<Order> findAll() {
+        return orderService.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public Order findById(@PathVariable Long id) {
+        return orderService.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found: " + id));
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Order create(@RequestBody OrderCreateRequest req) {
+        return orderService.create(req);
+    }
+
+    @PutMapping("/{id}")
+    public Order update(@PathVariable Long id, @RequestBody OrderUpdateRequest req) {
+        return orderService.update(id, req);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        orderService.deleteById(id);
     }
 }
