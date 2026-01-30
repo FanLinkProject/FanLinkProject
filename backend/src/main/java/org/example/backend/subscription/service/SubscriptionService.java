@@ -164,7 +164,18 @@ public class SubscriptionService {
                                 .build();
                 Subscription savedSubscription = subscriptionRepository.save(subscription);
 
-                // 6. 정산 처리 (아티스트 DM 구독인 경우)
+                // 6. Payment 기록 생성 (이력 관리용)
+                Payment payment = Payment.builder()
+                                .orderId(null)
+                                .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
+                                .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디 = 100원 가치 추산
+                                .status(PaymentStatus.DONE)
+                                .method(PaymentMethod.CARD) // TODO: ENUM에 CANDY 추가 권장
+                                .paidAt(now)
+                                .build();
+                paymentRepository.save(payment);
+
+                // 7. 정산 처리 (아티스트 DM 구독인 경우)
                 createSettlementIfNeeded(product, savedSubscription.getId());
 
                 log.info("캔디 구독 생성: userId={}, product={}, candyUsed={}",

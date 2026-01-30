@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.example.backend.global.security.details.PrincipalDetails;
+
 @RestController
 @RequestMapping("/api/v1/subscriptions")
 @RequiredArgsConstructor
@@ -30,10 +33,9 @@ public class SubscriptionController {
         @PostMapping("/cash")
         public ResponseEntity<SubscriptionResponse> createCashSubscription(
                         @RequestBody CreateCashSubscriptionRequest request,
-                        @RequestParam Long userId // TODO: Security Context에서 가져오기
-        ) {
+                        @AuthenticationPrincipal PrincipalDetails principal) {
                 Subscription subscription = subscriptionService.createCashSubscription(
-                                userId,
+                                principal.getUser().getId(),
                                 request.getProductId(),
                                 request.getAuthKey(),
                                 request.getCustomerKey());
@@ -53,10 +55,9 @@ public class SubscriptionController {
         @PostMapping("/candy")
         public ResponseEntity<SubscriptionResponse> createCandySubscription(
                         @RequestBody CreateCandySubscriptionRequest request,
-                        @RequestParam Long userId // TODO: Security Context에서 가져오기
-        ) {
+                        @AuthenticationPrincipal PrincipalDetails principal) {
                 Subscription subscription = subscriptionService.createCandySubscription(
-                                userId,
+                                principal.getUser().getId(),
                                 request.getProductId());
 
                 return ResponseEntity.ok(SubscriptionResponse.fromEntity(subscription));
@@ -72,9 +73,8 @@ public class SubscriptionController {
         @DeleteMapping("/{subscriptionId}")
         public ResponseEntity<Void> cancelSubscription(
                         @PathVariable Long subscriptionId,
-                        @RequestParam Long userId // TODO: Security Context에서 가져오기
-        ) {
-                subscriptionService.cancelSubscription(subscriptionId, userId);
+                        @AuthenticationPrincipal PrincipalDetails principal) {
+                subscriptionService.cancelSubscription(subscriptionId, principal.getUser().getId());
                 return ResponseEntity.noContent().build();
         }
 
@@ -84,9 +84,8 @@ public class SubscriptionController {
          */
         @GetMapping("/me")
         public ResponseEntity<List<SubscriptionResponse>> getMySubscriptions(
-                        @RequestParam Long userId // TODO: Security Context에서 가져오기
-        ) {
-                List<Subscription> subscriptions = subscriptionService.getMySubscriptions(userId);
+                        @AuthenticationPrincipal PrincipalDetails principal) {
+                List<Subscription> subscriptions = subscriptionService.getMySubscriptions(principal.getUser().getId());
                 List<SubscriptionResponse> responses = subscriptions.stream()
                                 .map(SubscriptionResponse::fromEntity)
                                 .collect(Collectors.toList());
