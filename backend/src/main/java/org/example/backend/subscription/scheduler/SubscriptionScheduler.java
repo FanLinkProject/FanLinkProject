@@ -152,6 +152,7 @@ public class SubscriptionScheduler {
         if (product.getArtistId() != null) {
             SettlementPending pending = SettlementPending.builder()
                     .paymentId(null)
+                    .subscriptionId(subscription.getId())
                     .artistId(product.getArtistId())
                     .amount(product.getCandyPrice())
                     .orderName(product.getName() + " (구독 갱신)")
