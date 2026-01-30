@@ -2,9 +2,11 @@ package org.example.backend.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.backend.global.exception.BusinessException;
 import org.example.backend.global.util.StringEncryptor;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
+import org.example.backend.user.exception.UserErrorCode;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -130,7 +132,7 @@ public class User {
             this.candy = 0L;
         }
         if (this.candy < amount) {
-            throw new IllegalArgumentException("Not enough candy");
+            throw new BusinessException(UserErrorCode.NOT_ENOUGH_CANDY);
         }
         this.candy -= amount;
     }

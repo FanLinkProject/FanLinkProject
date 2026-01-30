@@ -1,6 +1,7 @@
 package org.example.backend.user.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.exception.BusinessException;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.jwt.RefreshTokenStore;
 import org.example.backend.global.security.details.PrincipalDetails;
@@ -11,6 +12,7 @@ import org.example.backend.user.dto.response.TokenResponse;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
+import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -32,12 +34,12 @@ public class AuthService {
     public SignupResponse signup(SignupRequest request) {
         // 이메일 중복 확인
         if (userRepository.existsByEmail(request.email())) {
-            throw new RuntimeException("이미 존재하는 이메일입니다: " + request.email());
+            throw new BusinessException(UserErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
         // 닉네임 중복 확인
         if (userRepository.existsByNickname(request.nickname())) {
-            throw new RuntimeException("이미 존재하는 닉네임입니다: " + request.nickname());
+            throw new BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
         }
 
         // User 엔티티 생성(정적 팩토리 메서드 활용)
@@ -75,12 +77,12 @@ public class AuthService {
 
         // 비밀번호 검증
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+            throw new BusinessException(UserErrorCode.PASSWORD_MISMATCH);
         }
 
         // 계정 상태 확인
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new RuntimeException("비활성화된 계정입니다. 상태: " + user.getStatus());
+            throw new BusinessException(UserErrorCode.ACCOUNT_INACTIVE);
         }
 
         // JWT 토큰 생성
@@ -97,7 +99,7 @@ public class AuthService {
     public void logout(String refreshToken) {
         // RefreshToken 유효성 검증
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new RuntimeException("유효하지 않은 토큰입니다.");
+            throw new BusinessException(UserErrorCode.INVALID_TOKEN);
         }
 
         String email = jwtTokenProvider.getUserEmail(refreshToken);
@@ -113,18 +115,17 @@ public class AuthService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !(authentication.getPrincipal() instanceof PrincipalDetails)) {
-            throw new RuntimeException("인증된 사용자가 없습니다.");
+            throw new BusinessException(UserErrorCode.UNAUTHENTICATED);
         }
 
         PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
         User user = principalDetails.getUser();
 
-
         // 이미 탈퇴한 사용자인지 확인
         User currentUser = userRepository.findById(user.getId())
-                .orElseThrow(() -> new RuntimeException("유저를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
         if (currentUser.getDeletedAt() != null) {
-            throw new RuntimeException("이미 탈퇴한 계정입니다.");
+            throw new BusinessException(UserErrorCode.ACCOUNT_ALREADY_DELETED);
         }
 
         // 회원 탈퇴 처리(소프트삭제)
