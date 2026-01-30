@@ -16,6 +16,10 @@ import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.order.entity.Order;
+import org.example.backend.order.entity.OrderItem;
+import org.example.backend.order.enums.OrderStatus;
+import org.example.backend.order.repository.OrderRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +38,7 @@ public class SubscriptionScheduler {
     private final PaymentAdapter paymentAdapter;
     private final PaymentRepository paymentRepository;
     private final SettlementPendingRepository settlementPendingRepository;
+    private final org.example.backend.order.repository.OrderRepository orderRepository;
 
     /**
      * 매일 00:00에 정기 결제 로직을 실행하는 메인 스케줄러 메서드입니다.
@@ -114,6 +119,7 @@ public class SubscriptionScheduler {
 
         // 2. Payment 엔티티 생성
         Payment payment = Payment.builder()
+                .userId(subscription.getUserId())
                 .orderId(null)
                 .paymentKey(response.getPaymentKey())
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
@@ -148,12 +154,44 @@ public class SubscriptionScheduler {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
         user.useCandy(product.getCandyPrice()); // 잔액 부족 시 예외 발생
 
-        // 2. 정산 처리 (아티스트 DM 구독인 경우)
+        // 2. Order 생성 (Payment에 orderId가 필요함)
+        Order order = Order.builder()
+                .userId(subscription.getUserId())
+                .totalAmount(BigDecimal.ZERO)
+                .totalCandyAmount(product.getCandyPrice())
+                .name(product.getName() + " (구독 갱신)")
+                .status(OrderStatus.COMPLETED)
+                .orderNo("CANDY_RENEW_" + java.util.UUID.randomUUID().toString())
+                .build();
+
+        OrderItem orderItem = OrderItem.builder()
+                .product(product)
+                .quantity(1)
+                .price(BigDecimal.ZERO)
+                .candyPrice(product.getCandyPrice())
+                .build();
+
+        order.addOrderItem(orderItem);
+        Order savedOrder = orderRepository.save(order);
+
+        // 3. Payment 생성
+        Payment payment = Payment.builder()
+                .userId(subscription.getUserId())
+                .orderId(savedOrder.getId())
+                .paymentKey("CANDY_RENEW_" + java.util.UUID.randomUUID().toString())
+                .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L))
+                .status(PaymentStatus.DONE)
+                .method(PaymentMethod.CARD) // ENUM에 CANDY 추가 권장
+                .paidAt(LocalDateTime.now())
+                .build();
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // 4. 정산 처리 (아티스트 DM 구독인 경우)
         if (product.getArtistId() != null) {
             SettlementPending pending = SettlementPending.builder()
-                    .paymentId(null)
+                    .paymentId(savedPayment.getId()) // 실제 Payment ID 연결
                     .artistId(product.getArtistId())
-                    .amount(product.getCandyPrice())
+                    .amount(product.getCandyPrice() * 100L) // 1캔디=100원 환산
                     .orderName(product.getName() + " (구독 갱신)")
                     .sourceType(SettlementSourceType.CANDY)
                     .build();
