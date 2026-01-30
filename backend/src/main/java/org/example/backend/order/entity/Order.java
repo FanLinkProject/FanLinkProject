@@ -81,4 +81,8 @@ public class Order {
         this.orderItems.add(orderItem);
         orderItem.assignOrder(this);
     }
+
+    public void updateStatus(OrderStatus status) {
+        this.status = status;
+    }
 }
