@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+import org.example.backend.product.dto.request.ProductRequestDto;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -25,5 +29,11 @@ public class ProductController {
     public ResponseEntity<List<Product>> getAllProducts() {
         List<Product> products = productService.getAllProducts();
         return ResponseEntity.ok(products);
+    }
+
+    @PostMapping
+    public ResponseEntity<Product> createProduct(@RequestBody ProductRequestDto request) {
+        Product product = productService.createProduct(request);
+        return ResponseEntity.ok(product);
     }
 }
