@@ -49,38 +49,38 @@ export default function PaymentTestPage() {
     try {
       const tossPayments = await loadTossPayments(clientKey);
 
-      // 1. 주문 생성 요청 (백엔드)
-      const orderRes = await fetch("http://localhost:8080/api/v1/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: selectedProduct.name,
-          totalAmount: selectedProduct.price,
-          totalCandyAmount: 0,
-          orderItems: [
-            {
-              productId: selectedProduct.id,
-              quantity: 1
-            }
-          ]
-        })
-      });
+      let tossOrderId = null;
 
-      if (!orderRes.ok) {
-        throw new Error("주문 생성 실패");
+      // 1. 주문 생성 요청 (백엔드) - 캔디 구독은 제외 (내부적으로 생성함)
+      if (!(selectedProduct.isSubscription && selectedProduct.paymentMethod === "CANDY_ONLY")) {
+        const orderRes = await fetch("http://localhost:8080/api/v1/orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: selectedProduct.name,
+            totalAmount: selectedProduct.price,
+            totalCandyAmount: 0,
+            orderItems: [
+              {
+                productId: selectedProduct.id,
+                quantity: 1
+              }
+            ]
+          })
+        });
+
+        if (!orderRes.ok) {
+          throw new Error("주문 생성 실패");
+        }
+
+        const orderData = await orderRes.json();
+        tossOrderId = orderData.orderNo;
+        console.log(`Created Order: orderNo=${tossOrderId}, amount=${selectedProduct.price}`);
       }
 
-      const orderData = await orderRes.json();
-      const tossOrderId = orderData.orderNo;
-
-      console.log(`Created Order: orderNo=${tossOrderId}, amount=${selectedProduct.price}`);
-
-      console.log(`Created Order: orderNo=${tossOrderId}, amount=${selectedProduct.price}`);
-
-      // 2. 결제 요청 (Toss)
       // 2. 결제 요청 (Toss)
       if (selectedProduct.isSubscription) {
         if (selectedProduct.paymentMethod === "CANDY_ONLY") {
