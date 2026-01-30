@@ -20,8 +20,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.product.enums.ProductPaymentMethod;
 
+import org.example.backend.user.entity.User;
+import org.example.backend.user.repository.UserRepository;
+import org.example.backend.product.repository.ProductRepository;
+import org.example.backend.subscription.repository.SubscriptionRepository;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import org.example.backend.payment.exception.PaymentErrorCode;
+import org.example.backend.payment.exception.PaymentException;
 
 @Slf4j
 @Service
@@ -33,9 +41,9 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final SettlementPendingRepository settlementPendingRepository;
-    private final org.example.backend.user.repository.UserRepository userRepository;
-    private final org.example.backend.product.repository.ProductRepository productRepository;
-    private final org.example.backend.subscription.repository.SubscriptionRepository subscriptionRepository;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
+    private final SubscriptionRepository subscriptionRepository;
 
     /**
      * 결제 승인 요청을 처리합니다. (단건 결제)
@@ -46,19 +54,33 @@ public class PaymentService {
      * @param amount     결제 금액
      * @return 저장된 Payment 엔티티
      */
-    @Transactional
+    @Transactional(noRollbackFor = PaymentException.class)
     public Payment confirmPayment(String paymentKey, String orderNo, Long amount) {
         // 1. 주문 조회 (orderNo로 조회)
         Order order = orderRepository.findByOrderNo(orderNo)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 주문입니다."));
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.ORDER_NOT_FOUND));
 
         // 2. 금액 검증 (중요)
         if (order.getTotalAmount().longValue() != amount) {
-            throw new IllegalArgumentException("결제 금액이 일치하지 않습니다.");
+            throw new PaymentException(PaymentErrorCode.PAYMENT_AMOUNT_MISMATCH);
         }
 
-        // 3. Toss 결제 승인 요청
-        TossPaymentDto.PaymentConfirmResponse response = paymentAdapter.confirmPayment(paymentKey, orderNo, amount);
+        TossPaymentDto.PaymentConfirmResponse response;
+        try {
+            // 3. Toss 결제 승인 요청
+            response = paymentAdapter.confirmPayment(paymentKey, orderNo, amount);
+
+            // 결제 성공 시 주문 상태 변경
+            order.updateStatus(org.example.backend.order.enums.OrderStatus.COMPLETED);
+            orderRepository.save(order);
+        } catch (Exception e) {
+            // 결제 실패 시 주문 상태 변경 (FAILED)
+            order.updateStatus(org.example.backend.order.enums.OrderStatus.FAILED);
+            orderRepository.save(order);
+            // 원인 예외를 로그로 남기고 PaymentException 던짐
+            log.error("Payment Confirmation Failed: {}", e.getMessage(), e);
+            throw new PaymentException(PaymentErrorCode.PAYMENT_CONFIRM_FAILED);
+        }
 
         // 4. 결제 정보 저장
         Payment payment = Payment.builder()
@@ -77,15 +99,12 @@ public class PaymentService {
         // 5. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
         for (OrderItem item : order.getOrderItems()) {
             if (item.getProduct().getType() == ProductType.CANDY_CHARGE) {
-                // 충전량 계산 규칙: 100원당 1캔디 (가정) 혹은 별도 필드 필요.
-                // 현재는 별도 필드가 없으므로, 편의상 이름에서 파싱하거나 가격 기준 1% 등으로 가정해야 함.
-                // 하지만 보통 상품 생성 시 정해짐. 여기서는 단순하게 가격 / 100 으로 캔디 지급 로직 추가.
-                // (사용자가 "구현했잖아"라고 했으므로 더 단순한 로직이 있었을 수 있음. 일단 가격/100으로 구현)
+                // 충전량 계산 규칙: 100원당 1캔디
                 long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
 
                 // 유저 조회 후 충전
-                org.example.backend.user.entity.User user = userRepository.findById(order.getUserId())
-                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                User user = userRepository.findById(order.getUserId())
+                        .orElseThrow(() -> new PaymentException(PaymentErrorCode.USER_NOT_FOUND));
                 user.chargeCandy(candyAmount);
                 // 변경된 유저 상태 저장 (Transaction 내에서 Dirty Checking으로 반영되겠지만 명시적으로 save 호출 가능. Dirty
                 // Checking 믿고 생략 가능)
@@ -120,18 +139,32 @@ public class PaymentService {
      * @param orderId     주문 ID (구독 갱신 시에는 가상의 ID 사용 가능)
      * @return 결제 완료된 Payment 정보
      */
-    @Transactional
+    @Transactional(noRollbackFor = PaymentException.class)
     public Payment billingPayment(String billingKey, String customerKey, Long amount, Long orderId) {
         // 1. 주문 조회 및 검증
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 주문입니다."));
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.ORDER_NOT_FOUND));
 
         // userId는 주문에서 가져옴 (구독 갱신 시에도 주문 정보에 userId가 있어야 함. 만약 가상 주문이라면 userId 설정 필요)
         // 현재 로직상 orderId로 조회한 Order에는 항상 userId가 있음.
 
-        // 2. Toss 자동 결제 요청
-        TossPaymentDto.PaymentConfirmResponse response = paymentAdapter.billingPayment(billingKey, customerKey, amount,
-                String.valueOf(orderId), order.getName());
+        TossPaymentDto.PaymentConfirmResponse response;
+        try {
+            // 2. Toss 자동 결제 요청
+            response = paymentAdapter.billingPayment(billingKey, customerKey, amount,
+                    String.valueOf(orderId), order.getName());
+
+            // 결제 성공 시 주문 상태 변경
+            order.updateStatus(org.example.backend.order.enums.OrderStatus.COMPLETED);
+            orderRepository.save(order);
+        } catch (Exception e) {
+            // 결제 실패 시 주문 상태 변경 (FAILED)
+            order.updateStatus(org.example.backend.order.enums.OrderStatus.FAILED);
+            orderRepository.save(order);
+            // 원인 예외 로그
+            log.error("Billing Payment Failed: {}", e.getMessage(), e);
+            throw new PaymentException(PaymentErrorCode.BILLING_PAYMENT_FAILED);
+        }
 
         // 3. 결제 정보 저장
         Payment payment = Payment.builder()
@@ -145,6 +178,16 @@ public class PaymentService {
                 .build();
 
         return paymentRepository.save(payment);
+    }
+
+    /**
+     * 내 결제 내역을 조회합니다.
+     *
+     * @param userId 유저 ID
+     * @return 결제 내역 목록
+     */
+    public java.util.List<Payment> getMyPayments(Long userId) {
+        return paymentRepository.findAllByUserId(userId);
     }
 
     /**
