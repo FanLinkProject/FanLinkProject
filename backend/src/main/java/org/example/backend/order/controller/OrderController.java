@@ -2,9 +2,14 @@ package org.example.backend.order.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.backend.global.security.details.PrincipalDetails;
+import org.example.backend.order.dto.request.OrderRequestDto;
 import org.example.backend.order.service.OrderService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,5 +33,17 @@ public class OrderController {
         return ResponseEntity.ok(Map.of(
                 "orderNo", orderNo,
                 "amount", 24900));
+    }
+
+    /**
+     * 주문 생성 API
+     */
+    @PostMapping
+    public ResponseEntity<Map<String, String>> createOrder(
+            @AuthenticationPrincipal PrincipalDetails principal,
+            @RequestBody OrderRequestDto request) {
+
+        String orderNo = orderService.createOrder(principal.getUser().getId(), request);
+        return ResponseEntity.ok(Map.of("orderNo", orderNo));
     }
 }
