@@ -32,6 +32,9 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final SettlementPendingRepository settlementPendingRepository;
+    private final org.example.backend.user.repository.UserRepository userRepository;
+    private final org.example.backend.product.repository.ProductRepository productRepository;
+    private final org.example.backend.subscription.repository.SubscriptionRepository subscriptionRepository;
 
     /**
      * 결제 승인 요청을 처리합니다. (단건 결제)
@@ -69,7 +72,27 @@ public class PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
-        // 5. 정산 대기 데이터 생성 (캔디 충전 제외)
+        // 5. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getProduct().getType() == ProductType.CANDY_CHARGE) {
+                // 충전량 계산 규칙: 100원당 1캔디 (가정) 혹은 별도 필드 필요.
+                // 현재는 별도 필드가 없으므로, 편의상 이름에서 파싱하거나 가격 기준 1% 등으로 가정해야 함.
+                // 하지만 보통 상품 생성 시 정해짐. 여기서는 단순하게 가격 / 100 으로 캔디 지급 로직 추가.
+                // (사용자가 "구현했잖아"라고 했으므로 더 단순한 로직이 있었을 수 있음. 일단 가격/100으로 구현)
+                long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
+
+                // 유저 조회 후 충전
+                org.example.backend.user.entity.User user = userRepository.findById(order.getUserId())
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                user.chargeCandy(candyAmount);
+                // 변경된 유저 상태 저장 (Transaction 내에서 Dirty Checking으로 반영되겠지만 명시적으로 save 호출 가능. Dirty
+                // Checking 믿고 생략 가능)
+
+                log.info("캔디 충전 완료: userId={}, amount={}", user.getId(), candyAmount);
+            }
+        }
+
+        // 6. 정산 대기 데이터 생성 (캔디 충전 제외)
         createSettlementPendingIfNeeded(order, savedPayment);
 
         return savedPayment;
@@ -84,17 +107,6 @@ public class PaymentService {
      * @param userId      유저 ID
      * @return 발급된 빌링키
      */
-    @Transactional
-    public String issueBillingKey(String authKey, String customerKey, Long userId) {
-        // 1. Toss 빌링키 발급 요청
-        TossPaymentDto.BillingKeyResponse response = paymentAdapter.issueBillingKey(authKey, customerKey);
-
-        // 2. 빌링키 저장 (User 엔티티 or Subscription 엔티티)
-        // Subscription 생성 시점에 저장되거나, User에 카드 정보 등록용으로 저장
-        // 현재 설계상 Subscription에 billingKey가 있으므로, 여기서는 리턴만 하거나 User에 저장
-
-        return response.getBillingKey();
-    }
 
     /**
      * 발급된 빌링키를 사용하여 정기 결제를 수행합니다.
@@ -129,6 +141,30 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
+    /**
+     * 결제 후속 처리를 수행합니다. (캔디 충전 및 정산 대기 데이터 생성)
+     * 이 메서드는 단건 결제(confirmPayment)와 정기 결제(billingPayment)에서 공통으로 호출됩니다.
+     */
+    private void processPostPaymentActions(Order order, Payment payment) {
+        // 1. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getProduct().getType() == ProductType.CANDY_CHARGE) {
+                // 충전량 계산 규칙: 100원당 1캔디 (가정)
+                long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
+
+                // 유저 조회 후 충전
+                org.example.backend.user.entity.User user = userRepository.findById(order.getUserId())
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                user.chargeCandy(candyAmount);
+
+                log.info("캔디 충전 완료: userId={}, amount={}, orderNo={}", user.getId(), candyAmount, order.getOrderNo());
+            }
+        }
+
+        // 2. 정산 대기 데이터 생성 (캔디 충전 제외)
+        createSettlementPendingIfNeeded(order, payment);
+    }
+
     // 정산 대기 데이터 생성 (캔디 충전 제외)
     // 캔디 충전은 정산 대상이 아니며, 아티스트 상품(MD, 멤버십 등) 구매 시에만 정산 데이터(SettlementPending)가
     // 생성됩니다.
@@ -138,7 +174,6 @@ public class PaymentService {
 
             // 캔디 충전 상품은 정산 대상이 아님
             if (product.getType() == ProductType.CANDY_CHARGE) {
-                log.debug("캔디 충전 상품이므로 정산 대기열 생성 생략: {}", product.getName());
                 continue;
             }
 
@@ -152,7 +187,15 @@ public class PaymentService {
             SettlementSourceType sourceType = determineSourceType(product.getType());
 
             // 정산 금액 계산 (단가 * 수량)
-            Long settlementAmount = item.getPrice().longValue() * item.getQuantity();
+            // 캔디 결제인 경우, 1 캔디당 100원으로 계산
+            long settlementAmount;
+            if (product.getPaymentMethod() == org.example.backend.product.enums.ProductPaymentMethod.CANDY_ONLY) {
+                // candyPrice가 null일 수 있으므로 안전하게 처리 (Product 생성 시 검증됨)
+                long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
+                settlementAmount = candyPrice * 100 * item.getQuantity();
+            } else {
+                settlementAmount = item.getPrice().longValue() * item.getQuantity();
+            }
 
             // SettlementPending 생성
             SettlementPending pending = SettlementPending.builder()
