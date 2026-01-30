@@ -30,7 +30,7 @@ public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
     private final JwtTokenProvider jwtTokenProvider;
-    // private AbstractRequestMatcherRegistry oauth;
+    //private AbstractRequestMatcherRegistry oauth;
 
     // 비밀번호 암호화
     @Bean
@@ -59,9 +59,6 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 인증 X
                 .requestMatchers(
-                    "/api/payments/**",
-                    "/api/subscriptions/**",
-                    "/api/orders/**",
                     "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
                     "/error"                  // 에러 페이지(인증안된 경로 일때 )
                 ).permitAll()
@@ -84,11 +81,11 @@ public class SecurityConfig {
         http
                 .formLogin(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // UsernamePasswordAuthenticationFilter 이전에 JWT 인증 필터를 실행
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
-                        UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

@@ -38,9 +38,3 @@ media:
     replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
   attachments:
     max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
-
-payment:
-  toss:
-    base-url: https://api.tosspayments.com/v1
-    client-key: ${PAYMENTS_CLIENT_KEY}
-    secret-key: ${PAYMENTS_SECRET_KEY}

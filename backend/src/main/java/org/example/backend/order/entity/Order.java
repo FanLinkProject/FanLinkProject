@@ -1,84 +1,55 @@
 package org.example.backend.order.entity;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.example.backend.order.enums.OrderStatus;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.UUID;
 
 @Entity
+@Table(name = "orders")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@EntityListeners(AuditingEntityListener.class)
-@Table(name = "orders")
 public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 비즈니스/API 노출용 고유 식별자, UUID로 중복 방지
+    @Column(name = "order_id", nullable = false, unique = true)
+    private String orderId;
+
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Column(name = "total_amount", nullable = false)
-    private BigDecimal totalAmount; // 총 현금 결제 금액
-
-    @Column(name = "total_candy_amount", nullable = false)
-    private Long totalCandyAmount; // 총 Candy 사용 금액
-
-    @Column(nullable = false)
-    private String name; // 주문명 (예: "상품A 외 2건")
+    private Long totalAmount;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private OrderStatus status;
+    @Column(name = "order_status", nullable = false)
+    private OrderStatus orderStatus;
 
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @LastModifiedDate
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItem> orderItems = new ArrayList<>();
-
-    @Column(nullable = false, unique = true)
-    private String orderNo; // 결제 요청용 고유 주문 번호 (UUID)
-
-    @Builder
-    public Order(Long userId, BigDecimal totalAmount, Long totalCandyAmount, String name, OrderStatus status,
-            String orderNo) {
+    // orderId는 UUID 자동 발급, orderStatus는 READY로 초기화
+    public Order(Long userId, Long totalAmount) {
+        this.orderId = UUID.randomUUID().toString();
         this.userId = userId;
         this.totalAmount = totalAmount;
-        this.totalCandyAmount = totalCandyAmount;
-        this.name = name;
-        this.status = status;
-        this.orderNo = (orderNo != null) ? orderNo : java.util.UUID.randomUUID().toString();
+        this.orderStatus = OrderStatus.READY;
     }
 
-    public void addOrderItem(OrderItem orderItem) {
-        this.orderItems.add(orderItem);
-        orderItem.assignOrder(this);
+    // 결제 완료 시 호출
+    public void completeOrder() {
+        this.orderStatus = OrderStatus.COMPLETED;
+    }
+
+    // 주문 취소 시 호출
+    public void cancelOrder() {
+        this.orderStatus = OrderStatus.CANCELED;
+    }
+
+    // Controller/Service에서 임의 상태로 변경할 때 사용
+    public void changeStatus(OrderStatus orderStatus) {
+        this.orderStatus = orderStatus;
     }
 }
