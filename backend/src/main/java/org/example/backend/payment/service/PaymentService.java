@@ -62,6 +62,7 @@ public class PaymentService {
 
         // 4. 결제 정보 저장
         Payment payment = Payment.builder()
+                .userId(order.getUserId()) // User ID 설정
                 .orderId(order.getId()) // DB FK는 여전히 ID 사용
                 .paymentKey(paymentKey)
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
@@ -125,12 +126,16 @@ public class PaymentService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 주문입니다."));
 
+        // userId는 주문에서 가져옴 (구독 갱신 시에도 주문 정보에 userId가 있어야 함. 만약 가상 주문이라면 userId 설정 필요)
+        // 현재 로직상 orderId로 조회한 Order에는 항상 userId가 있음.
+
         // 2. Toss 자동 결제 요청
         TossPaymentDto.PaymentConfirmResponse response = paymentAdapter.billingPayment(billingKey, customerKey, amount,
                 String.valueOf(orderId), order.getName());
 
         // 3. 결제 정보 저장
         Payment payment = Payment.builder()
+                .userId(order.getUserId()) // User ID 설정
                 .orderId(orderId)
                 .paymentKey(response.getPaymentKey())
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
