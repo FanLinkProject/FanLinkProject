@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.example.backend.global.security.details.PrincipalDetails;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -37,5 +40,11 @@ public class PaymentController {
 
         Payment payment = paymentService.confirmPayment(paymentKey, orderId, amount);
         return ResponseEntity.ok(payment);
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<java.util.List<Payment>> getMyPayments(
+            @AuthenticationPrincipal PrincipalDetails principal) {
+        return ResponseEntity.ok(paymentService.getMyPayments(principal.getUser().getId()));
     }
 }
