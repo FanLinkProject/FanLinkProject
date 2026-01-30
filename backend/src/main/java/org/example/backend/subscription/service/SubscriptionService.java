@@ -31,6 +31,8 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class SubscriptionService {
 
+        private final int CANDY_PRICE = 100;
+
         private final SubscriptionRepository subscriptionRepository;
         private final UserRepository userRepository;
         private final ProductRepository productRepository;
@@ -176,7 +178,7 @@ public class SubscriptionService {
                 paymentRepository.save(payment);
 
                 // 7. 정산 처리 (아티스트 DM 구독인 경우)
-                createSettlementIfNeeded(product, savedSubscription.getId());
+                createSettlementIfNeeded(product, payment);
 
                 log.info("캔디 구독 생성: userId={}, product={}, candyUsed={}",
                                 userId, product.getName(), product.getCandyPrice());
@@ -229,10 +231,10 @@ public class SubscriptionService {
          * 아티스트 상품(artistId가 있는 경우)에 대해서만 정산 데이터가 생성됩니다.
          * 플랫폼 멤버십(artistId가 없는 경우)은 정산 제외됩니다.
          *
-         * @param product        구독 상품
-         * @param subscriptionId 구독 ID (로깅용)
+         * @param product 구독 상품
+         * @param payment 결제 정보 (Payment ID 추출용)
          */
-        private void createSettlementIfNeeded(Product product, Long subscriptionId) {
+        private void createSettlementIfNeeded(Product product, Payment payment) {
                 // artistId가 없으면 플랫폼 멤버십이므로 정산 제외
                 if (product.getArtistId() == null) {
                         log.debug("플랫폼 멤버십이므로 정산 제외: {}", product.getName());
@@ -241,9 +243,9 @@ public class SubscriptionService {
 
                 // SettlementPending 생성
                 SettlementPending pending = SettlementPending.builder()
-                                .paymentId(null) // 구독 차감은 Payment 없음
+                                .paymentId(payment.getId())
                                 .artistId(product.getArtistId())
-                                .amount(product.getCandyPrice())
+                                .amount(product.getCandyPrice() * CANDY_PRICE)
                                 .orderName(product.getName() + " (구독)")
                                 .sourceType(SettlementSourceType.CANDY)
                                 .build();
