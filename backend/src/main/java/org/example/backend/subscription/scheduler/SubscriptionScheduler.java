@@ -38,7 +38,7 @@ public class SubscriptionScheduler {
     private final PaymentAdapter paymentAdapter;
     private final PaymentRepository paymentRepository;
     private final SettlementPendingRepository settlementPendingRepository;
-    private final org.example.backend.order.repository.OrderRepository orderRepository;
+    private final OrderRepository orderRepository;
 
     /**
      * 매일 00:00에 정기 결제 로직을 실행하는 메인 스케줄러 메서드입니다.
