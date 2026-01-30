@@ -30,3 +30,10 @@ Content-Type: application/json
 GET http://localhost:8080/api/user/me
 Authorization: Bearer <Access_Token_Here>
 Content-Type: application/json
+
+### 로그아웃
+POST http://localhost:8080/api/auth/logout?refreshToken={{ refreshToken 값 }}
+
+### 회원 탈퇴
+DELETE http://localhost:8080/api/auth
+Authorization: Bearer {{ accessToken 값 }}
