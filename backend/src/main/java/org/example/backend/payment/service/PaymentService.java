@@ -18,6 +18,7 @@ import org.example.backend.settlement.enums.SettlementSourceType;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.product.enums.ProductPaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -189,7 +190,7 @@ public class PaymentService {
             // 정산 금액 계산 (단가 * 수량)
             // 캔디 결제인 경우, 1 캔디당 100원으로 계산
             long settlementAmount;
-            if (product.getPaymentMethod() == org.example.backend.product.enums.ProductPaymentMethod.CANDY_ONLY) {
+            if (product.getPaymentMethod() == ProductPaymentMethod.CANDY_ONLY) {
                 // candyPrice가 null일 수 있으므로 안전하게 처리 (Product 생성 시 검증됨)
                 long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
                 settlementAmount = candyPrice * 100 * item.getQuantity();
