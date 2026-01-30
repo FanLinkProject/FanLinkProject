@@ -2,6 +2,7 @@ package org.example.backend.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.backend.global.util.StringEncryptor;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.springframework.data.annotation.CreatedDate;
@@ -35,7 +36,7 @@ public class User {
     private String name;
 
     @Column(name = "password", nullable = true)
-    private String password; // TODO : 암호화
+    private String password;
 
     @Column(name = "gender", nullable = false)
     private String gender;
@@ -47,8 +48,9 @@ public class User {
     @Column(name = "privacy_policy_agreed", nullable = false)
     private Boolean privacyPolicyAgreed;
 
+    @Convert(converter = StringEncryptor.class)
     @Column(name = "phone_number", unique = true, nullable = false)
-    private String phoneNumber; // TODO : 암호화
+    private String phoneNumber;
 
     @Column(name = "candy")
     private Long candy;
