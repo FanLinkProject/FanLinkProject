@@ -242,7 +242,6 @@ public class SubscriptionService {
                 // SettlementPending 생성
                 SettlementPending pending = SettlementPending.builder()
                                 .paymentId(null) // 구독 차감은 Payment 없음
-                                .subscriptionId(subscriptionId)
                                 .artistId(product.getArtistId())
                                 .amount(product.getCandyPrice())
                                 .orderName(product.getName() + " (구독)")
