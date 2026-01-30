@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.payment.config.TossPaymentConfig;
 import org.example.backend.payment.dto.TossPaymentDto;
+import org.example.backend.payment.exception.PaymentErrorCode;
+import org.example.backend.payment.exception.PaymentException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -41,10 +43,13 @@ public class TossPaymentAdapter implements PaymentAdapter {
                 .amount(amount)
                 .build();
 
-        HttpEntity<TossPaymentDto.PaymentConfirmRequest> entity = new HttpEntity<>(request, getHeaders());
-
-        // 실제로는 try-catch로 예외처리 필요 (Toss 에러 응답 파싱 등)
-        return restTemplate.postForObject(url, entity, TossPaymentDto.PaymentConfirmResponse.class);
+        try {
+            HttpEntity<TossPaymentDto.PaymentConfirmRequest> entity = new HttpEntity<>(request, getHeaders());
+            return restTemplate.postForObject(url, entity, TossPaymentDto.PaymentConfirmResponse.class);
+        } catch (Exception e) {
+            log.error("Toss 결제 승인 실패: {}", e.getMessage());
+            throw new PaymentException(PaymentErrorCode.PAYMENT_CONFIRM_FAILED);
+        }
     }
 
     /**
