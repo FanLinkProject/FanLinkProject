@@ -21,6 +21,7 @@ public class ChatMessageResponse {
 	private Long messageId;
 	private Long roomId;
 	private Long senderId;
+    private String senderNickName;
 	private MessageType type;
 	private String content;
 	private LocalDateTime createdAt;
@@ -30,6 +31,7 @@ public class ChatMessageResponse {
 			.messageId(message.getId())
 			.roomId(message.getChatRoom().getId())
 			.senderId(message.getSender().getId())
+            .senderNickName(message.getSender().getNickname())
 			.type(message.getMessageType())
 			.content(message.getContent())
 			.createdAt(message.getCreatedAt())

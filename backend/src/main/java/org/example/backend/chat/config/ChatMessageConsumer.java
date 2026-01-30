@@ -49,7 +49,7 @@ public class ChatMessageConsumer {
 	 * - "chat-room" (단일 토픽 사용)
 	 * - ChatService에서 동일 토픽으로 발행
 	 */
-	@KafkaListener(
+	/*@KafkaListener(
 		topics = "chat-room",
 		groupId = "chat-server",
 		containerFactory = "kafkaListenerContainerFactory"
@@ -60,5 +60,30 @@ public class ChatMessageConsumer {
 			"/sub/chat/room/" + event.getRoomId(),
 			event
 		);
-	}
+	}*/
+    /** 팬 → 아티스트 */
+    @KafkaListener(
+            topics = "artist-channel",
+            groupId = "chat-server",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumeFanToArtist(ChatMessageResponse event) {
+        messagingTemplate.convertAndSend(
+                "/sub/chat/artist/" + event.getRoomId(),
+                event
+        );
+    }
+
+    /** 아티스트 → 팬 */
+    @KafkaListener(
+            topics = "fan-channel",
+            groupId = "chat-server",
+            containerFactory = "kafkaListenerContainerFactory"
+    )
+    public void consumeArtistToFan(ChatMessageResponse event) {
+        messagingTemplate.convertAndSend(
+                "/sub/chat/fan/" + event.getRoomId(),
+                event
+        );
+    }
 }

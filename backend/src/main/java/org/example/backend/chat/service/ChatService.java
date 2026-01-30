@@ -48,7 +48,7 @@ public class ChatService {
 	 * - request.senderId는 임시로 사용 중(테스트용)
 	 * - 실제 운영에서는 WebSocket 세션/JWT(SecurityContext)에서 사용자 식별해야 함
 	 */
-	@Transactional
+	/*@Transactional
 	public void handleMessage(User user, ChatMessageRequest request) {
 
 		// 1) 발신자 조회(현재는 senderId로 임시 조회)
@@ -75,8 +75,59 @@ public class ChatService {
 			"chat-room",
 			room.getId().toString(),
 			event
-		);
-	}
+		);*/
+
+
+    /** 팬 → 아티스트 */
+    public void sendToArtist(User sender, ChatMessageRequest request) {
+        // 1) 채팅방 조회
+        ChatRoom room = chatRoomRepository.findById(request.getRoomId())
+                .orElseThrow(() -> new IllegalArgumentException("채팅방이 없습니다. id=" + request.getRoomId()));
+
+        // 2) 타입 = FAN (팬이 보낸 메시지)
+        MessageType type = MessageType.FAN;
+
+        // 3) 메시지 저장
+        ChatMessage message = ChatMessage.of(room, sender, type, request.getContent());
+        ChatMessage saved = chatMessageRepository.save(message);
+
+        // 4) Kafka 발행 → artist-channel (아티스트만 받음)
+        ChatMessageResponse response = ChatMessageResponse.from(saved);
+
+        kafkaTemplate.send(
+                "artist-channel",
+                room.getId().toString(),
+                response
+        );;
+    }
+
+    /** 아티스트 → 팬 */
+    public void sendToFans(User sender,ChatMessageRequest request) {
+        // 1) 채팅방 조회
+        ChatRoom room = chatRoomRepository.findById(request.getRoomId())
+                .orElseThrow(() -> new IllegalArgumentException("채팅방이 없습니다. id=" + request.getRoomId()));
+
+        // 2) 아티스트 권한 체크
+        if (!room.getOwner().getId().equals(sender.getId())) {
+            throw new IllegalStateException("방의 아티스트만 팬들에게 메시지를 보낼 수 있습니다.");
+        }
+
+        // 3) 타입 = ARTIST
+        MessageType type = MessageType.ARTIST;
+
+        // 4) 메시지 저장
+        ChatMessage message = ChatMessage.of(room, sender, type, request.getContent());
+        ChatMessage saved = chatMessageRepository.save(message);
+
+        // 5) Kafka 발행 → fan-channel (방 전체 팬들이 받음)
+        ChatMessageResponse response = ChatMessageResponse.from(saved);
+
+        kafkaTemplate.send(
+                "fan-channel",
+                room.getId().toString(),
+                response
+        );
+    }
 
 	/**
 	 * 현재 로그인 사용자 조회
@@ -87,8 +138,8 @@ public class ChatService {
 	 * 추후:
 	 * - WebSocket 세션 attribute 또는 SecurityContext 기반으로 교체
 	 */
-	private User getCurrentUser(Long senderId) {
+/*	private User getCurrentUser(Long senderId) {
 		return userRepository.findById(senderId)
 			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-	}
+	}*/
 }

@@ -53,9 +53,22 @@ public class ChatWebSocketController {
 	 * - senderId는 클라이언트에서 전송되지만, 서버에서 실제 로그인 사용자와 일치 검증 필요
 	 * - ChatService에서 getCurrentUser()로 실제 발신자 확인
 	 */
-	@MessageMapping("/chat/send")
+	/*@MessageMapping("/chat/send")
 	public void send(@Payload ChatMessageRequest request, Principal principal) {
 		PrincipalDetails loginUser = (PrincipalDetails) ((org.springframework.security.core.Authentication) principal).getPrincipal();
 		chatService.handleMessage(loginUser.getUser(), request);
-	}
+	}*/
+
+    @MessageMapping("/chat/send/fan")
+    public void sendFanMessage(ChatMessageRequest request, Principal principal) {
+        PrincipalDetails loginUser = (PrincipalDetails) ((org.springframework.security.core.Authentication) principal).getPrincipal();
+        chatService.sendToArtist(loginUser.getUser(), request);// Kafka → artist-channel
+    }
+
+    @MessageMapping("/chat/send/artist")
+    public void sendArtistMessage(ChatMessageRequest request, Principal principal) {
+        PrincipalDetails loginUser = (PrincipalDetails) ((org.springframework.security.core.Authentication) principal).getPrincipal();
+        chatService.sendToFans(loginUser.getUser(), request);     // Kafka → fan-channel
+    }
+
 }

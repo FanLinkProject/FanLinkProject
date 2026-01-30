@@ -34,6 +34,26 @@ public class ChatDMController {
 		return chatDMService.getCurrentUserId(email);
 	}
 
+    // -----------------------------------
+    // 0-1. 프론트에서 Role 조회
+    // GET /api/chat/DM/role
+    // -----------------------------------
+    @GetMapping("/role")
+    public Map<String, String> getMyRole(@AuthenticationPrincipal PrincipalDetails principal) {
+        String role = principal.getUser().getRole().name(); // FAN / ARTIST
+        return Map.of("role", role);
+    }
+
+    // -----------------------------------
+    // 0-2. 프론트에서 닉네임 조회
+    // GET /api/chat/DM/nickname
+    // -----------------------------------
+    @GetMapping("/nickname")
+    public Map<String, String> getMyNickname(@AuthenticationPrincipal PrincipalDetails principal) {
+        String nickname = principal.getUser().getNickname(); // 엔티티에서 바로 닉네임
+        return Map.of("nickname", nickname);
+    }
+
 	// -----------------------------------
 	// 1. 채팅방 생성
 	// POST /api/chat/DM/rooms
