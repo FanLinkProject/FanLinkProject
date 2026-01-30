@@ -92,6 +92,7 @@ public class SubscriptionService {
 
                 // 6. Payment 엔티티 생성
                 Payment payment = Payment.builder()
+                                .userId(userId)
                                 .orderId(null) // 구독 결제는 주문 없음
                                 .paymentKey(paymentResponse.getPaymentKey())
                                 .amount(BigDecimal.valueOf(paymentResponse.getTotalAmount()))
@@ -195,6 +196,7 @@ public class SubscriptionService {
 
                 // 7. Payment 기록 생성 (이력 관리용)
                 Payment payment = Payment.builder()
+                                .userId(userId)
                                 .orderId(savedOrder.getId()) // Order ID 연결
                                 .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
                                 .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디 = 100원 가치 추산
