@@ -11,14 +11,11 @@ import org.example.backend.payment.entity.Payment;
 import org.example.backend.payment.enums.PaymentMethod;
 import org.example.backend.payment.enums.PaymentStatus;
 import org.example.backend.payment.repository.PaymentRepository;
-import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductType;
-import org.example.backend.settlement.entity.SettlementPending;
-import org.example.backend.settlement.enums.SettlementSourceType;
-import org.example.backend.settlement.repository.SettlementPendingRepository;
+import org.example.backend.settlement.event.PaymentCompletedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.backend.product.enums.ProductPaymentMethod;
 
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
@@ -40,14 +37,14 @@ public class PaymentService {
     private final PaymentAdapter paymentAdapter;
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
-    private final SettlementPendingRepository settlementPendingRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final SubscriptionRepository subscriptionRepository;
 
     /**
      * 결제 승인 요청을 처리합니다. (단건 결제)
-     * 가장 중요한 로직은 주문 금액 검증과 결제 승인 후 정산 데이터 생성입니다.
+     * 결제 승인 후 이벤트를 발행하여 정산 데이터를 생성합니다.
      *
      * @param paymentKey Toss Payments 결제 키
      * @param orderNo    주문 번호
@@ -96,38 +93,14 @@ public class PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
-        // 5. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
-        for (OrderItem item : order.getOrderItems()) {
-            if (item.getProduct().getType() == ProductType.CASH) {
-                // 충전량 계산 규칙: 100원당 1캔디
-                long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
+        // 5. 후속 처리 (캔디 충전 등)
+        processPostPaymentActions(order);
 
-                // 유저 조회 후 충전
-                User user = userRepository.findById(order.getUserId())
-                        .orElseThrow(() -> new PaymentException(PaymentErrorCode.USER_NOT_FOUND));
-                user.chargeCandy(candyAmount);
-                // 변경된 유저 상태 저장 (Transaction 내에서 Dirty Checking으로 반영되겠지만 명시적으로 save 호출 가능. Dirty
-                // Checking 믿고 생략 가능)
-
-                log.info("캔디 충전 완료: userId={}, amount={}", user.getId(), candyAmount);
-            }
-        }
-
-        // 6. 정산 대기 데이터 생성 (캔디 충전 제외)
-        createSettlementPendingIfNeeded(order, savedPayment);
+        // 6. 결제 완료 이벤트 발행 (정산 처리를 위해)
+        eventPublisher.publishEvent(new PaymentCompletedEvent(this, savedPayment, order));
 
         return savedPayment;
     }
-
-    /**
-     * 정기 결제를 위한 빌링키를 발급받습니다.
-     * 이 메서드는 빌링키 발급만 수행하며, 실제 결제는 이루어지지 않습니다.
-     *
-     * @param authKey     Toss 위젯에서 받은 인증 키
-     * @param customerKey 고객 식별 키
-     * @param userId      유저 ID
-     * @return 발급된 빌링키
-     */
 
     /**
      * 발급된 빌링키를 사용하여 정기 결제를 수행합니다.
@@ -144,9 +117,6 @@ public class PaymentService {
         // 1. 주문 조회 및 검증
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.ORDER_NOT_FOUND));
-
-        // userId는 주문에서 가져옴 (구독 갱신 시에도 주문 정보에 userId가 있어야 함. 만약 가상 주문이라면 userId 설정 필요)
-        // 현재 로직상 orderId로 조회한 Order에는 항상 userId가 있음.
 
         TossPaymentDto.PaymentConfirmResponse response;
         try {
@@ -177,8 +147,38 @@ public class PaymentService {
                 .paidAt(LocalDateTime.parse(response.getApprovedAt()))
                 .build();
 
-        return paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // 4. 후속 처리 (캔디 충전 등)
+        processPostPaymentActions(order);
+
+        // 5. 결제 완료 이벤트 발행 (정산 처리를 위해)
+        eventPublisher.publishEvent(new PaymentCompletedEvent(this, savedPayment, order));
+
+        return savedPayment;
     }
+
+    /**
+     * 결제 성공 후 후속 처리를 수행합니다.
+     * 예: CASH 타입 상품 구매 시 캔디 충전
+     */
+    private void processPostPaymentActions(Order order) {
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getProduct().getType() == ProductType.CASH) {
+                // 충전량 계산 규칙: 100원당 1캔디
+                long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
+
+                // 유저 조회 후 충전
+                User user = userRepository.findById(order.getUserId())
+                        .orElseThrow(() -> new PaymentException(PaymentErrorCode.USER_NOT_FOUND));
+                user.chargeCandy(candyAmount);
+
+                log.info("캔디 충전 완료: userId={}, amount={}", user.getId(), candyAmount);
+            }
+        }
+    }
+
+
 
     /**
      * 내 결제 내역을 조회합니다.
@@ -191,88 +191,8 @@ public class PaymentService {
     }
 
     /**
-     * 결제 후속 처리를 수행합니다. (캔디 충전 및 정산 대기 데이터 생성)
-     * 이 메서드는 단건 결제(confirmPayment)와 정기 결제(billingPayment)에서 공통으로 호출됩니다.
+     * Toss Payments 한글 응답값을 Enum으로 변환
      */
-    private void processPostPaymentActions(Order order, Payment payment) {
-        // 1. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
-        for (OrderItem item : order.getOrderItems()) {
-            if (item.getProduct().getType() == ProductType.CASH) {
-                // 충전량 계산 규칙: 100원당 1캔디 (가정)
-                long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
-
-                // 유저 조회 후 충전
-                org.example.backend.user.entity.User user = userRepository.findById(order.getUserId())
-                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
-                user.chargeCandy(candyAmount);
-
-                log.info("캔디 충전 완료: userId={}, amount={}, orderNo={}", user.getId(), candyAmount, order.getOrderNo());
-            }
-        }
-
-        // 2. 정산 대기 데이터 생성 (캔디 충전 제외)
-        createSettlementPendingIfNeeded(order, payment);
-    }
-
-    // 정산 대기 데이터 생성 (캔디 충전 제외)
-    // 캔디 충전은 정산 대상이 아니며, 아티스트 상품(MD, 멤버십 등) 구매 시에만 정산 데이터(SettlementPending)가
-    // 생성됩니다.
-    private void createSettlementPendingIfNeeded(Order order, Payment payment) {
-        for (OrderItem item : order.getOrderItems()) {
-            Product product = item.getProduct();
-
-            // 캔디 충전 상품은 정산 대상이 아님
-            // 정산 대상이 아니면 스킵 (플랫폼 수익 상품 등)
-            if (!product.getType().isSettlementTarget()) {
-                continue;
-            }
-
-            // artistId 검증 (정산 대상이나 artistId가 누락된 경우)
-            if (product.getArtistId() == null) {
-                log.warn("정산 대상 상품에 아티스트 ID 누락: {}", product.getName());
-                continue;
-            }
-
-            // 정산 소스 타입 결정
-            SettlementSourceType sourceType = determineSourceType(product.getType());
-
-            // 정산 금액 계산 (단가 * 수량)
-            // 캔디 결제인 경우, 1 캔디당 100원으로 계산
-            long settlementAmount;
-            if (product.getPaymentMethod() == ProductPaymentMethod.CANDY_ONLY) {
-                // candyPrice가 null일 수 있으므로 안전하게 처리 (Product 생성 시 검증됨)
-                long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
-                settlementAmount = candyPrice * 100 * item.getQuantity();
-            } else {
-                settlementAmount = item.getPrice().longValue() * item.getQuantity();
-            }
-
-            // SettlementPending 생성
-            SettlementPending pending = SettlementPending.builder()
-                    .paymentId(payment.getId())
-                    .artistId(product.getArtistId())
-                    .amount(settlementAmount)
-                    .orderName(product.getName())
-                    .sourceType(sourceType)
-                    .build();
-
-            settlementPendingRepository.save(pending);
-
-            log.info("정산 대기열 생성: artistId={}, amount={}, product={}",
-                    product.getArtistId(), settlementAmount, product.getName());
-        }
-    }
-
-    // ProductType -> SettlementSourceType 변환
-    private SettlementSourceType determineSourceType(ProductType productType) {
-        return switch (productType) {
-            case SETTLEMENT_CANDY -> SettlementSourceType.CANDY;
-            case SETTLEMENT_CASH -> SettlementSourceType.CASH;
-            default -> throw new IllegalArgumentException("정산 불가능한 상품 타입입니다: " + productType);
-        };
-    }
-
-    // Toss Payments 한글 응답값을 Enum으로 변환
     private PaymentMethod convertPaymentMethod(String tossMethod) {
         return switch (tossMethod) {
             case "카드" -> PaymentMethod.CARD;
