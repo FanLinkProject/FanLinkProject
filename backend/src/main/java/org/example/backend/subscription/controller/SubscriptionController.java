@@ -38,7 +38,8 @@ public class SubscriptionController {
                                 principal.getUser().getId(),
                                 request.getProductId(),
                                 request.getAuthKey(),
-                                request.getCustomerKey());
+                                request.getCustomerKey(),
+                                request.getOrderNo());
 
                 return ResponseEntity.ok(SubscriptionResponse.fromEntity(subscription));
         }
