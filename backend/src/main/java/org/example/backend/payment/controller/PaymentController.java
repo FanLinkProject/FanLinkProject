@@ -42,6 +42,16 @@ public class PaymentController {
         return ResponseEntity.ok(payment);
     }
 
+    @GetMapping("/fail")
+    public ResponseEntity<String> failPayment(
+            @RequestParam String code,
+            @RequestParam String message,
+            @RequestParam String orderId) { // Tosspayments는 orderId 파라미터로 주문번호를 전달함
+
+        paymentService.handlePaymentFailure(code, message, orderId);
+        return ResponseEntity.ok("결제 실패 처리 완료: " + message);
+    }
+
     @GetMapping("/my")
     public ResponseEntity<java.util.List<Payment>> getMyPayments(
             @AuthenticationPrincipal PrincipalDetails principal) {
