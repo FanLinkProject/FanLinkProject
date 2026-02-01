@@ -241,4 +241,23 @@ public class PaymentService {
             }
         };
     }
+
+    /**
+     * 결제 실패 처리
+     * Toss Payments에서 리다이렉트된 실패 요청을 처리합니다.
+     *
+     * @param code    에러 코드
+     * @param message 에러 메시지
+     * @param orderNo 주문 번호
+     */
+    @Transactional
+    public void handlePaymentFailure(String code, String message, String orderNo) {
+        Order order = orderRepository.findByOrderNo(orderNo)
+                .orElseThrow(() -> new PaymentException(PaymentErrorCode.ORDER_NOT_FOUND));
+
+        order.updateStatus(OrderStatus.FAILED);
+        orderRepository.save(order);
+
+        log.error("Payment Failed: code={}, message={}, orderNo={}", code, message, orderNo);
+    }
 }
