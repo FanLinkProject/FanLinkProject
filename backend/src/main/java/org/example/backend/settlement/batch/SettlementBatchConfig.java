@@ -19,9 +19,12 @@ import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilde
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
+import java.net.SocketTimeoutException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +62,18 @@ public class SettlementBatchConfig {
                 .reader(artistReader())
                 .processor(settlementProcessor(null, null))
                 .writer(settlementWriter())
+
+                // --- 재시도 로직 ---
+                .faultTolerant() // 내결함성 기능 활성화
+
+                .retryLimit(3)   // 에러 발생 시 최대 3번까지 다시 시도
+                .retry(OptimisticLockingFailureException.class) // DB 낙관적 락 에러 시 재시도
+                .retry(DeadlockLoserDataAccessException.class)  // 데드락 발생 시 재시도
+                .retry(SocketTimeoutException.class)           // 네트워크 타임아웃 시 재시도
+
+                .skipLimit(10)   // 특정 데이터 에러 시 최대 10건까지는 건너뜀
+                .skip(IllegalArgumentException.class) // 비즈니스 로직 에러 시 해당 아티스트만 스킵
+
                 .build();
     }
 
