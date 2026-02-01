@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE:fanlinkdb}
-    username: ${MYSQL_USER}
-    password: ${MYSQL_PASSWORD}
+    url: jdbc:mysql://localhost:3306/fanlink?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+    username: root
+    password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -15,8 +15,37 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  
+  # 이메일 발송 설정 (Gmail SMTP 예시)
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:hyen20902@gmail.com}
+    password: ${MAIL_PASSWORD:wwecbxjfkgzyugyn}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# SMS API 설정 (실제 SMS 발송을 위한 설정 - CoolSMS)
+sms:
+  api:
+    enabled: ${SMS_API_ENABLED:false}  # false: 개발 모드 (로그만 출력), true: 실제 SMS 발송
+    key: ${SMS_API_KEY:NCS9IYN7V6XVXFCY}
+    secret: ${SMS_API_SECRET:0OEALX4OKX2DIQS8GY4FMUDXK9ZKJVF6}
+    from: ${SMS_FROM:01083368078}  # 발신번호 (CoolSMS에 등록된 번호)
 
 # 암호화 키 설정 (환경 변수 ENCRYPTION_KEY로 설정 가능, 32바이트 권장)
-# 프로덕션 환경에서는 반드시 환경 변수로 설정
+# 프로덕션 환경에서는 반드시 환경 변수로 설정하세요
 encryption:
   key: ${ENCRYPTION_KEY:default-encryption-key-32bytes!!}
+

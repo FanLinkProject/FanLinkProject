@@ -38,6 +38,10 @@ public record SignupRequest(
         Boolean privacyPolicyAgreed,
 
         @NotBlank(message = "전화번호를 입력하세요.")
-        String phoneNumber
+        String phoneNumber,
+
+        @NotBlank(message = "이메일 인증 코드는 반드시 입력해야 합니다.")
+        @Pattern(regexp = "^\\d{6}$", message = "인증 코드는 6자리 숫자여야 합니다.")
+        String emailVerificationCode
 ) {
 }

@@ -25,7 +25,16 @@ public enum UserErrorCode implements ErrorCode {
     ACCOUNT_ALREADY_EXISTS(HttpStatus.CONFLICT, "ACCOUNT_ALREADY_EXISTS", "이미 등록된 계좌 정보가 있습니다."),
 
     // 캔디 관련
-    NOT_ENOUGH_CANDY(HttpStatus.BAD_REQUEST, "NOT_ENOUGH_CANDY", "캔디가 부족합니다.");
+    NOT_ENOUGH_CANDY(HttpStatus.BAD_REQUEST, "NOT_ENOUGH_CANDY", "캔디가 부족합니다."),
+
+    // 인증 코드 관련
+    EMAIL_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "EMAIL_VERIFICATION_FAILED", "이메일 인증이 완료되지 않았습니다. 인증 코드를 확인해주세요."),
+    PHONE_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "PHONE_VERIFICATION_FAILED", "전화번호 인증이 완료되지 않았습니다. 인증번호를 확인해주세요."),
+    PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "PHONE_NUMBER_ALREADY_EXISTS", "이미 사용 중인 전화번호입니다."),
+
+    // 발송 관련
+    EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_SEND_FAILED", "이메일 발송에 실패했습니다."),
+    SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS_SEND_FAILED", "SMS 발송에 실패했습니다.");
 
     private final HttpStatus status;
     private final String code;

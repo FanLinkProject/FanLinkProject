@@ -29,9 +29,19 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenStore refreshTokenStore;
+    private final VerificationCodeService verificationCodeService;
 
     // 회원가입
     public SignupResponse signup(SignupRequest request) {
+        // 이메일 인증 확인
+        boolean isEmailVerified = verificationCodeService.verifyEmailCode(
+                request.email(),
+                request.emailVerificationCode()
+        );
+        if (!isEmailVerified) {
+            throw new BusinessException(UserErrorCode.EMAIL_VERIFICATION_FAILED);
+        }
+
         // 이메일 중복 확인
         if (userRepository.existsByEmail(request.email())) {
             throw new BusinessException(UserErrorCode.EMAIL_ALREADY_EXISTS);

@@ -48,30 +48,31 @@ public class SecurityConfig {
 
                 // 요청별 인증/인가 설정
                 .authorizeHttpRequests(auth -> auth
-                        // 인증 X
-                        .requestMatchers(
-                                "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
-                                "/error"                  // 에러 페이지(인증안된 경로 일때 )
-                        ).permitAll()
+                    // 인증 X
+                    .requestMatchers(
+                        "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
+                        "/api/verification/**",   // 인증 코드 발송/검증 API
+                        "/error"                  // 에러 페이지(인증안된 경로 일때 )
+                    ).permitAll()
 
-                        // 관리자
-                        .requestMatchers("/api/admin/**")
-                        .hasRole("ADMIN")
+                    // 관리자
+                    .requestMatchers("/api/admin/**")
+                    .hasRole("ADMIN")
 
-                        // 아티스트
-                        .requestMatchers("/api/artist/**")
-                        .hasAnyRole("ARTIST", "ADMIN")
+                    // 아티스트
+                    .requestMatchers("/api/artist/**")
+                    .hasAnyRole("ARTIST", "ADMIN")
 
-                        // 유저(팬)
-                        .requestMatchers("/api/user/**")
-                        .hasAnyRole("USER", "ARTIST", "ADMIN")
+                    // 유저(팬)
+                    .requestMatchers("/api/user/**")
+                    .hasAnyRole("USER", "ARTIST", "ADMIN")
 
-                        // 그 외 모든 요청은 인증 필요
-                        .anyRequest().authenticated()
+                    // 그 외 모든 요청은 인증 필요
+                    .anyRequest().authenticated()
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception
-                    .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
