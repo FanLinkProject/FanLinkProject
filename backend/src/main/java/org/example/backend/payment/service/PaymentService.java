@@ -16,11 +16,10 @@ import org.example.backend.settlement.event.PaymentCompletedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.order.enums.OrderStatus;
 
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
-import org.example.backend.product.repository.ProductRepository;
-import org.example.backend.subscription.repository.SubscriptionRepository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,8 +38,6 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final UserRepository userRepository;
-    private final ProductRepository productRepository;
-    private final SubscriptionRepository subscriptionRepository;
 
     /**
      * 결제 승인 요청을 처리합니다. (단건 결제)
@@ -68,11 +65,11 @@ public class PaymentService {
             response = paymentAdapter.confirmPayment(paymentKey, orderNo, amount);
 
             // 결제 성공 시 주문 상태 변경
-            order.updateStatus(org.example.backend.order.enums.OrderStatus.COMPLETED);
+            order.updateStatus(OrderStatus.COMPLETED);
             orderRepository.save(order);
         } catch (Exception e) {
             // 결제 실패 시 주문 상태 변경 (FAILED)
-            order.updateStatus(org.example.backend.order.enums.OrderStatus.FAILED);
+            order.updateStatus(OrderStatus.FAILED);
             orderRepository.save(order);
             // 원인 예외를 로그로 남기고 PaymentException 던짐
             log.error("Payment Confirmation Failed: {}", e.getMessage(), e);
@@ -83,6 +80,7 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .userId(order.getUserId()) // User ID 설정
                 .orderId(order.getId()) // DB FK는 여전히 ID 사용
+                .orderNo(orderNo) // Order No 저장
                 .paymentKey(paymentKey)
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
                 .status(PaymentStatus.DONE)
@@ -109,27 +107,27 @@ public class PaymentService {
      * @param billingKey  발급받은 빌링키
      * @param customerKey 고객 식별 키
      * @param amount      결제 금액
-     * @param orderId     주문 ID (구독 갱신 시에는 가상의 ID 사용 가능)
+     * @param orderNo     주문 번호 (UUID)
      * @return 결제 완료된 Payment 정보
      */
     @Transactional(noRollbackFor = PaymentException.class)
-    public Payment billingPayment(String billingKey, String customerKey, Long amount, Long orderId) {
+    public Payment billingPayment(String billingKey, String customerKey, Long amount, String orderNo) {
         // 1. 주문 조회 및 검증
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByOrderNo(orderNo)
                 .orElseThrow(() -> new PaymentException(PaymentErrorCode.ORDER_NOT_FOUND));
 
         TossPaymentDto.PaymentConfirmResponse response;
         try {
             // 2. Toss 자동 결제 요청
             response = paymentAdapter.billingPayment(billingKey, customerKey, amount,
-                    String.valueOf(orderId), order.getName());
+                    orderNo, order.getName());
 
             // 결제 성공 시 주문 상태 변경
-            order.updateStatus(org.example.backend.order.enums.OrderStatus.COMPLETED);
+            order.updateStatus(OrderStatus.COMPLETED);
             orderRepository.save(order);
         } catch (Exception e) {
             // 결제 실패 시 주문 상태 변경 (FAILED)
-            order.updateStatus(org.example.backend.order.enums.OrderStatus.FAILED);
+            order.updateStatus(OrderStatus.FAILED);
             orderRepository.save(order);
             // 원인 예외 로그
             log.error("Billing Payment Failed: {}", e.getMessage(), e);
@@ -139,12 +137,14 @@ public class PaymentService {
         // 3. 결제 정보 저장
         Payment payment = Payment.builder()
                 .userId(order.getUserId()) // User ID 설정
-                .orderId(orderId)
+                .orderId(order.getId())
+                .orderNo(orderNo)
                 .paymentKey(response.getPaymentKey())
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
                 .status(PaymentStatus.DONE)
                 .method(PaymentMethod.CARD) // 자동결제는 대부분 CARD
-                .paidAt(LocalDateTime.parse(response.getApprovedAt()))
+                .paidAt(LocalDateTime.parse(response.getApprovedAt(),
+                        java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
                 .build();
 
         Payment savedPayment = paymentRepository.save(payment);
@@ -178,8 +178,6 @@ public class PaymentService {
         }
     }
 
-
-
     /**
      * 내 결제 내역을 조회합니다.
      *
@@ -202,6 +200,7 @@ public class PaymentService {
         Payment payment = Payment.builder()
                 .userId(order.getUserId())
                 .orderId(order.getId())
+                .orderNo(order.getOrderNo())
                 .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
                 .amount(BigDecimal.valueOf(krwAmount))
                 .status(PaymentStatus.DONE)
