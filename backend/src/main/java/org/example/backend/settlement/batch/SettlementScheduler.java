@@ -28,7 +28,7 @@ public class SettlementScheduler {
     private final Job settlementJob;
 
     // 매월 15일 새벽 4시 실행
-    @Scheduled(cron = "0 0 4 15 * *")
+    @Scheduled(cron = "${settlement.batch.cron}", zone = "Asia/Seoul")
     public void runSettlementJob() {
         log.info("========== [자동 정산] 배치 시작 (매월 15일) ==========");
 
@@ -38,7 +38,6 @@ public class SettlementScheduler {
         LocalDate endDate = lastMonth.withDayOfMonth(lastMonth.lengthOfMonth());
 
         try {
-            // [안전장치 3] runTime 제거 -> 동일 파라미터로 실행 시 Spring Batch가 중복 실행 차단
             JobParameters params = new JobParametersBuilder()
                     .addString("startDate", startDate.toString())
                     .addString("endDate", endDate.toString())
