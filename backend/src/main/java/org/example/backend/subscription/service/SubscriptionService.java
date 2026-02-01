@@ -24,6 +24,7 @@ import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.product.enums.ProductPaymentMethod;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -66,7 +67,7 @@ public class SubscriptionService {
                                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품입니다."));
 
                 // 2. 캔디 충전 상품 검증
-                if (product.getType() != ProductType.CANDY_CHARGE) {
+                if (product.getType() != ProductType.CASH) {
                         throw new IllegalArgumentException("현금 구독은 캔디 충전 상품만 가능합니다.");
                 }
 
@@ -104,7 +105,7 @@ public class SubscriptionService {
                 paymentRepository.save(payment);
 
                 // 7. 캔디 충전
-                user.chargeCandy(product.getCandyPrice());
+                user.chargeCandy(product.getPrice() / 100);
 
                 // 8. Subscription 생성
                 LocalDateTime now = LocalDateTime.now();
@@ -119,19 +120,19 @@ public class SubscriptionService {
                                 .build();
 
                 log.info("현금 구독 생성: userId={}, product={}, candyCharged={}",
-                                userId, product.getName(), product.getCandyPrice());
+                                userId, product.getName(), product.getPrice() / 100);
 
                 return subscriptionRepository.save(subscription);
         }
 
         /**
-         * 캔디 정기차감 구독을 생성합니다. (멤버십/DM)
+         * 캔디 정기차감 구독을 생성합니다. (광고제거/DM)
          * 1. 유저 보유 캔디 확인 및 차감
          * 2. 구독 정보 저장
          * 3. 아티스트 상품인 경우 정산 대기 데이터 생성
          *
          * @param userId    유저 ID
-         * @param productId 상품 ID (멤버십 상품이어야 함)
+         * @param productId 상품 ID
          * @return 생성된 구독 엔티티
          */
         @Transactional
@@ -142,9 +143,9 @@ public class SubscriptionService {
                 Product product = productRepository.findById(productId)
                                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품입니다."));
 
-                // 2. 멤버십 상품 검증
-                if (product.getType() != ProductType.MEMBERSHIP) {
-                        throw new IllegalArgumentException("캔디 구독은 멤버십 상품만 가능합니다.");
+                // 2. 멤버십 상품 검증 (캔디 결제 상품인지 확인)
+                if (product.getPaymentMethod() != ProductPaymentMethod.CANDY_ONLY) {
+                        throw new IllegalArgumentException("캔디 구독은 캔디 결제 상품만 가능합니다.");
                 }
 
                 // 3. 중복 구독 확인
@@ -201,7 +202,7 @@ public class SubscriptionService {
                                 .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
                                 .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디 = 100원 가치 추산
                                 .status(PaymentStatus.DONE)
-                                .method(PaymentMethod.CARD) // TODO: ENUM에 CANDY 추가 권장
+                                .method(PaymentMethod.CANDY)
                                 .paidAt(now)
                                 .build();
                 paymentRepository.save(payment);
