@@ -110,7 +110,7 @@ export default function PaymentTestPage() {
           // 카드 구독: 빌링키 발급 요청 (카드 등록)
           await tossPayments.requestBillingAuth("카드", {
             customerKey: "test_customer_" + Date.now(), // 실제로는 유저 고유 ID 사용
-            successUrl: window.location.origin + `/payment/success?productId=${selectedProduct.id}`,
+            successUrl: window.location.origin + `/payment/success?productId=${selectedProduct.id}&orderNo=${tossOrderId}`,
             failUrl: window.location.origin + "/payment/fail",
           });
         }
