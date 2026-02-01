@@ -13,4 +13,5 @@ public class CreateCashSubscriptionRequest {
     private Long productId;
     private String authKey;
     private String customerKey;
+    private String orderNo;
 }
