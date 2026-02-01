@@ -17,6 +17,8 @@ import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.product.enums.ProductPaymentMethod;
+import org.example.backend.subscription.exception.SubscriptionErrorCode;
+import org.example.backend.subscription.exception.SubscriptionException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -50,7 +52,8 @@ public class SubscriptionService {
          * @return 생성된 구독 엔티티
          */
         @Transactional
-        public Subscription createCashSubscription(Long userId, Long productId, String authKey, String customerKey) {
+        public Subscription createCashSubscription(Long userId, Long productId, String authKey, String customerKey,
+                        String orderNo) {
                 // 1. 유저 및 상품 조회
                 User user = userRepository.findById(userId)
                                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
@@ -65,31 +68,25 @@ public class SubscriptionService {
                 // 3. 중복 구독 확인
                 subscriptionRepository.findByUserIdAndProduct_IdAndIsActive(userId, productId, true)
                                 .ifPresent(s -> {
-                                        throw new IllegalArgumentException("이미 동일한 상품을 구독 중입니다.");
+                                        throw new SubscriptionException(SubscriptionErrorCode.DUPLICATE_SUBSCRIPTION);
                                 });
 
-                // 4. 빌링키 발급 (PaymentService 위임)
+                // 4. 주문 조회 (Frontend에서 생성한 주문)
+                Order order = orderRepository.findByOrderNo(orderNo)
+                                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 주문입니다."));
+
+                // 주문 유효성 검증
+                if (!order.getUserId().equals(userId)) {
+                        throw new IllegalArgumentException("본인의 주문만 처리할 수 있습니다.");
+                }
+                // 결제 금액 검증 (상품 가격과 주문 금액 일치 여부)
+                // 주의: order.totalAmount와 product.price 비교 (BigDecimal vs Long)
+                if (order.getTotalAmount().compareTo(BigDecimal.valueOf(product.getPrice())) != 0) {
+                        throw new IllegalArgumentException("주문 금액이 상품 가격과 일치하지 않습니다.");
+                }
+
+                // 5. 빌링키 발급 (PaymentService 위임)
                 String billingKey = paymentService.issueBillingKey(authKey, customerKey);
-
-                // 5. Order 생성 (Payment 서비스는 Order ID를 요구함)
-                Order order = Order.builder()
-                                .userId(userId)
-                                .totalAmount(BigDecimal.valueOf(product.getPrice()))
-                                .totalCandyAmount(0L)
-                                .name(product.getName() + " (구독)")
-                                .status(OrderStatus.PENDING) // 결제 전 단계
-                                .orderNo("CASH_SUB_" + java.util.UUID.randomUUID().toString())
-                                .build();
-
-                OrderItem orderItem = OrderItem.builder()
-                                .product(product)
-                                .quantity(1)
-                                .price(BigDecimal.valueOf(product.getPrice()))
-                                .candyPrice(0L)
-                                .build();
-
-                order.addOrderItem(orderItem);
-                Order savedOrder = orderRepository.save(order);
 
                 // 6. 첫 결제 실행 (PaymentService 위임)
                 // 내부에서 Payment 생성, 캔디 충전(PostAction), 이벤트 발행(정산) 모두 처리됨
@@ -97,7 +94,7 @@ public class SubscriptionService {
                                 billingKey,
                                 customerKey,
                                 product.getPrice(),
-                                savedOrder.getOrderNo()); // 수정: Order ID(Long) -> Order No(String)
+                                order.getOrderNo());
 
                 // 7. Subscription 생성
                 LocalDateTime now = LocalDateTime.now();
@@ -145,7 +142,7 @@ public class SubscriptionService {
                 // 3. 중복 구독 확인
                 subscriptionRepository.findByUserIdAndProduct_IdAndIsActive(userId, productId, true)
                                 .ifPresent(s -> {
-                                        throw new IllegalArgumentException("이미 동일한 상품을 구독 중입니다.");
+                                        throw new SubscriptionException(SubscriptionErrorCode.DUPLICATE_SUBSCRIPTION);
                                 });
 
                 // 4. 캔디 잔액 확인 및 차감
