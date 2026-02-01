@@ -2,16 +2,11 @@ package org.example.backend.subscription.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.backend.payment.adapter.PaymentAdapter;
-import org.example.backend.payment.dto.TossPaymentDto;
 import org.example.backend.payment.entity.Payment;
 import org.example.backend.payment.enums.PaymentMethod;
 import org.example.backend.payment.enums.PaymentStatus;
 import org.example.backend.payment.repository.PaymentRepository;
 import org.example.backend.product.entity.Product;
-import org.example.backend.settlement.entity.SettlementPending;
-import org.example.backend.settlement.enums.SettlementSourceType;
-import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
@@ -20,6 +15,9 @@ import org.example.backend.order.entity.Order;
 import org.example.backend.order.entity.OrderItem;
 import org.example.backend.order.enums.OrderStatus;
 import org.example.backend.order.repository.OrderRepository;
+import org.example.backend.payment.service.PaymentService;
+import org.example.backend.settlement.event.PaymentCompletedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,10 +33,10 @@ public class SubscriptionScheduler {
 
     private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
-    private final PaymentAdapter paymentAdapter;
+    private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
-    private final SettlementPendingRepository settlementPendingRepository;
     private final OrderRepository orderRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 매일 00:00에 정기 결제 로직을 실행하는 메인 스케줄러 메서드입니다.
@@ -103,48 +101,50 @@ public class SubscriptionScheduler {
 
     /**
      * 개별 현금 구독 처리
+     * Order 생성 -> 결제 -> 이벤트 -> 정산/캔디충전
      */
     private void processCashSubscription(Subscription subscription) {
         Product product = subscription.getProduct();
         String customerKey = "customer-" + subscription.getUserId();
 
-        // 1. 빌링키로 결제 실행
-        String orderIdForBilling = "subscription-renewal-" + subscription.getId() + "-" + System.currentTimeMillis();
-        TossPaymentDto.PaymentConfirmResponse response = paymentAdapter.billingPayment(
+        // 1. Order 생성 (필수: PaymentService가 Order를 요구함)
+        Order order = Order.builder()
+                .userId(subscription.getUserId())
+                .totalAmount(BigDecimal.valueOf(product.getPrice()))
+                .totalCandyAmount(0L)
+                .name(product.getName() + " (정기결제)")
+                .status(OrderStatus.PENDING) // 결제 전
+                .orderNo("SUB_CASH_" + java.util.UUID.randomUUID().toString())
+                .build();
+
+        OrderItem orderItem = OrderItem.builder()
+                .product(product)
+                .quantity(1)
+                .price(BigDecimal.valueOf(product.getPrice()))
+                .candyPrice(0L)
+                .build();
+        order.addOrderItem(orderItem);
+        Order savedOrder = orderRepository.save(order);
+
+        // 2. 통합 결제 서비스 호출 (결제 + 캔디충전 + 이벤트발행까지 모두 수행)
+        paymentService.billingPayment(
                 subscription.getBillingKey(),
                 customerKey,
                 product.getPrice(),
-                orderIdForBilling,
-                product.getName() + " (정기결제)");
+                savedOrder.getId()
+        );
 
-        // 2. Payment 엔티티 생성
-        Payment payment = Payment.builder()
-                .userId(subscription.getUserId())
-                .orderId(null)
-                .paymentKey(response.getPaymentKey())
-                .amount(BigDecimal.valueOf(response.getTotalAmount()))
-                .status(PaymentStatus.DONE)
-                .method(PaymentMethod.CARD)
-                .paidAt(LocalDateTime.parse(response.getApprovedAt(),
-                        java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
-                .build();
-        paymentRepository.save(payment);
-
-        // 3. 유저 캔디 충전
-        User user = userRepository.findById(subscription.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다."));
-        user.chargeCandy(product.getCandyPrice());
-
-        // 4. 다음 결제일 갱신 (수동으로 필드 업데이트 - Subscription에 메서드 필요)
+        // 3. 다음 결제일 갱신
         // TODO: Subscription 엔티티에 renewNextPaymentDate() 메서드 추가 권장
         subscriptionRepository.save(subscription);
 
-        log.info("현금 구독 갱신 성공: subscriptionId={}, userId={}, charged={}",
-                subscription.getId(), subscription.getUserId(), product.getCandyPrice());
+        log.info("현금 구독 갱신 성공: subscriptionId={}, userId={}",
+                subscription.getId(), subscription.getUserId());
     }
 
     /**
      * 개별 캔디 구독 처리
+     * 리팩토링: 직접 정산 데이터 생성 X -> PaymentCompletedEvent 발행 O
      */
     private void processCandySubscription(Subscription subscription) {
         Product product = subscription.getProduct();
@@ -179,33 +179,21 @@ public class SubscriptionScheduler {
                 .userId(subscription.getUserId())
                 .orderId(savedOrder.getId())
                 .paymentKey("CANDY_RENEW_" + java.util.UUID.randomUUID().toString())
-                .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L))
+                .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디=100원 환산 가치
                 .status(PaymentStatus.DONE)
-                .method(PaymentMethod.CARD) // ENUM에 CANDY 추가 권장
+                .method(PaymentMethod.CARD)
                 .paidAt(LocalDateTime.now())
                 .build();
         Payment savedPayment = paymentRepository.save(payment);
 
-        // 4. 정산 처리 (아티스트 DM 구독인 경우)
-        if (product.getArtistId() != null) {
-            SettlementPending pending = SettlementPending.builder()
-                    .paymentId(savedPayment.getId()) // 실제 Payment ID 연결
-                    .artistId(product.getArtistId())
-                    .amount(product.getCandyPrice() * 100L) // 1캔디=100원 환산
-                    .orderName(product.getName() + " (구독 갱신)")
-                    .sourceType(SettlementSourceType.CANDY)
-                    .build();
-            settlementPendingRepository.save(pending);
+        // 4. 정산 이벤트 발행
+        // SettlementEventListener가 ProductType을 보고 정산 여부를 판단하고 처리함
+        eventPublisher.publishEvent(new PaymentCompletedEvent(this, savedPayment, savedOrder));
 
-            log.info("정산 대기열 생성 (구독 갱신): artistId={}, amount={}",
-                    product.getArtistId(), product.getCandyPrice());
-        }
-
-        // 3. 다음 결제일 갱신
-        // TODO: Subscription 엔티티에 renewNextPaymentDate() 메서드 추가
+        // 5. 다음 결제일 갱신
         subscriptionRepository.save(subscription);
 
-        log.info("캔디 구독 갱신 성공: subscriptionId={}, userId={}, deducted={}",
-                subscription.getId(), subscription.getUserId(), product.getCandyPrice());
+        log.info("캔디 구독 갱신 성공 (이벤트 발행 완료): subscriptionId={}, userId={}",
+                subscription.getId(), subscription.getUserId());
     }
 }
