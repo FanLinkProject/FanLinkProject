@@ -36,7 +36,6 @@ public class SubscriptionService {
         private final ProductRepository productRepository;
         private final PaymentService paymentService;
 
-
         /**
          * 현금 정기결제 구독을 생성합니다. (캔디 정기 충전)
          * 1. Toss Payments 빌링키 발급
@@ -98,7 +97,7 @@ public class SubscriptionService {
                                 billingKey,
                                 customerKey,
                                 product.getPrice(),
-                                savedOrder.getId());
+                                savedOrder.getOrderNo()); // 수정: Order ID(Long) -> Order No(String)
 
                 // 7. Subscription 생성
                 LocalDateTime now = LocalDateTime.now();

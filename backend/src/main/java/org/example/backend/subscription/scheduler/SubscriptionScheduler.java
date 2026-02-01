@@ -131,8 +131,7 @@ public class SubscriptionScheduler {
                 subscription.getBillingKey(),
                 customerKey,
                 product.getPrice(),
-                savedOrder.getId()
-        );
+                savedOrder.getOrderNo());
 
         // 3. 다음 결제일 갱신
         // TODO: Subscription 엔티티에 renewNextPaymentDate() 메서드 추가 권장
