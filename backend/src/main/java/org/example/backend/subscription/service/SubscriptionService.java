@@ -6,21 +6,14 @@ import org.example.backend.order.entity.Order;
 import org.example.backend.order.entity.OrderItem;
 import org.example.backend.order.enums.OrderStatus;
 import org.example.backend.order.repository.OrderRepository;
-import org.example.backend.payment.adapter.PaymentAdapter;
-import org.example.backend.payment.dto.TossPaymentDto;
-import org.example.backend.payment.entity.Payment;
-import org.example.backend.payment.enums.PaymentMethod;
-import org.example.backend.payment.enums.PaymentStatus;
-import org.example.backend.payment.repository.PaymentRepository;
+import org.example.backend.payment.service.PaymentService;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductType;
 import org.example.backend.product.repository.ProductRepository;
-import org.example.backend.settlement.event.PaymentCompletedEvent;
 import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.product.enums.ProductPaymentMethod;
@@ -41,17 +34,15 @@ public class SubscriptionService {
         private final SubscriptionRepository subscriptionRepository;
         private final UserRepository userRepository;
         private final ProductRepository productRepository;
-        private final PaymentAdapter paymentAdapter;
-        private final PaymentRepository paymentRepository;
-        private final ApplicationEventPublisher eventPublisher;
+        private final PaymentService paymentService;
+
 
         /**
          * 현금 정기결제 구독을 생성합니다. (캔디 정기 충전)
          * 1. Toss Payments 빌링키 발급
-         * 2. 첫 결제 실행
-         * 3. Order 및 Payment 생성
-         * 4. 캔디 충전 및 구독 정보 저장
-         * 5. 결제 완료 이벤트 발행 (정산 처리를 위해)
+         * 2. Order 생성
+         * 3. 첫 결제 실행 (PaymentService 위임)
+         * 4. Subscription 생성
          *
          * @param userId      유저 ID
          * @param productId   상품 ID (캔디 충전 상품이어야 함)
@@ -78,31 +69,19 @@ public class SubscriptionService {
                                         throw new IllegalArgumentException("이미 동일한 상품을 구독 중입니다.");
                                 });
 
-                // 4. 빌링키 발급
-                TossPaymentDto.BillingKeyResponse billingKeyResponse = paymentAdapter.issueBillingKey(authKey,
-                                customerKey);
-                String billingKey = billingKeyResponse.getBillingKey();
+                // 4. 빌링키 발급 (PaymentService 위임)
+                String billingKey = paymentService.issueBillingKey(authKey, customerKey);
 
-                // 5. 첫 결제 실행
-                String orderIdForBilling = "subscription-" + userId + "-" + System.currentTimeMillis();
-                TossPaymentDto.PaymentConfirmResponse paymentResponse = paymentAdapter.billingPayment(
-                                billingKey,
-                                customerKey,
-                                product.getPrice(),
-                                orderIdForBilling,
-                                product.getName());
-
-                // 6. Order 생성 (Payment에 orderId가 필요함)
+                // 5. Order 생성 (Payment 서비스는 Order ID를 요구함)
                 Order order = Order.builder()
                                 .userId(userId)
                                 .totalAmount(BigDecimal.valueOf(product.getPrice()))
                                 .totalCandyAmount(0L)
                                 .name(product.getName() + " (구독)")
-                                .status(OrderStatus.COMPLETED)
+                                .status(OrderStatus.PENDING) // 결제 전 단계
                                 .orderNo("CASH_SUB_" + java.util.UUID.randomUUID().toString())
                                 .build();
 
-                // OrderItem 추가
                 OrderItem orderItem = OrderItem.builder()
                                 .product(product)
                                 .quantity(1)
@@ -111,26 +90,17 @@ public class SubscriptionService {
                                 .build();
 
                 order.addOrderItem(orderItem);
-
                 Order savedOrder = orderRepository.save(order);
 
-                // 7. Payment 엔티티 생성
-                Payment payment = Payment.builder()
-                                .userId(userId)
-                                .orderId(savedOrder.getId()) // Order ID 연결
-                                .paymentKey(paymentResponse.getPaymentKey())
-                                .amount(BigDecimal.valueOf(paymentResponse.getTotalAmount()))
-                                .status(PaymentStatus.DONE)
-                                .method(PaymentMethod.CARD)
-                                .paidAt(LocalDateTime.parse(paymentResponse.getApprovedAt(),
-                                                java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
-                                .build();
-                paymentRepository.save(payment);
+                // 6. 첫 결제 실행 (PaymentService 위임)
+                // 내부에서 Payment 생성, 캔디 충전(PostAction), 이벤트 발행(정산) 모두 처리됨
+                paymentService.billingPayment(
+                                billingKey,
+                                customerKey,
+                                product.getPrice(),
+                                savedOrder.getId());
 
-                // 8. 캔디 충전
-                user.chargeCandy(product.getPrice() / 100);
-
-                // 9. Subscription 생성
+                // 7. Subscription 생성
                 LocalDateTime now = LocalDateTime.now();
                 Subscription subscription = Subscription.builder()
                                 .userId(userId)
@@ -144,11 +114,7 @@ public class SubscriptionService {
 
                 Subscription savedSubscription = subscriptionRepository.save(subscription);
 
-                // 10. 결제 완료 이벤트 발행 (정산 처리를 위해)
-                eventPublisher.publishEvent(new PaymentCompletedEvent(this, payment, savedOrder));
-
-                log.info("현금 구독 생성: userId={}, product={}, candyCharged={}",
-                                userId, product.getName(), product.getPrice() / 100);
+                log.info("현금 구독 생성 완료: userId={}, subscriptionId={}", userId, savedSubscription.getId());
 
                 return savedSubscription;
         }
@@ -156,8 +122,9 @@ public class SubscriptionService {
         /**
          * 캔디 정기차감 구독을 생성합니다. (광고제거/DM)
          * 1. 유저 보유 캔디 확인 및 차감
-         * 2. 구독 정보 저장
-         * 3. 아티스트 상품인 경우 정산 대기 데이터 생성
+         * 2. Order 생성
+         * 3. Payment 생성 (PaymentService 위임)
+         * 4. Subscription 생성
          *
          * @param userId    유저 ID
          * @param productId 상품 ID
@@ -211,35 +178,21 @@ public class SubscriptionService {
                                 .orderNo("CANDY_SUB_" + java.util.UUID.randomUUID().toString())
                                 .build();
 
-                // OrderItem 추가
                 OrderItem orderItem = OrderItem.builder()
                                 .product(product)
                                 .quantity(1)
-                                .price(BigDecimal.ZERO) // 캔디 결제 상품의 현금가는 0으로 처리 (혹은 product.getPrice()가 0이면 그것 사용)
+                                .price(BigDecimal.ZERO)
                                 .candyPrice(product.getCandyPrice())
                                 .build();
 
                 order.addOrderItem(orderItem);
-
                 Order savedOrder = orderRepository.save(order);
 
-                // 7. Payment 기록 생성 (이력 관리용)
-                Payment payment = Payment.builder()
-                                .userId(userId)
-                                .orderId(savedOrder.getId()) // Order ID 연결
-                                .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
-                                .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디 = 100원 가치 추산
-                                .status(PaymentStatus.DONE)
-                                .method(PaymentMethod.CANDY)
-                                .paidAt(now)
-                                .build();
-                paymentRepository.save(payment);
+                // 7. Payment 기록 생성 (PaymentService 위임)
+                // 내부에서 Payment 저장 및 정산 이벤트 발행 처리
+                paymentService.createCandyPayment(savedOrder);
 
-                // 8. 결제 완료 이벤트 발행 (정산 처리를 위해)
-                eventPublisher.publishEvent(new PaymentCompletedEvent(this, payment, savedOrder));
-
-                log.info("캔디 구독 생성: userId={}, product={}, candyUsed={}",
-                                userId, product.getName(), product.getCandyPrice());
+                log.info("캔디 구독 생성 완료: userId={}, subscriptionId={}", userId, savedSubscription.getId());
 
                 return savedSubscription;
         }

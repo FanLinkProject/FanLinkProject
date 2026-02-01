@@ -191,6 +191,44 @@ public class PaymentService {
     }
 
     /**
+     * 캔디 결제(전액 캔디 사용)에 대한 Payment 기록을 생성합니다.
+     * PG사를 통하지 않는 내부 결제.
+     */
+    @Transactional
+    public Payment createCandyPayment(Order order) {
+        // 캔디 결제는 금액(amount)을 원화 가치로 환산하여 저장 (1캔디 = 100원 기준)
+        long krwAmount = order.getTotalCandyAmount() * 100L;
+
+        Payment payment = Payment.builder()
+                .userId(order.getUserId())
+                .orderId(order.getId())
+                .paymentKey("CANDY_" + java.util.UUID.randomUUID().toString())
+                .amount(BigDecimal.valueOf(krwAmount))
+                .status(PaymentStatus.DONE)
+                .method(PaymentMethod.CANDY) // ENUM에 CANDY 확인 필요, 없으면 CARD 등 대체
+                .paidAt(LocalDateTime.now())
+                .build();
+
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // 이벤트 발행
+        eventPublisher.publishEvent(new PaymentCompletedEvent(this, savedPayment, order));
+
+        return savedPayment;
+    }
+
+    /**
+     * 빌링키를 발급받습니다.
+     *
+     * @param authKey     인증 키
+     * @param customerKey 고객 키
+     * @return 발급된 빌링키
+     */
+    public String issueBillingKey(String authKey, String customerKey) {
+        return paymentAdapter.issueBillingKey(authKey, customerKey).getBillingKey();
+    }
+
+    /**
      * Toss Payments 한글 응답값을 Enum으로 변환
      */
     private PaymentMethod convertPaymentMethod(String tossMethod) {
