@@ -98,7 +98,7 @@ public class PaymentService {
 
         // 5. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
         for (OrderItem item : order.getOrderItems()) {
-            if (item.getProduct().getType() == ProductType.CANDY_CHARGE) {
+            if (item.getProduct().getType() == ProductType.CASH) {
                 // 충전량 계산 규칙: 100원당 1캔디
                 long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
 
@@ -197,7 +197,7 @@ public class PaymentService {
     private void processPostPaymentActions(Order order, Payment payment) {
         // 1. 캔디 충전 처리 (CANDY_CHARGE 상품인 경우)
         for (OrderItem item : order.getOrderItems()) {
-            if (item.getProduct().getType() == ProductType.CANDY_CHARGE) {
+            if (item.getProduct().getType() == ProductType.CASH) {
                 // 충전량 계산 규칙: 100원당 1캔디 (가정)
                 long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
 
@@ -222,13 +222,14 @@ public class PaymentService {
             Product product = item.getProduct();
 
             // 캔디 충전 상품은 정산 대상이 아님
-            if (product.getType() == ProductType.CANDY_CHARGE) {
+            // 정산 대상이 아니면 스킵 (플랫폼 수익 상품 등)
+            if (!product.getType().isSettlementTarget()) {
                 continue;
             }
 
-            // artistId가 없는 경우 (플랫폼 상품) 처리
+            // artistId 검증 (정산 대상이나 artistId가 누락된 경우)
             if (product.getArtistId() == null) {
-                log.warn("아티스트 ID가 없는 상품: {}", product.getName());
+                log.warn("정산 대상 상품에 아티스트 ID 누락: {}", product.getName());
                 continue;
             }
 
@@ -265,9 +266,9 @@ public class PaymentService {
     // ProductType -> SettlementSourceType 변환
     private SettlementSourceType determineSourceType(ProductType productType) {
         return switch (productType) {
-            case GOODS -> SettlementSourceType.PRODUCT;
-            case MEMBERSHIP -> SettlementSourceType.SUBSCRIPTION;
-            case CANDY_CHARGE -> SettlementSourceType.CANDY; // 실제로는 호출되지 않음
+            case SETTLEMENT_CANDY -> SettlementSourceType.CANDY;
+            case SETTLEMENT_CASH -> SettlementSourceType.CASH;
+            default -> throw new IllegalArgumentException("정산 불가능한 상품 타입입니다: " + productType);
         };
     }
 
