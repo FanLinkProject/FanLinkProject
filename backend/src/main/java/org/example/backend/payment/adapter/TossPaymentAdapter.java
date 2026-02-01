@@ -90,4 +90,20 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
         return restTemplate.postForObject(url, entity, TossPaymentDto.PaymentConfirmResponse.class);
     }
+
+    /**
+     * 주문 번호로 결제 정보를 조회합니다.
+     * (Pending 주문 정리 스케줄러에서 사용)
+     */
+    public TossPaymentDto.PaymentConfirmResponse getPaymentByOrderNo(String orderNo) {
+        String url = tossPaymentConfig.getBaseUrl() + "/payments/orders/" + orderNo;
+        try {
+            HttpEntity<?> entity = new HttpEntity<>(getHeaders());
+            return restTemplate.exchange(url, org.springframework.http.HttpMethod.GET, entity,
+                    TossPaymentDto.PaymentConfirmResponse.class).getBody();
+        } catch (Exception e) {
+            log.warn("Toss 결제 조회 실패 (orderNo={}): {}", orderNo, e.getMessage());
+            return null; // 조회 실패 시 null 반환 (404 등)
+        }
+    }
 }
