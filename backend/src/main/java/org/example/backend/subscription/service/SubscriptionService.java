@@ -15,13 +15,12 @@ import org.example.backend.payment.repository.PaymentRepository;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductType;
 import org.example.backend.product.repository.ProductRepository;
-import org.example.backend.settlement.entity.SettlementPending;
-import org.example.backend.settlement.enums.SettlementSourceType;
-import org.example.backend.settlement.repository.SettlementPendingRepository;
+import org.example.backend.settlement.event.PaymentCompletedEvent;
 import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.product.enums.ProductPaymentMethod;
@@ -44,13 +43,15 @@ public class SubscriptionService {
         private final ProductRepository productRepository;
         private final PaymentAdapter paymentAdapter;
         private final PaymentRepository paymentRepository;
-        private final SettlementPendingRepository settlementPendingRepository;
+        private final ApplicationEventPublisher eventPublisher;
 
         /**
          * 현금 정기결제 구독을 생성합니다. (캔디 정기 충전)
          * 1. Toss Payments 빌링키 발급
          * 2. 첫 결제 실행
-         * 3. 캔디 충전 및 구독 정보 저장
+         * 3. Order 및 Payment 생성
+         * 4. 캔디 충전 및 구독 정보 저장
+         * 5. 결제 완료 이벤트 발행 (정산 처리를 위해)
          *
          * @param userId      유저 ID
          * @param productId   상품 ID (캔디 충전 상품이어야 함)
@@ -91,10 +92,32 @@ public class SubscriptionService {
                                 orderIdForBilling,
                                 product.getName());
 
-                // 6. Payment 엔티티 생성
+                // 6. Order 생성 (Payment에 orderId가 필요함)
+                Order order = Order.builder()
+                                .userId(userId)
+                                .totalAmount(BigDecimal.valueOf(product.getPrice()))
+                                .totalCandyAmount(0L)
+                                .name(product.getName() + " (구독)")
+                                .status(OrderStatus.COMPLETED)
+                                .orderNo("CASH_SUB_" + java.util.UUID.randomUUID().toString())
+                                .build();
+
+                // OrderItem 추가
+                OrderItem orderItem = OrderItem.builder()
+                                .product(product)
+                                .quantity(1)
+                                .price(BigDecimal.valueOf(product.getPrice()))
+                                .candyPrice(0L)
+                                .build();
+
+                order.addOrderItem(orderItem);
+
+                Order savedOrder = orderRepository.save(order);
+
+                // 7. Payment 엔티티 생성
                 Payment payment = Payment.builder()
                                 .userId(userId)
-                                .orderId(null) // 구독 결제는 주문 없음
+                                .orderId(savedOrder.getId()) // Order ID 연결
                                 .paymentKey(paymentResponse.getPaymentKey())
                                 .amount(BigDecimal.valueOf(paymentResponse.getTotalAmount()))
                                 .status(PaymentStatus.DONE)
@@ -104,10 +127,10 @@ public class SubscriptionService {
                                 .build();
                 paymentRepository.save(payment);
 
-                // 7. 캔디 충전
+                // 8. 캔디 충전
                 user.chargeCandy(product.getPrice() / 100);
 
-                // 8. Subscription 생성
+                // 9. Subscription 생성
                 LocalDateTime now = LocalDateTime.now();
                 Subscription subscription = Subscription.builder()
                                 .userId(userId)
@@ -119,10 +142,15 @@ public class SubscriptionService {
                                 .isActive(true)
                                 .build();
 
+                Subscription savedSubscription = subscriptionRepository.save(subscription);
+
+                // 10. 결제 완료 이벤트 발행 (정산 처리를 위해)
+                eventPublisher.publishEvent(new PaymentCompletedEvent(this, payment, savedOrder));
+
                 log.info("현금 구독 생성: userId={}, product={}, candyCharged={}",
                                 userId, product.getName(), product.getPrice() / 100);
 
-                return subscriptionRepository.save(subscription);
+                return savedSubscription;
         }
 
         /**
@@ -207,8 +235,8 @@ public class SubscriptionService {
                                 .build();
                 paymentRepository.save(payment);
 
-                // 8. 정산 처리 (아티스트 DM 구독인 경우)
-                createSettlementIfNeeded(product, payment);
+                // 8. 결제 완료 이벤트 발행 (정산 처리를 위해)
+                eventPublisher.publishEvent(new PaymentCompletedEvent(this, payment, savedOrder));
 
                 log.info("캔디 구독 생성: userId={}, product={}, candyUsed={}",
                                 userId, product.getName(), product.getCandyPrice());
@@ -256,33 +284,4 @@ public class SubscriptionService {
                 return subscriptionRepository.findByUserIdAndIsActive(userId, true);
         }
 
-        /**
-         * 정산 대기 데이터(SettlementPending)를 생성합니다.
-         * 아티스트 상품(artistId가 있는 경우)에 대해서만 정산 데이터가 생성됩니다.
-         * 플랫폼 멤버십(artistId가 없는 경우)은 정산 제외됩니다.
-         *
-         * @param product 구독 상품
-         * @param payment 결제 정보 (Payment ID 추출용)
-         */
-        private void createSettlementIfNeeded(Product product, Payment payment) {
-                // artistId가 없으면 플랫폼 멤버십이므로 정산 제외
-                if (product.getArtistId() == null) {
-                        log.debug("플랫폼 멤버십이므로 정산 제외: {}", product.getName());
-                        return;
-                }
-
-                // SettlementPending 생성
-                SettlementPending pending = SettlementPending.builder()
-                                .paymentId(payment.getId())
-                                .artistId(product.getArtistId())
-                                .amount(product.getCandyPrice() * CANDY_PRICE)
-                                .orderName(product.getName() + " (구독)")
-                                .sourceType(SettlementSourceType.CANDY)
-                                .build();
-
-                settlementPendingRepository.save(pending);
-
-                log.info("정산 대기열 생성 (구독): artistId={}, amount={}, product={}",
-                                product.getArtistId(), product.getCandyPrice(), product.getName());
-        }
 }
