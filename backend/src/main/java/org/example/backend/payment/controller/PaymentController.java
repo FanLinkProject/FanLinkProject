@@ -17,7 +17,7 @@ import org.example.backend.global.security.details.PrincipalDetails;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/payments")
+@RequestMapping("/api/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 

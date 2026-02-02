@@ -16,7 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.example.backend.global.security.details.PrincipalDetails;
 
 @RestController
-@RequestMapping("/api/v1/subscriptions")
+@RequestMapping("/api/subscriptions")
 @RequiredArgsConstructor
 public class SubscriptionController {
 
