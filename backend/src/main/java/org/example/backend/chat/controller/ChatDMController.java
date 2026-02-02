@@ -29,9 +29,10 @@ public class ChatDMController {
 	// POST /api/chat/DM/userId
 	// -----------------------------------
 	@PostMapping("/userId")
-	public Long getCurrentUserId(@RequestBody Map<String, String> body) {
+	public  ResponseEntity<Long> getCurrentUserId(@RequestBody Map<String, String> body) {
 		String email = body.get("email");
-		return chatDMService.getCurrentUserId(email);
+        Long userId = chatDMService.getCurrentUserId(email);
+		return ResponseEntity.ok(userId);
 	}
 
     // -----------------------------------
@@ -39,9 +40,9 @@ public class ChatDMController {
     // GET /api/chat/DM/role
     // -----------------------------------
     @GetMapping("/role")
-    public Map<String, String> getMyRole(@AuthenticationPrincipal PrincipalDetails principal) {
+    public ResponseEntity<Map<String, String>> getMyRole(@AuthenticationPrincipal PrincipalDetails principal) {
         String role = principal.getUser().getRole().name(); // FAN / ARTIST
-        return Map.of("role", role);
+        return ResponseEntity.ok(Map.of("role", role));
     }
 
     // -----------------------------------
@@ -49,9 +50,9 @@ public class ChatDMController {
     // GET /api/chat/DM/nickname
     // -----------------------------------
     @GetMapping("/nickname")
-    public Map<String, String> getMyNickname(@AuthenticationPrincipal PrincipalDetails principal) {
+    public ResponseEntity<Map<String, String>> getMyNickname(@AuthenticationPrincipal PrincipalDetails principal) {
         String nickname = principal.getUser().getNickname(); // 엔티티에서 바로 닉네임
-        return Map.of("nickname", nickname);
+        return ResponseEntity.ok(Map.of("nickname", nickname));
     }
 
 	// -----------------------------------
@@ -81,23 +82,44 @@ public class ChatDMController {
 	// GET /api/chat/DM/rooms/{roomId}/messages?userId={userId}&cursor={cursorId}
 	// 서비스에서 role 체크 후 반환
 	// -----------------------------------
-	@GetMapping("/rooms/{roomId}/messages")
-	public List<ChatMessageResponse> getMessages(
+
+    /**
+     * 팬 화면 메시지 조회
+     * - cursor 없으면 최신 50개
+     * - cursor 있으면 과거 메시지 50개
+     */
+    @GetMapping("/fan/rooms/{roomId}/messages")
+	public ResponseEntity<List<ChatMessageResponse>> getMessages(
 		@PathVariable Long roomId,
 		@AuthenticationPrincipal PrincipalDetails principal,
 		@RequestParam(required = false) Long cursor
 	) {
-		System.out.println("roomId=" + roomId + ", userId=" + principal.getUserId() + ", cursor=" + cursor);
-
-
-		if (cursor == null) {
-			List<ChatMessageResponse> result = chatDMService.getLatestMessagesByRole(roomId, principal.getUserId());
-			System.out.println("result size=" + result.size());
-			return result;
-		} else {
-			List<ChatMessageResponse> result = chatDMService.getMessagesBeforeByRole(roomId, principal.getUserId(), cursor);
-			System.out.println("result size=" + result.size());
-			return result;
-		}
+        List<ChatMessageResponse> result;
+        if (cursor == null) {
+            result = chatDMService.getLatestMessagesByRole(roomId, principal.getUserId());
+        } else {
+            result = chatDMService.getMessagesBeforeByRole(roomId, principal.getUserId(), cursor);
+        }
+        return ResponseEntity.ok(result);
 	}
+
+
+    /**
+     * 아티스트 화면 메시지 조회
+     * - cursor 없으면 최신 50개
+     * - cursor 있으면 과거 메시지 50개
+     */
+    @GetMapping("/artist/rooms/{roomId}/messages")
+    public ResponseEntity<List<Object>> getArtistMessages(
+            @PathVariable Long roomId,
+            @RequestParam(required = false) Long cursor
+    ) {
+        List<Object> result;
+        if (cursor == null) {
+            result = chatDMService.getLatestMessagesForArtist(roomId);
+        } else {
+            result = chatDMService.getMessagesBeforeForArtist(roomId, cursor);
+        }
+        return ResponseEntity.ok(result);
+    }
 }

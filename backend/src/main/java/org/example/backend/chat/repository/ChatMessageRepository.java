@@ -67,4 +67,5 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
                                             @Param("userId") Long userId,
                                             @Param("cursorId") Long cursorId);
 
+
 }
