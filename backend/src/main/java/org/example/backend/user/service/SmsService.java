@@ -1,0 +1,91 @@
+package org.example.backend.user.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import net.nurigo.sdk.NurigoApp;
+import net.nurigo.sdk.message.model.Message;
+import net.nurigo.sdk.message.service.DefaultMessageService;
+import org.example.backend.global.exception.BusinessException;
+import org.example.backend.user.exception.UserErrorCode;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import jakarta.annotation.PostConstruct;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class SmsService {
+
+    @Value("${sms.api.enabled:false}")
+    private boolean smsApiEnabled;
+
+    @Value("${sms.api.key:}")
+    private String apiKey;
+
+    @Value("${sms.api.secret:}")
+    private String apiSecret;
+
+    @Value("${sms.api.from:}")
+    private String fromNumber;
+
+    private DefaultMessageService messageService;
+
+    // CoolSMS SDK 초기화
+    @PostConstruct
+    public void init() {
+        if (smsApiEnabled && !apiKey.isEmpty() && !apiSecret.isEmpty()) {
+            this.messageService = NurigoApp.INSTANCE.initialize(apiKey, apiSecret, "https://api.coolsms.co.kr");
+            log.info("CoolSMS 초기화 완료");
+        } else if (!smsApiEnabled) {
+            log.info("SMS 개발 모드: 실제 SMS 발송 없이 로그만 출력합니다.");
+        } else {
+            log.warn("CoolSMS API 키가 설정되지 않았습니다. SMS 발송이 불가능합니다.");
+        }
+    }
+
+    // 전화번호로 인증번호 발송
+    public void sendVerificationCode(String phoneNumber, String code) {
+        try {
+            if (smsApiEnabled && messageService != null) {
+                // 실제 SMS API 호출
+                sendSmsViaApi(phoneNumber, code);
+            } else {
+                // 개발 모드: 로그만 출력
+                log.info("=== SMS 인증번호 발송 (개발 모드) ===");
+                log.info("수신자: {}", phoneNumber);
+                log.info("인증번호: {}", code);
+                log.info("실제 SMS 발송을 위해서는 application.yml에 sms.api.enabled=true로 설정하세요.");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("SMS 발송 실패: {}", phoneNumber, e);
+            throw new BusinessException(UserErrorCode.SMS_SEND_FAILED);
+        }
+    }
+
+    // CoolSMS API를 통한 실제 SMS 발송
+    private void sendSmsViaApi(String phoneNumber, String code) {
+        if (messageService == null) {
+            throw new BusinessException(UserErrorCode.SMS_SEND_FAILED);
+        }
+
+        try {
+            // 전화번호 형식 변환 (하이픈 제거)
+            String cleanPhoneNumber = phoneNumber.replaceAll("-", "");
+            
+            Message message = new Message();
+            message.setFrom(fromNumber);
+            message.setTo(cleanPhoneNumber);
+            message.setText("[FanLink] 인증번호: " + code);
+
+            // SMS 발송
+            messageService.send(message);
+            log.info("SMS 인증번호 발송 완료: {} -> {}", phoneNumber, code);
+        } catch (Exception e) {
+            log.error("CoolSMS 발송 실패: {}", phoneNumber, e);
+            throw new BusinessException(UserErrorCode.SMS_SEND_FAILED);
+        }
+    }
+}

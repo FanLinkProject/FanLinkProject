@@ -2,8 +2,11 @@ package org.example.backend.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.backend.global.exception.BusinessException;
+import org.example.backend.global.util.StringEncryptor;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
+import org.example.backend.user.exception.UserErrorCode;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -35,7 +38,7 @@ public class User {
     private String name;
 
     @Column(name = "password", nullable = true)
-    private String password; // TODO : 암호화
+    private String password;
 
     @Column(name = "gender", nullable = false)
     private String gender;
@@ -47,8 +50,9 @@ public class User {
     @Column(name = "privacy_policy_agreed", nullable = false)
     private Boolean privacyPolicyAgreed;
 
+    @Convert(converter = StringEncryptor.class)
     @Column(name = "phone_number", unique = true, nullable = false)
-    private String phoneNumber; // TODO : 암호화
+    private String phoneNumber;
 
     @Column(name = "candy")
     private Long candy;
@@ -128,7 +132,7 @@ public class User {
             this.candy = 0L;
         }
         if (this.candy < amount) {
-            throw new IllegalArgumentException("Not enough candy");
+            throw new BusinessException(UserErrorCode.NOT_ENOUGH_CANDY);
         }
         this.candy -= amount;
     }

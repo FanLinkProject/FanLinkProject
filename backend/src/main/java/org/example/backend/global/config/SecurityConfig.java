@@ -30,7 +30,6 @@ public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
     private final JwtTokenProvider jwtTokenProvider;
-    //private AbstractRequestMatcherRegistry oauth;
 
     // 비밀번호 암호화
     @Bean
@@ -43,48 +42,39 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
 
-            // 기본 보안 설정 비활성화
-            // .csrf(AbstractHttpConfigurer::disable)
-            // .formLogin(AbstractHttpConfigurer::disable)
-            // .httpBasic(AbstractHttpConfigurer::disable)
-            
-            // CORS 설정 적용
-            // .cors(cors -> cors.configurationSource(corsConfigurationSource))
-            
-            // 세션 관리 상태 없음 설정
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 세션 관리 상태 없음 설정
+                .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // 요청별 인증/인가 설정
-            .authorizeHttpRequests(auth -> auth
-                // 인증 X
-                .requestMatchers(
-                    "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
-                    "/error"                  // 에러 페이지(인증안된 경로 일때 )
-                ).permitAll()
+                // 요청별 인증/인가 설정
+                .authorizeHttpRequests(auth -> auth
+                    // 인증 X
+                    .requestMatchers(
+                        "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
+                        "/api/verification/**",   // 인증 코드 발송/검증 API
+                        "/error"                  // 에러 페이지(인증안된 경로 일때 )
+                    ).permitAll()
 
-                // 관리자
-                .requestMatchers("/api/admin/**")
+                    // 관리자
+                    .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
-                
-                // 아티스트
-                .requestMatchers("/api/artist/**")
+
+                    // 아티스트
+                    .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "ADMIN")
-                
-                // 유저(팬)
-                .requestMatchers("/api/user/**")
+
+                    // 유저(팬)
+                    .requestMatchers("/api/user/**")
                     .hasAnyRole("USER", "ARTIST", "ADMIN")
-                
-                // 그 외 모든 요청은 인증 필요
-                .anyRequest().authenticated()
-            );
-        http
+
+                    // 그 외 모든 요청은 인증 필요
+                    .anyRequest().authenticated()
+                )
                 .formLogin(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // UsernamePasswordAuthenticationFilter 이전에 JWT 인증 필터를 실행
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
