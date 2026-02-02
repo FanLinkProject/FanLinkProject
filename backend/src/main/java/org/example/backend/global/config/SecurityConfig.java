@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.oauth2.OAuth2SuccessHandler;
-import org.example.backend.global.security.oauth2.PrincipalOAuth2UserService;
+import org.example.backend.global.security.service.PrincipalOAuth2UserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -55,6 +55,15 @@ public class SecurityConfig {
 
             // 요청별 인증/인가 설정
             .authorizeHttpRequests(auth -> auth
+                // 테스트용 코드 추후 삭제- 테스트 페이지 접근 허용
+                .requestMatchers(
+                        "/",
+                        "/index.html",
+                        "/callback.html",
+                        "/favicon.ico",
+                        "/css/**",
+                        "/js/**"
+                    ).permitAll()
                 // 인증 없이 접근 가능한 경로
                 .requestMatchers(
                     "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
