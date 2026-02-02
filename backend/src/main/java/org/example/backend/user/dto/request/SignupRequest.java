@@ -42,6 +42,14 @@ public record SignupRequest(
 
         @NotBlank(message = "이메일 인증 코드는 반드시 입력해야 합니다.")
         @Pattern(regexp = "^\\d{6}$", message = "인증 코드는 6자리 숫자여야 합니다.")
-        String emailVerificationCode
-) {
+        String emailVerificationCode,
+
+        //기본값 USER
+        String role
+)
+ {
+//    public String role() {
+//    return null;
+//    }
+
 }

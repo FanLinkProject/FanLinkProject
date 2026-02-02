@@ -52,6 +52,13 @@ public class AuthService {
             throw new BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
         }
 
+        // [수정] 역할 결정 로직
+        // 프론트에서 "ARTIST"라고 보내면 아티스트 권한 부여, 그 외에는 무조건 USER (ADMIN 가입 방지)
+        UserRole userRole = UserRole.USER;
+        if (request.role() != null && request.role().equalsIgnoreCase("ARTIST")) {
+            userRole = UserRole.ARTIST;
+        }
+
         // User 엔티티 생성(정적 팩토리 메서드 활용)
         User user = User.of(
                 request.email(),
@@ -62,7 +69,7 @@ public class AuthService {
                 request.birth(),
                 request.phoneNumber(),
                 request.privacyPolicyAgreed(),
-                UserRole.USER
+                userRole // 결정된 역할 추가
         );
 
         // User 저장
