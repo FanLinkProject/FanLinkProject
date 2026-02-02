@@ -75,6 +75,11 @@ public class SecurityConfig {
                                 "/api/orders/**")
                         .authenticated()
 
+                .requestMatchers(
+					"/ws-chat/**",
+					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
+                ).permitAll()
+
                 // 관리자
                 .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
