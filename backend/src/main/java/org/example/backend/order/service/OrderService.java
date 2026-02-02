@@ -11,6 +11,8 @@ import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.repository.ProductRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.example.backend.user.entity.User;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +35,7 @@ public class OrderService {
          * 실제 운영 환경에서는 사용되지 않으며, 결제 테스트 시 유효한 orderNo를 제공하기 위함입니다.
          *
          * @return 테스트용 주문 번호 (PENDING 상태)
-         * @throws OrderException 테스트 데이터가 없을 경우 or 주문이 이미 결제 완료된 경우
+         * @throws OrderException 테스트 데이터가 없을 경우 or 주문이 이미 처리된 경우
          */
         public String getTestPendingOrderNo() {
                 // PENDING 상태의 첫 번째 주문 조회 (테스트용)
@@ -49,25 +51,22 @@ public class OrderService {
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
+         * 
+         * 로직 흐름:
+         * 1. 사용자 조회 (Email)
+         * 2. 상품 조회 및 총액 계산 (DB 가격 기준), OrderItem 목록 생성
+         * 3. Order 생성 및 저장
          */
         @Transactional
         public String createOrder(String email, OrderRequestDto request) {
-                // 이메일로 사용자 조회
+                // 1. 이메일로 사용자 조회
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new OrderException(OrderErrorCode.USER_NOT_FOUND));
 
-                // 1. Order 객체 생성 (일단 금액은 0으로 초기화, 아이템 추가하면서 계산)
-                Order order = Order.builder()
-                                .userId(user.getId())
-                                .name(request.name())
-                                .totalAmount(BigDecimal.ZERO)
-                                .totalCandyAmount(0L)
-                                .status(OrderStatus.PENDING) // 초기 상태 PENDING
-                                .orderNo(java.util.UUID.randomUUID().toString())
-                                .build();
-
+                // 2. 상품 조회, 총액 계산, OrderItem 생성
                 BigDecimal calculatedTotalAmount = BigDecimal.ZERO;
                 long calculatedTotalCandyAmount = 0L;
+                List<OrderItem> orderItems = new ArrayList<>();
 
                 for (OrderItemDto itemDto : request.orderItems()) {
                         Product product = productRepository.findById(itemDto.productId())
@@ -82,33 +81,6 @@ public class OrderService {
                                         .add(itemPrice.multiply(BigDecimal.valueOf(itemDto.quantity())));
                         calculatedTotalCandyAmount += itemCandyPrice * itemDto.quantity();
 
-                        OrderItem orderItem = OrderItem.builder()
-                                        .product(product)
-                                        .quantity(itemDto.quantity())
-                                        .price(itemPrice)
-                                        .candyPrice(itemCandyPrice)
-                                        .build();
-
-                        order.addOrderItem(orderItem);
-                }
-
-                // 2. 계산된 총액으로 Order 업데이트
-
-                java.util.List<OrderItem> orderItems = new java.util.ArrayList<>();
-                calculatedTotalAmount = BigDecimal.ZERO;
-                calculatedTotalCandyAmount = 0L;
-
-                for (OrderItemDto itemDto : request.orderItems()) {
-                        Product product = productRepository.findById(itemDto.productId())
-                                        .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
-
-                        BigDecimal itemPrice = BigDecimal.valueOf(product.getPrice());
-                        Long itemCandyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
-
-                        calculatedTotalAmount = calculatedTotalAmount
-                                        .add(itemPrice.multiply(BigDecimal.valueOf(itemDto.quantity())));
-                        calculatedTotalCandyAmount += itemCandyPrice * itemDto.quantity();
-
                         // OrderItem 생성
                         OrderItem orderItem = OrderItem.builder()
                                         .product(product)
@@ -116,11 +88,12 @@ public class OrderService {
                                         .price(itemPrice)
                                         .candyPrice(itemCandyPrice)
                                         .build();
+
                         orderItems.add(orderItem);
                 }
 
-                // 2. Order 생성
-                order = Order.builder()
+                // 3. Order 생성
+                Order order = Order.builder()
                                 .userId(user.getId())
                                 .name(request.name())
                                 .totalAmount(calculatedTotalAmount)
@@ -129,11 +102,12 @@ public class OrderService {
                                 .orderNo(java.util.UUID.randomUUID().toString())
                                 .build();
 
-                // 3. 관계 설정
+                // 4. 관계 설정 (Order <-> OrderItem)
                 for (OrderItem item : orderItems) {
                         order.addOrderItem(item);
                 }
 
+                // 5. 저장
                 orderRepository.save(order);
                 return order.getOrderNo();
         }
