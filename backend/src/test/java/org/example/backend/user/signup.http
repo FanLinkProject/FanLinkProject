@@ -1,0 +1,54 @@
+### 회원가입 API 테스트 가이드
+### 이메일 인증 코드를 받는 방법:
+### 1. 실제 이메일로 받기 (Gmail SMTP 설정 필요)
+### 2. Redis에서 직접 확인하기 (개발/테스트용)
+
+### ============================================
+### 1단계: 이메일 인증 코드 발송
+### ============================================
+POST http://localhost:8080/api/verification/email/send
+Content-Type: application/json
+
+{
+  "email": "test4@example.com"
+}
+
+### ============================================
+### 이메일 인증 코드 확인 방법
+### ============================================
+### 방법 1: 실제 이메일 확인
+### - Gmail 설정이 되어 있다면 실제 이메일로 인증 코드가 발송됩니다
+### - 이메일을 확인하여 6자리 인증 코드를 복사하세요
+
+### 방법 2: Redis에서 직접 확인 (개발/테스트용)
+### 터미널에서 다음 명령어 실행:
+### docker exec -it fanlink-redis redis-cli GET email:code:test@example.com
+
+### ============================================
+### 2단계: 회원가입
+### ============================================
+### 위에서 받은 이메일 인증 코드를 emailVerificationCode에 입력하세요
+POST http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "test4@example.com",
+  "nickname": "test4",
+  "name": "가나바",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-1238-5678",
+  "role": "ARTIST",
+  "emailVerificationCode": "571486"
+}
+
+### ============================================
+### Redis에서 인증 코드 확인하는 스크립트 (참고)
+### ============================================
+### macOS/Linux:
+### redis-cli GET email:code:test@example.com
+###
+### Windows (Redis 설치된 경우):
+### redis-cli.exe GET email:code:test@example.com

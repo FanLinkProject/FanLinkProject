@@ -33,56 +33,71 @@ public class AuthService {
 
     // 회원가입
     public SignupResponse signup(SignupRequest request) {
-        // 이메일 인증 확인
-        boolean isEmailVerified = verificationCodeService.verifyEmailCode(
-                request.email(),
-                request.emailVerificationCode()
-        );
-        if (!isEmailVerified) {
-            throw new BusinessException(UserErrorCode.EMAIL_VERIFICATION_FAILED);
+        try {
+            // 이메일 인증 확인
+            boolean isEmailVerified = verificationCodeService.verifyEmailCode(
+                    request.email(),
+                    request.emailVerificationCode()
+            );
+            if (!isEmailVerified) {
+                throw new BusinessException(UserErrorCode.EMAIL_VERIFICATION_FAILED);
+            }
+
+            // 이메일 중복 확인
+            if (userRepository.existsByEmail(request.email())) {
+                throw new BusinessException(UserErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+
+            // 닉네임 중복 확인
+            if (userRepository.existsByNickname(request.nickname())) {
+                throw new BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
+            }
+
+            // [수정] 역할 결정 로직
+            // 프론트에서 "ARTIST"라고 보내면 아티스트 권한 부여, 그 외에는 무조건 USER (ADMIN 가입 방지)
+            UserRole userRole = UserRole.USER;
+            if (request.role() != null && request.role().equalsIgnoreCase("ARTIST")) {
+                userRole = UserRole.ARTIST;
+            }
+
+            // 전화번호 중복 확인
+            if (userRepository.existsByPhoneNumber(request.phoneNumber())) {
+                throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
+            }
+
+            // User 엔티티 생성(정적 팩토리 메서드 활용)
+            User user = User.of(
+                    request.email(),
+                    request.nickname(),
+                    request.name(),
+                    passwordEncoder.encode(request.password()),
+                    request.gender(),
+                    request.birth(),
+                    request.phoneNumber(),
+                    request.privacyPolicyAgreed(),
+                    userRole
+            );
+
+            // User 저장
+            User savedUser = userRepository.save(user);
+
+            // JWT 토큰 생성
+            String accessToken = jwtTokenProvider.createAccessToken(savedUser.getEmail(), savedUser.getRole().getValue());
+            String refreshToken = jwtTokenProvider.createRefreshToken(savedUser.getEmail(), savedUser.getRole().getValue());
+
+            // Redis-RefreshToken 저장
+            refreshTokenStore.save(savedUser.getEmail(), refreshToken);
+
+            return SignupResponse.from(savedUser, accessToken, refreshToken);
+        } catch (BusinessException e) {
+            // BusinessException은 그대로 전달
+            throw e;
+        } catch (Exception e) {
+            // 예상치 못한 예외는 로그에 기록하고 재발생
+            System.err.println("[ERROR] 회원가입 중 예외 발생: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("회원가입 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
-
-        // 이메일 중복 확인
-        if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException(UserErrorCode.EMAIL_ALREADY_EXISTS);
-        }
-
-        // 닉네임 중복 확인
-        if (userRepository.existsByNickname(request.nickname())) {
-            throw new BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
-        }
-
-        // [수정] 역할 결정 로직
-        // 프론트에서 "ARTIST"라고 보내면 아티스트 권한 부여, 그 외에는 무조건 USER (ADMIN 가입 방지)
-        UserRole userRole = UserRole.USER;
-        if (request.role() != null && request.role().equalsIgnoreCase("ARTIST")) {
-            userRole = UserRole.ARTIST;
-        }
-
-        // User 엔티티 생성(정적 팩토리 메서드 활용)
-        User user = User.of(
-                request.email(),
-                request.nickname(),
-                request.name(),
-                passwordEncoder.encode(request.password()),
-                request.gender(),
-                request.birth(),
-                request.phoneNumber(),
-                request.privacyPolicyAgreed(),
-                userRole // 결정된 역할 추가
-        );
-
-        // User 저장
-        User savedUser = userRepository.save(user);
-
-        // JWT 토큰 생성
-        String accessToken = jwtTokenProvider.createAccessToken(savedUser.getEmail(), savedUser.getRole().getValue());
-        String refreshToken = jwtTokenProvider.createRefreshToken(savedUser.getEmail(), savedUser.getRole().getValue());
-
-        // Redis-RefreshToken 저장
-        refreshTokenStore.save(savedUser.getEmail(), refreshToken);
-
-        return SignupResponse.from(savedUser, accessToken, refreshToken);
     }
 
     // 로그인

@@ -67,8 +67,13 @@ public class VerificationCodeService {
         String storedCode = redisTemplate.opsForValue().get(key);
         
         if (storedCode == null) {
-            return false; // 인증 코드가 없거나 만료됨
+            // 디버깅: 인증 코드가 없거나 만료됨
+            System.out.println("[DEBUG] 인증 코드 없음 또는 만료됨. 이메일: " + email + ", 키: " + key);
+            return false;
         }
+        
+        // 디버깅: 저장된 코드와 입력된 코드 비교
+        System.out.println("[DEBUG] 저장된 코드: " + storedCode + ", 입력된 코드: " + code);
         
         if (storedCode.equals(code)) {
             // 검증 성공 시 인증 코드 삭제 (1회용)
