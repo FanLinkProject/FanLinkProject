@@ -37,17 +37,17 @@ public class User {
     @Column(name = "password", nullable = true)
     private String password; // TODO : 암호화
 
-    @Column(name = "gender", nullable = false)
+    @Column(name = "gender", nullable = true)
     private String gender;
 
-    @Column(name = "birth", nullable = false)
+    @Column(name = "birth", nullable = true)
     private String birth;
 
     // 개인정보 처리 동의 여부
     @Column(name = "privacy_policy_agreed", nullable = false, columnDefinition = "TINYINT(1)")
     private Boolean privacyPolicyAgreed;
 
-    @Column(name = "phone_number", unique = true, nullable = false)
+    @Column(name = "phone_number", unique = true, nullable = true)
     private String phoneNumber; // TODO : 암호화
 
     @Column(name = "candy")
