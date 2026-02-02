@@ -43,7 +43,7 @@ public class OrderController {
             @AuthenticationPrincipal PrincipalDetails principal,
             @RequestBody OrderRequestDto request) {
 
-        String orderNo = orderService.createOrder(principal.getUser().getId(), request);
+        String orderNo = orderService.createOrder(principal.getUsername(), request);
         return ResponseEntity.ok(Map.of("orderNo", orderNo));
     }
 }

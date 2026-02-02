@@ -11,9 +11,10 @@ import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.repository.ProductRepository;
 import java.math.BigDecimal;
-import java.util.List;
 import org.springframework.stereotype.Service;
+import org.example.backend.user.entity.User;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.user.repository.UserRepository;
 
 @Slf4j
 @Service
@@ -23,6 +24,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
 
     /**
      * 테스트를 위한 PENDING 상태의 주문 번호를 조회합니다.
@@ -48,10 +50,14 @@ public class OrderService {
      * 인증된 사용자의 요청으로 주문을 생성합니다.
      */
     @Transactional
-    public String createOrder(Long userId, OrderRequestDto request) {
+    public String createOrder(String email, OrderRequestDto request) {
+        // 이메일로 사용자 조회
+        User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + email));
+
         // 1. Order 객체 생성 (일단 금액은 0으로 초기화, 아이템 추가하면서 계산)
         Order order = Order.builder()
-                .userId(userId)
+                .userId(user.getId())
                 .name(request.name())
                 .totalAmount(BigDecimal.ZERO)
                 .totalCandyAmount(0L)
@@ -114,7 +120,7 @@ public class OrderService {
 
         // 2. Order 생성
         order = Order.builder()
-                .userId(userId)
+                .userId(user.getId())
                 .name(request.name())
                 .totalAmount(calculatedTotalAmount)
                 .totalCandyAmount(calculatedTotalCandyAmount)
