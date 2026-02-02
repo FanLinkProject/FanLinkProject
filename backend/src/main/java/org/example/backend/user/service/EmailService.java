@@ -16,24 +16,40 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Value("${mail.dev-mode:true}")
+    private boolean devMode;
+
     @Value("${spring.mail.username:}")
     private String fromEmail;
 
     // 이메일 인증 코드 발송
     public void sendVerificationCode(String toEmail, String code) {
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("[FanLink] 이메일 인증 코드");
-            message.setText(
-                    "안녕하세요. FanLink입니다.\n\n" +
-                    "인증 코드: " + code + "\n\n" +
-                    "이 코드는 5분간 유효합니다.\n"
-            );
+            if (devMode) {
+                // 개발 모드: 콘솔에 인증 코드 출력
+                log.info("========================================");
+                log.info("=== 이메일 인증 코드 발송 (개발 모드) ===");
+                log.info("========================================");
+                log.info("수신자: {}", toEmail);
+                log.info("인증 코드: {}", code);
+                log.info("이 코드는 5분간 유효합니다.");
+                log.info("실제 이메일 발송을 위해서는 application.yml에 mail.dev-mode=false로 설정하세요.");
+                log.info("========================================");
+            } else {
+                // 실제 이메일 발송
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setFrom(fromEmail);
+                message.setTo(toEmail);
+                message.setSubject("[FanLink] 이메일 인증 코드");
+                message.setText(
+                        "안녕하세요. FanLink입니다.\n\n" +
+                        "인증 코드: " + code + "\n\n" +
+                        "이 코드는 5분간 유효합니다.\n"
+                );
 
-            mailSender.send(message);
-            log.info("이메일 인증 코드 발송 완료: {}", toEmail);
+                mailSender.send(message);
+                log.info("이메일 인증 코드 발송 완료: {}", toEmail);
+            }
         } catch (Exception e) {
             log.error("이메일 발송 실패: {}", toEmail, e);
             throw new BusinessException(UserErrorCode.EMAIL_SEND_FAILED);
