@@ -5,6 +5,8 @@ import org.example.backend.notification.config.EmitterRepository;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.dto.response.NotificationResponse;
 import org.example.backend.notification.entity.Notification;
+import org.example.backend.notification.exception.NotificationErrorCode;
+import org.example.backend.notification.exception.NotificationException;
 import org.example.backend.notification.repository.NotificationRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
@@ -48,9 +50,9 @@ public class NotificationService {
     // 알림 생성 + SSE 푸시
     public void sendNotification(NotificationSendRequest request) {
         User receiver = userRepository.findById(request.getReceiverId())
-                .orElseThrow(() -> new IllegalArgumentException("receiver not found"));
+			.orElseThrow(() -> new NotificationException(NotificationErrorCode.RECEIVER_NOT_FOUND));
         User sender = userRepository.findById(request.getSenderId())
-                .orElseThrow(() -> new IllegalArgumentException("sender not found"));
+			.orElseThrow(() -> new NotificationException(NotificationErrorCode.SENDER_NOT_FOUND));
 
         Notification notification = Notification.builder()
                 .receiver(receiver)
@@ -79,7 +81,7 @@ public class NotificationService {
     // 단일 읽음 처리
     public void markAsRead(Long notificationId) {
         Notification noti = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 알림"));
+			.orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
         noti.markAsRead();  // 엔티티에 markAsRead() 메서드 있어야 함
     }
 
@@ -90,6 +92,7 @@ public class NotificationService {
     }
 
     // 읽지 않은 알림 목록 조회
+	@Transactional(readOnly = true)
     public List<NotificationResponse> getUnreadNotifications(Long userId) {
         return notificationRepository.findByReceiverIdAndIsReadFalseOrderByCreatedAtDesc(userId)
                 .stream()
@@ -98,7 +101,8 @@ public class NotificationService {
     }
 
     // 전체 알림 목록 조회
-    public List<NotificationResponse> getAllNotifications(Long userId) {
+	@Transactional(readOnly = true)
+	public List<NotificationResponse> getAllNotifications(Long userId) {
         return notificationRepository.findByReceiverIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(n -> new NotificationResponse(n.getContent(), n.getCreatedAt()))
