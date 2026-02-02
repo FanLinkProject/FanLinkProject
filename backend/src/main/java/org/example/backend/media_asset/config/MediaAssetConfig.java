@@ -5,7 +5,6 @@ import org.example.backend.media_asset.metadata.VideoMetadataExtractor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -17,7 +16,6 @@ import java.time.ZoneId;
 
 @Configuration
 @EnableScheduling
-@EnableJpaAuditing
 @EnableConfigurationProperties({AwsProperties.class, MediaProperties.class})
 public class MediaAssetConfig {
 
