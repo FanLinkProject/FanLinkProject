@@ -48,8 +48,4 @@ public record SignupRequest(
         String role
 )
  {
-//    public String role() {
-//    return null;
-//    }
-
 }
