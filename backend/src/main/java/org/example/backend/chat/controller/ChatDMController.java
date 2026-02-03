@@ -56,18 +56,7 @@ public class ChatDMController {
     }
 
 	// -----------------------------------
-	// 1. 채팅방 생성
-	// POST /api/chat/DM/rooms
-	// -----------------------------------
-	@PostMapping("/rooms")
-	public ResponseEntity<ChatRoomResponse> createChatRoom(
-		@RequestBody ChatRoomRequest chatRoomRequest) {
-		return ResponseEntity.status(HttpStatus.CREATED)
-			.body(chatDMService.createChatDMRoom(chatRoomRequest));
-	}
-
-	// -----------------------------------
-	// 2. 채팅방 리스트 조회
+	// 1. 채팅방 리스트 조회
 	// GET /api/chat/DM/rooms?userId={userId}
 	// -----------------------------------
 	@GetMapping("/rooms")
@@ -78,7 +67,7 @@ public class ChatDMController {
 	}
 
 	// -----------------------------------
-	// 3. 메시지 조회 (팬 / 아티스트 통합)
+	// 2. 메시지 조회 (팬 / 아티스트 통합)
 	// GET /api/chat/DM/rooms/{roomId}/messages?userId={userId}&cursor={cursorId}
 	// 서비스에서 role 체크 후 반환
 	// -----------------------------------
