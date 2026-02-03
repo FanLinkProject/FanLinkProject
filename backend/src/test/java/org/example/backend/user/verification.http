@@ -1,0 +1,91 @@
+### 이메일 및 전화번호 인증 테스트 파일
+### IntelliJ IDEA나 VS Code의 REST Client 확장 프로그램에서 사용 가능합니다.
+
+@baseUrl = http://localhost:8080
+@email = test@example.com
+@phoneNumber = 010-1234-5678
+
+### ============================================
+### 1. 이메일 인증 코드 발송
+### ============================================
+POST {{baseUrl}}/api/verification/email/send
+Content-Type: application/json
+
+{
+  "email": "이메일"
+}
+
+### ============================================
+### 2. 이메일 인증 코드 검증 (선택사항)
+### ============================================
+POST {{baseUrl}}/api/verification/email/verify
+Content-Type: application/json
+
+{
+  "email": "이메일",
+  "code": "인증코드"
+}
+
+### ============================================
+### 3. 전화번호 인증번호 발송
+### ============================================
+POST http://localhost:8080/api/verification/phone/send
+Content-Type: application/json
+
+{
+ "phoneNumber": "전화번호"
+}
+
+### ============================================
+### 4. 전화번호 인증번호 검증 (선택사항)
+### ============================================
+POST {{baseUrl}}/api/verification/phone/verify
+Content-Type: application/json
+
+{
+  "phoneNumber": "전화번호",
+  "code": "인증코드"
+}
+
+### ============================================
+### 5. 회원가입 (이메일 인증 코드 필수)
+### ============================================
+POST {{baseUrl}}/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "nickname": "testuser",
+  "name": "테스트유저",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "{{phoneNumber}}",
+  "emailVerificationCode": "123456"
+}
+
+### ============================================
+### 6. 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "password123"
+}
+
+### ============================================
+### 7. 전화번호 업데이트 (인증번호 필수)
+### ============================================
+### 먼저 로그인하여 accessToken을 받아야 합니다.
+### Authorization 헤더에 Bearer 토큰을 추가하세요.
+PUT {{baseUrl}}/api/user/phone
+Content-Type: application/json
+Authorization: Bearer YOUR_ACCESS_TOKEN_HERE
+
+{
+  "phoneNumber": "010-9876-5432",
+  "verificationCode": "123456"
+}
