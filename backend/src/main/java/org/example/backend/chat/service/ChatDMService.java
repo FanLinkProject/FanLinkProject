@@ -7,6 +7,7 @@ import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.example.backend.chat.dto.response.ChatRoomResponse;
 import org.example.backend.chat.entity.ChatMessage;
 import org.example.backend.chat.entity.ChatRoom;
+import org.example.backend.chat.entity.ChatRoomMember;
 import org.example.backend.chat.enums.MessageType;
 import org.example.backend.chat.exception.ChatException;
 import org.example.backend.chat.exception.DMChatErrorCode;
@@ -43,8 +44,8 @@ public class ChatDMService {
 
     //chatroom 생성
     @Transactional
-    public ChatRoomResponse createChatDMRoom(ChatRoomRequest chatRoomRequest) {
-        User user = userRepository.findById(chatRoomRequest.getHostId()) // hostId는 Long 타입
+    public ChatRoomResponse createChatDMRoom(Long artistId) {
+        User user = userRepository.findById(artistId)
                 .orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
 
         if (user.getRole() == UserRole.ARTIST) {
@@ -150,4 +151,45 @@ public class ChatDMService {
 
         return result;
     }
+
+	@Transactional
+	public void joinChatDMRoom(Long userId, Long artistId) {
+
+		User user = userRepository.findById(userId)
+			.orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
+
+		User artist = userRepository.findById(artistId)
+			.orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
+
+		ChatRoom chatRoom = chatRoomRepository.findByOwner(artist)
+			.orElseThrow(() -> new ChatException(DMChatErrorCode.CHAT_ROOM_NOT_FOUND));
+
+		boolean exists = chatRoomMemberRepository.existsByUserAndChatRoom(user, chatRoom);
+		if (exists) return;
+
+		ChatRoomMember chatRoomMember = ChatRoomMember.builder()
+			.user(user)
+			.chatRoom(chatRoom)
+			.build();
+
+		chatRoomMemberRepository.save(chatRoomMember);
+	}
+
+
+	@Transactional
+	public void exitChatDMRoom(Long userId, Long artistId) {
+
+		User user = userRepository.findById(userId)
+			.orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
+
+		User artist = userRepository.findById(artistId)
+			.orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
+
+		ChatRoom chatRoom = chatRoomRepository.findByOwner(artist)
+			.orElseThrow(() -> new ChatException(DMChatErrorCode.CHAT_ROOM_NOT_FOUND));
+
+		ChatRoomMember member = chatRoomMemberRepository.findByUserAndChatRoom(user, chatRoom)
+		        .orElseThrow(() -> new ChatException(DMChatErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
+		chatRoomMemberRepository.delete(member);
+	}
 }
