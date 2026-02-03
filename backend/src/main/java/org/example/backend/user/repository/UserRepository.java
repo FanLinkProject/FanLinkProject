@@ -26,4 +26,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     // 상태 조회
     Page<User> findByStatus(UserStatus status, Pageable pageable);
+    
+    // 아티스트 검색 (닉네임으로 검색, ACTIVE 상태만)
+    Page<User> findByRoleAndNicknameContainingAndStatusAndDeletedAtIsNull(
+            UserRole role, 
+            String nickname, 
+            UserStatus status, 
+            Pageable pageable
+    );
+    
+    // 아티스트 전체 목록 조회 (ACTIVE 상태만)
+    Page<User> findByRoleAndStatusAndDeletedAtIsNull(
+            UserRole role,
+            UserStatus status,
+            Pageable pageable
+    );
 }
