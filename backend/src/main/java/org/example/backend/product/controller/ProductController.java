@@ -1,14 +1,18 @@
 package org.example.backend.product.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.product.dto.ProductRequest;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.service.ProductService;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+
+import org.example.backend.product.dto.request.ProductRequestDto;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
 @RequestMapping("/api/products")
@@ -17,31 +21,19 @@ public class ProductController {
 
     private final ProductService productService;
 
+    /**
+     * 모든 상품 목록을 조회합니다.
+     * 프론트엔드에서 구독 여부(isSubscription)로 필터링하여 보여줄 수 있습니다.
+     */
     @GetMapping
-    public List<Product> findAll() {
-        return productService.findAll();
-    }
-
-    @GetMapping("/{id}")
-    public Product findById(@PathVariable Long id) {
-        return productService.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found: " + id));
+    public ResponseEntity<List<Product>> getAllProducts() {
+        List<Product> products = productService.getAllProducts();
+        return ResponseEntity.ok(products);
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Product create(@RequestBody ProductRequest req) {
-        return productService.create(req);
-    }
-
-    @PutMapping("/{id}")
-    public Product update(@PathVariable Long id, @RequestBody ProductRequest req) {
-        return productService.update(id, req);
-    }
-
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        productService.deleteById(id);
+    public ResponseEntity<Product> createProduct(@RequestBody ProductRequestDto request) {
+        Product product = productService.createProduct(request);
+        return ResponseEntity.ok(product);
     }
 }

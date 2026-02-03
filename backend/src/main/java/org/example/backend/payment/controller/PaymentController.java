@@ -1,47 +1,60 @@
 package org.example.backend.payment.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.payment.dto.PaymentRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.example.backend.payment.config.TossPaymentConfig;
+import org.example.backend.payment.dto.response.PaymentConfigResponse;
 import org.example.backend.payment.entity.Payment;
 import org.example.backend.payment.service.PaymentService;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.example.backend.global.security.details.PrincipalDetails;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final TossPaymentConfig tossPaymentConfig;
 
-    @GetMapping
-    public List<Payment> findAll() {
-        return paymentService.findAll();
+    @GetMapping("/config")
+    public ResponseEntity<PaymentConfigResponse> getConfig() {
+        return ResponseEntity.ok(new PaymentConfigResponse(
+                tossPaymentConfig.getClientKey(),
+                tossPaymentConfig.getBaseUrl() + "/success",
+                tossPaymentConfig.getBaseUrl() + "/fail"));
     }
 
-    @GetMapping("/{id}")
-    public Payment findById(@PathVariable Long id) {
-        return paymentService.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found: " + id));
+    @GetMapping("/confirm")
+    public ResponseEntity<Payment> confirmPayment(
+            @RequestParam String paymentKey,
+            @RequestParam String orderId,
+            @RequestParam Long amount) {
+
+        Payment payment = paymentService.confirmPayment(paymentKey, orderId, amount);
+        return ResponseEntity.ok(payment);
     }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Payment create(@RequestBody PaymentRequest req) {
-        return paymentService.create(req);
+    @GetMapping("/fail")
+    public ResponseEntity<String> failPayment(
+            @RequestParam String code,
+            @RequestParam String message,
+            @RequestParam String orderId) { // Tosspayments는 orderId 파라미터로 주문번호를 전달함
+
+        paymentService.handlePaymentFailure(code, message, orderId);
+        return ResponseEntity.ok("결제 실패 처리 완료: " + message);
     }
 
-    @PutMapping("/{id}")
-    public Payment update(@PathVariable Long id, @RequestBody PaymentRequest req) {
-        return paymentService.update(id, req);
-    }
-
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        paymentService.deleteById(id);
+    @GetMapping("/my")
+    public ResponseEntity<java.util.List<Payment>> getMyPayments(
+            @AuthenticationPrincipal PrincipalDetails principal) {
+        return ResponseEntity.ok(paymentService.getMyPayments(principal.getUser().getId()));
     }
 }
