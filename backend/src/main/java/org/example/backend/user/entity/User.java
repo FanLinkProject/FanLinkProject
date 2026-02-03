@@ -136,11 +136,11 @@ public class User {
         user.setName(name != null ? name : nickname);
         user.setPassword(""); // OAuth2 사용자는 비밀번호 없음
         user.setGender(gender != null ? gender : "UNKNOWN");
-        // birth는 NOT NULL이라 기본값 보장
+        // birth는 NOT NULL이라 기본값 넣어줬음.
         // 실제 birth(YYYY-MM-DD)는 OAuth2 서비스에서 birthyear+birthday를 합쳐 setBirth로 갱신합니다.
         user.setBirth("1900-01-01");
         user.setPrivacyPolicyAgreed(true); // OAuth2 로그인 시 동의한 것으로 간주
-        // phone_number는 NOT NULL + UNIQUE라 기본값 보장 (없으면 providerId 기반으로 유니크하게 생성)
+        // phone_number는 NOT NULL + UNIQUE라 기본값 설정 (없으면 providerId 기반으로 유니크하게 생성)
         user.setPhoneNumber(phoneNumber != null && !phoneNumber.isBlank() ? phoneNumber : ("kakao_" + providerId));
         user.setProfileImageUrl(profileImageUrl);
         user.setRole(UserRole.USER); // 기본 역할은 USER
