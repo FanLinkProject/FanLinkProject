@@ -3,10 +3,12 @@ package org.example.backend.user.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
+import org.example.backend.user.dto.request.BlockRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
+import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
 import org.example.backend.user.service.UserService;
 import org.springframework.data.domain.Page;
@@ -69,6 +71,36 @@ public class UserController {
             @PageableDefault(size = 10) Pageable pageable
     ) {
         Page<ArtistSearchResponse> response = userService.getArtists(nickname, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    // 유저 차단
+    @PostMapping("/block")
+    public ResponseEntity<Void> blockUser(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @Valid @RequestBody BlockRequest request
+    ) {
+        userService.blockUser(principalDetails.getUser(), request);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 유저 차단 해제
+    @DeleteMapping("/block/{userId}")
+    public ResponseEntity<Void> unblockUser(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PathVariable Long userId
+    ) {
+        userService.unblockUser(principalDetails.getUser(), userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 차단한 유저 목록 조회
+    @GetMapping("/block")
+    public ResponseEntity<Page<BlockedResponse>> getBlockedUsers(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        Page<BlockedResponse> response = userService.getBlockedUsers(principalDetails.getUser(), pageable);
         return ResponseEntity.ok(response);
     }
 }

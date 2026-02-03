@@ -2,11 +2,14 @@ package org.example.backend.user.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
+import org.example.backend.user.dto.request.BlockRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
+import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
+import org.example.backend.user.entity.Block;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
@@ -114,5 +117,49 @@ public class UserService {
         }
         
         return artists.map(ArtistSearchResponse::from);
+    }
+
+    // 유저 차단
+    public void blockUser(User blocker, BlockRequest request) {
+        // 자기 자신을 차단할 수 없음
+        if (blocker.getId().equals(request.userId())) {
+            throw new BusinessException(UserErrorCode.USER_ACCESS_DENIED);
+        }
+
+        // 차단할 유저 조회
+        User blocked = userRepository.findById(request.userId())
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        // 이미 차단한 유저인지 확인
+        if (blockRepository.existsByBlockerAndBlocked(blocker, blocked)) {
+            throw new BusinessException(UserErrorCode.USER_ACCESS_DENIED);
+        }
+
+        // 차단 관계 생성
+        Block block = new Block();
+        block.setBlocker(blocker);
+        block.setBlocked(blocked);
+        blockRepository.save(block);
+    }
+
+    // 유저 차단 해제
+    public void unblockUser(User blocker, Long blockedUserId) {
+        // 차단할 유저 조회
+        User blocked = userRepository.findById(blockedUserId)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        // 차단 관계 조회
+        Block block = blockRepository.findByBlockerAndBlocked(blocker, blocked)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        // 차단 관계 삭제
+        blockRepository.delete(block);
+    }
+
+    // 차단 유저 목록 조회
+    @Transactional(readOnly = true)
+    public Page<BlockedResponse> getBlockedUsers(User blocker, Pageable pageable) {
+        Page<Block> blocks = blockRepository.findByBlocker(blocker, pageable);
+        return blocks.map(BlockedResponse::from);
     }
 }

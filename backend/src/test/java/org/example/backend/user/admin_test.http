@@ -1,0 +1,217 @@
+### 관리자 및 유저 기능 테스트 파일
+### IntelliJ IDEA나 VS Code의 REST Client 확장 프로그램에서 사용 가능합니다.
+
+@baseUrl = http://localhost:8080
+
+### ============================================
+### 0. 초기 관리자 계정 생성 안내
+### ============================================
+### 애플리케이션 시작 시 자동으로 관리자 계정이 생성됩니다.
+### 이메일: admin@example.com
+### 비밀번호: admin123
+### 
+### 만약 자동 생성이 안 되었다면, 애플리케이션을 재시작하세요.
+### 또는 데이터베이스에 직접 INSERT 하거나 아래 SQL을 실행하세요:
+###
+### INSERT INTO users (email, nickname, name, password, gender, birth, privacy_policy_agreed, phone_number, role, provider, provider_id, status, candy, created_at, deleted_at)
+### VALUES ('admin@example.com', '관리자', '관리자', '$2a$10$...', 'M', '1990-01-01', true, '010-0000-0000', 'ADMIN', 'LOCAL', 'NONE', 'ACTIVE', 0, NOW(), NULL);
+###
+### 비밀번호는 BCrypt로 암호화된 'admin123'입니다.
+
+### ============================================
+### 1. 관리자 로그인 (테스트용)
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+
+### 로그인 성공 시 accessToken과 refreshToken을 받습니다.
+### 아래 변수에 토큰을 설정하세요:
+### @adminAccessToken = 여기에_받은_accessToken_입력
+
+### ============================================
+### 2. 관리자 - 아티스트 계정 생성
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{ accessToken }}
+Content-Type: application/json
+
+{
+  "email": "artist1@example.com",
+  "nickname": "아티스트예명1",
+  "name": "김아티스트",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-1111-1111"
+}
+
+
+### ============================================
+### 3. 관리자 - 유저 패널티 부여 (RESTRICT)
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{ accessToken }}
+Content-Type: application/json
+
+{
+  "userId": 40,
+  "penaltyType": "RESTRICT",
+  "reason": "부적절한 게시글 작성"
+}
+
+
+### ============================================
+### 4. 관리자 - 유저 패널티 부여 (WEEKEND_BAN)
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "penaltyType": "WEEKEND_BAN",
+  "reason": "욕설 및 도배 반복"
+}
+
+
+### ============================================
+### 5. 관리자 - 유저 패널티 부여 (PERMANENT_BAN)
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": 3,
+  "penaltyType": "PERMANENT_BAN",
+  "reason": "심각한 규칙 위반"
+}
+
+
+### ============================================
+### 6. 관리자 - 전체 신고 목록 조회
+### ============================================
+GET {{baseUrl}}/api/admin/mypage/reports?page=0&size=20
+Authorization: Bearer {{adminAccessToken}}
+
+
+### ============================================
+### 7. 관리자 - 부여한 패널티 내역 조회
+### ============================================
+GET {{baseUrl}}/api/admin/mypage/penalties?page=0&size=20
+Authorization: Bearer {{adminAccessToken}}
+
+
+### ============================================
+### 8. 일반 유저 로그인 (테스트용)
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user1@example.com",
+  "password": "password123"
+}
+
+
+### ============================================
+### 9. 아티스트 전체 목록 조회
+### ============================================
+GET {{baseUrl}}/api/user/artists?page=0&size=20
+Authorization: Bearer {{ accessToken }}
+
+
+### ============================================
+### 9-1. 아티스트 닉네임으로 검색
+### ============================================
+GET {{baseUrl}}/api/user/artists?nickname={{artist_nickname}}&page=0&size=20
+Authorization: Bearer {{ accessToken }}
+
+
+### ============================================
+### 10. 유저 차단
+### ============================================
+POST {{baseUrl}}/api/user/block
+Authorization: Bearer {{ accessToken }}
+Content-Type: application/json
+
+{
+  "userId": 41
+}
+
+
+### ============================================
+### 11. 차단한 유저 목록 조회
+### ============================================
+GET {{baseUrl}}/api/user/block?page=0&size=20
+Authorization: Bearer {{ accessToken }}
+
+
+### ============================================
+### 12. 유저 차단 해제
+### ============================================
+DELETE {{baseUrl}}/api/user/block/{{userId}}
+Authorization: Bearer {{ accessToken }}
+
+
+### ============================================
+### 13. 자기 자신 차단 시도 (에러 테스트)
+### ============================================
+POST {{baseUrl}}/api/user/block
+Authorization: Bearer {{userAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+
+### ============================================
+### 14. 이미 차단한 유저 다시 차단 시도 (에러 테스트)
+### ============================================
+POST {{baseUrl}}/api/user/block
+Authorization: Bearer {{userAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": 5
+}
+
+
+### ============================================
+### 15. 존재하지 않는 유저 패널티 부여 (에러 테스트)
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": 99999,
+  "penaltyType": "RESTRICT",
+  "reason": "테스트"
+}
+
+
+### ============================================
+### 16. 중복 이메일로 아티스트 계정 생성 (에러 테스트)
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "artist1@example.com",
+  "nickname": "아티스트예명2",
+  "name": "이아티스트",
+  "password": "password123",
+  "gender": "F",
+  "birth": "1995-05-05",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-2222-2222"
+}
