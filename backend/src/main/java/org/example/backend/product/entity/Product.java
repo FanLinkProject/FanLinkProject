@@ -73,5 +73,35 @@ public class Product {
         this.type = type;
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
+
+        validate();
+    }
+
+    private void validate() {
+        if (type == null) {
+            throw new IllegalArgumentException("상품 타입은 필수입니다.");
+        }
+
+        // 1. 정산 대상 여부 검증
+        if (type.isSettlementTarget() && artistId == null) {
+            throw new IllegalArgumentException("정산 대상 상품(SETTLEMENT_*)은 아티스트 ID가 필수입니다.");
+        }
+
+        // 2. 결제 수단 검증
+        if (paymentMethod != type.getPaymentMethod()) {
+            throw new IllegalArgumentException("상품 타입의 결제 수단과 입력된 결제 수단이 일치하지 않습니다. (Type: " + type + ", Method: "
+                    + type.getPaymentMethod() + ")");
+        }
+
+        // 3. 가격 검증
+        if (type.getPaymentMethod() == ProductPaymentMethod.CASH_ONLY) {
+            if (price == null || price < 0) {
+                throw new IllegalArgumentException("현금 결제 상품은 가격(price)이 필수이며 0 이상이어야 합니다.");
+            }
+        } else if (type.getPaymentMethod() == ProductPaymentMethod.CANDY_ONLY) {
+            if (candyPrice == null || candyPrice <= 0) {
+                throw new IllegalArgumentException("캔디 결제 상품은 캔디 가격(candyPrice)이 필수이며 0보다 커야 합니다.");
+            }
+        }
     }
 }
