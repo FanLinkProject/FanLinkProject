@@ -53,12 +53,15 @@ dependencies {
 
     //Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-    
+
     // 이메일 발송
     implementation 'org.springframework.boot:spring-boot-starter-mail'
-    
+
     // CoolSMS SDK (SMS 발송)
     implementation 'net.nurigo:sdk:4.2.7'
+
+    //OAuth2
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 tasks.named('test') {
