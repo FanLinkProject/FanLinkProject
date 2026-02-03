@@ -60,10 +60,20 @@ public class Payment {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "order_no")
+    private String orderNo;
+
     @Builder
-    public Payment(Long orderId, String paymentKey, BigDecimal amount, PaymentStatus status, PaymentMethod method,
+    public Payment(Long userId, Long orderId, String orderNo, String paymentKey, BigDecimal amount,
+            PaymentStatus status,
+            PaymentMethod method,
             LocalDateTime paidAt) {
+        this.userId = userId;
         this.orderId = orderId;
+        this.orderNo = orderNo;
         this.paymentKey = paymentKey;
         this.amount = amount;
         this.status = status;

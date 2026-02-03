@@ -53,3 +53,19 @@ media:
     replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
   attachments:
     max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
+
+# 정산 관련 설정
+settlement:
+  # 정산 배치 실행 스케줄 (매월 15일 오전 4시)
+  batch:
+    cron: ${SETTLEMENT_BATCH_CRON:0 0 4 15 * *}
+  # 정산 복구 배치 실행 스케줄 (매일 새벽 2시)
+  recovery:
+    cron: ${SETTLEMENT_RECOVERY_CRON:0 0 2 * * *}
+
+
+payment:
+  toss:
+    base-url: https://api.tosspayments.com/v1
+    client-key: ${PAYMENTS_CLIENT_KEY}
+    secret-key: ${PAYMENTS_SECRET_KEY}
