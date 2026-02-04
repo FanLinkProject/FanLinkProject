@@ -30,14 +30,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
     show-sql: true
-  #====== batch설정 추가==========
-  batch:
-    jdbc:
-      # 애플리케이션 시작 시 배치 테이블 자동 생성
-      initialize-schema: always
-    job:
-      # 애플리케이션 시작 시 배치 job 자동 실행 방지 (필요할 때만 실행)
-      enabled: false
+
   #===============================
   data:
     redis:
