@@ -1,0 +1,289 @@
+### 관리자 및 유저 기능 테스트 파일
+### IntelliJ IDEA / VS Code REST Client에서 사용 가능합니다.
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@example.com
+@adminPassword = admin123
+@userEmail = user1@example.com
+@userPassword = password123
+
+# 응답을 보고 직접 채우는 값들
+@adminAccessToken =
+@userAccessToken =
+@groupId = 0
+@targetUserId = 0
+@artistId = 0
+
+
+### ============================================
+### 1) 관리자 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### 응답의 accessToken을 복사해서 @adminAccessToken에 넣으세요.
+
+
+### ============================================
+### 2) 관리자 - 그룹 계정 생성 (UserRole.GROUP)
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJST0xFX0FETUlOIiwiaWF0IjoxNzcwMTA0NDk1LCJleHAiOjE3NzAxMDgwOTV9.8c01pTYkLE6wyPBmSqYZwBZYNkp8iC_bo1CB7LEXE3E
+Content-Type: application/json
+
+{
+  "email": "group1@example.com",
+  "nickname": "그룹계정1",
+  "name": "그룹계정1",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-9000-0001",
+  "isGroup": true,
+  "groupId": null
+}
+
+### 응답의 id를 확인해서 @groupId에 넣으세요.
+
+
+### ============================================
+### 3) 관리자 - 개인 아티스트 생성 (그룹 지정 없음)
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJST0xFX0FETUlOIiwiaWF0IjoxNzcwMTA0NDk1LCJleHAiOjE3NzAxMDgwOTV9.8c01pTYkLE6wyPBmSqYZwBZYNkp8iC_bo1CB7LEXE3E
+Content-Type: application/json
+
+{
+  "email": "artist2@example.com",
+  "nickname": "아티스트예명2",
+  "name": "이아티스트",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1992-02-02",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-2333-2222",
+  "isGroup": false,
+  "groupId": null
+}
+
+
+### ============================================
+### 4) 관리자 - 개인 아티스트 생성 (그룹 소속 지정)
+###    - @groupId 필요
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbkBleGFtcGxlLmNvbSIsInJvbGUiOiJST0xFX0FETUlOIiwiaWF0IjoxNzcwMTA0NDk1LCJleHAiOjE3NzAxMDgwOTV9.8c01pTYkLE6wyPBmSqYZwBZYNkp8iC_bo1CB7LEXE3E
+Content-Type: application/json
+
+{
+  "email": "artist3@example.com",
+  "nickname": "그룹멤버1",
+  "name": "일멤버",
+  "password": "password123",
+  "gender": "F",
+  "birth": "1995-05-05",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-1111-2222",
+  "isGroup": false,
+  "groupId": 43
+}
+
+
+### ============================================
+### 5) 개인 아티스트 생성 실패 (존재하지 않는 groupId)
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "artist3@example.com",
+  "nickname": "그룹멤버3",
+  "name": "박멤버",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1994-04-04",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-1111-3333",
+  "isGroup": false,
+  "groupId": 999999
+}
+
+
+### ============================================
+### 6) 개인 아티스트 생성 실패 (groupId가 GROUP 역할이 아님)
+###    - 아래 groupId를 USER/ARTIST/ADMIN 계정 id로 바꿔 테스트
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "artist4@example.com",
+  "nickname": "그룹멤버4",
+  "name": "최멤버",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1993-03-03",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-1111-4444",
+  "isGroup": false,
+  "groupId": {{artistId}}
+}
+
+
+### ============================================
+### 7) 관리자 - 유저 패널티 부여 (RESTRICT)
+###    - @targetUserId 필요
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": {{targetUserId}},
+  "penaltyType": "RESTRICT",
+  "reason": "부적절한 게시글 작성"
+}
+
+
+### ============================================
+### 8) 관리자 - 유저 패널티 부여 (WEEKEND_BAN)
+###    - @targetUserId 필요
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": {{targetUserId}},
+  "penaltyType": "WEEKEND_BAN",
+  "reason": "욕설 및 도배 반복"
+}
+
+
+### ============================================
+### 9) 관리자 - 유저 패널티 부여 (PERMANENT_BAN)
+###    - @targetUserId 필요
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": {{targetUserId}},
+  "penaltyType": "PERMANENT_BAN",
+  "reason": "심각한 규칙 위반"
+}
+
+
+### ============================================
+### 10) 관리자 - 전체 신고 목록 조회
+### ============================================
+GET {{baseUrl}}/api/admin/mypage/reports?page=0&size=20
+Authorization: Bearer {{adminAccessToken}}
+
+
+### ============================================
+### 11) 관리자 - 부여한 패널티 내역 조회
+### ============================================
+GET {{baseUrl}}/api/admin/mypage/penalties?page=0&size=20
+Authorization: Bearer {{adminAccessToken}}
+
+
+### ============================================
+### 12) 일반 유저 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}"
+}
+
+### 응답의 accessToken을 복사해서 @userAccessToken에 넣으세요.
+
+
+### ============================================
+### 13) 아티스트 전체 목록 조회
+### ============================================
+GET {{baseUrl}}/api/user/artists?page=0&size=20
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 13-1) 아티스트 닉네임으로 검색
+### ============================================
+@artistNickname = 아티스트예명1
+GET {{baseUrl}}/api/user/artists?nickname={{artistNickname}}&page=0&size=20
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 14) 유저 차단
+###    - @targetUserId 필요 (내 id 말고 다른 유저 id)
+### ============================================
+POST {{baseUrl}}/api/user/block
+Authorization: Bearer {{userAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": {{targetUserId}}
+}
+
+
+### ============================================
+### 15) 차단한 유저 목록 조회
+### ============================================
+GET {{baseUrl}}/api/user/block?page=0&size=20
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 16) 유저 차단 해제
+###    - @targetUserId 필요
+### ============================================
+DELETE {{baseUrl}}/api/user/block/{{targetUserId}}
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 17) 존재하지 않는 유저 패널티 부여 (에러 테스트)
+### ============================================
+POST {{baseUrl}}/api/admin/penalties
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": 99999,
+  "penaltyType": "RESTRICT",
+  "reason": "테스트"
+}
+
+
+### ============================================
+### 18) 중복 이메일로 아티스트 계정 생성 (에러 테스트)
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "artist1@example.com",
+  "nickname": "아티스트예명2",
+  "name": "이아티스트",
+  "password": "password123",
+  "gender": "F",
+  "birth": "1995-05-05",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-2222-2222",
+  "isGroup": false,
+  "groupId": null
+}

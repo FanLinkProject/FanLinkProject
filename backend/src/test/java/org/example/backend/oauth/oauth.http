@@ -21,8 +21,8 @@ POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "f1@tt.com",
-  "password": "qwer@123"
+  "email": "test4@example.com",
+  "password": "password123"
 }
 
 ### 3. 발급받은 토큰으로 인증이 필요한 API 호출 (예시: 마이페이지)
@@ -37,3 +37,53 @@ POST http://localhost:8080/api/auth/logout?refreshToken={{ refreshToken 값 }}
 ### 회원 탈퇴
 DELETE http://localhost:8080/api/auth
 Authorization: Bearer {{ accessToken 값 }}
+
+### 암복호화테스트
+POST http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "nickname": "testuser",
+  "name": "홍길동",
+  "password": "password123",
+  "gender": "MALE",
+  "birth": "1990-01-01",
+  "phoneNumber": "010-1234-5678",
+  "privacyPolicyAgreed": true
+}
+
+### 테스트
+POST http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+"email": "encrypt-test@example.com",
+"nickname": "encryptuser",
+"name": "암호화테스트",
+"password": "password123",
+"gender": "MALE",
+"birth": "1990-01-01",
+"phoneNumber": "010-1234-5678",
+"privacyPolicyAgreed": true
+}
+
+### 테스트1
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+"email": "test@example.com",
+"password": "password123"
+}
+
+### 테스트2
+POST http://localhost:8080/api/accounts
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6IlJPTEVfVVNFUiIsImlhdCI6MTc2OTc0ODE4MSwiZXhwIjoxNzY5NzUxNzgxfQ.-C3HWBJkqE6dziqBc62Pv5v4egebm9oL9-bw9yGJnrU
+
+{
+"bankName": "KB국민은행",
+"accountNumber": "123-456-789012",
+"holderName": "홍길동"
+}

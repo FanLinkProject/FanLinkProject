@@ -1,0 +1,23 @@
+${AnsiStyle.BOLD}${AnsiColor.BRIGHT_MAGENTA}███████╗ █████╗ ███╗   ██╗██╗     ██╗███╗   ██╗██╗  ██╗
+${AnsiColor.BRIGHT_MAGENTA}██╔════╝██╔══██╗████╗  ██║██║     ██║████╗  ██║██║ ██╔╝
+${AnsiColor.BRIGHT_MAGENTA}█████╗  ███████║██╔██╗ ██║██║     ██║██╔██╗ ██║█████╔╝
+${AnsiColor.MAGENTA}██╔══╝  ██╔══██║██║╚██╗██║██║     ██║██║╚██╗██║██╔═██╗
+${AnsiColor.MAGENTA}██║     ██║  ██║██║ ╚████║███████╗██║██║ ╚████║██║  ██╗
+${AnsiColor.MAGENTA}╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝
+${AnsiStyle.NORMAL}${AnsiColor.DEFAULT}
+:: FanLink Community Hub ::       (v${spring-boot.version})
+:: FanLink Server ::        (v1.0.0-Dev)
+
+============================================================================
+D E V E L O P E R
+
+[ Team Leader ]     최형규   ::  오늘의 라디오, 쉼 없이 떠드는 열정 팀장
+[ Project Owner ]   양승민   ::  퀄리티 타협은 없다, 절대 기준의 통치자
+[ Scrum Master ]    김태환   ::  일정 지연은 죽음뿐, 시간의 지배자
+[ Infrastructure ]  양민섭   ::  서버가 꺼지면 내 심장도 멈춘다, 인프라의 신
+[ Scrum Assist ]    박나현   ::  노션 깎는 장인, 혼돈 속의 질서 정립자
+[ Record Manager ]  강우연   ::  토씨 하나 놓치지 않는 기록의 추적자
+[ Record Manager ]  박혜은   ::  기억보다 강한 기록, 회의록의 마법사
+
+============================================================================
+Server is Ready... Let's make the fandom shiny! ✨
