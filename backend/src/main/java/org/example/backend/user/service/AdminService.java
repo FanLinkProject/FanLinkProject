@@ -9,12 +9,14 @@ import org.example.backend.user.dto.request.PenaltyCreateRequest;
 import org.example.backend.user.dto.response.AdminPenaltyResponse;
 import org.example.backend.user.dto.response.ReportResponse;
 import org.example.backend.user.dto.response.SignupResponse;
+import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.Penalty;
 import org.example.backend.user.entity.Report;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.example.backend.user.exception.UserErrorCode;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.PenaltyRepository;
 import org.example.backend.user.repository.ReportRepository;
 import org.example.backend.user.repository.UserRepository;
@@ -37,6 +39,7 @@ public class AdminService {
     private final RefreshTokenStore refreshTokenStore;
     private final PenaltyRepository penaltyRepository;
     private final ReportRepository reportRepository;
+    private final GroupMemberRepository groupMemberRepository;
 
     // 아티스트 계정 생성
     public SignupResponse createArtistAccount(ArtistCreateRequest request) {
@@ -53,7 +56,38 @@ public class AdminService {
             throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
         }
 
-        // User 엔티티 생성 (ARTIST 역할로 생성)
+        // 그룹 계정 여부에 따라 역할 결정
+        UserRole role = (request.isGroup() != null && request.isGroup()) 
+                ? UserRole.GROUP 
+                : UserRole.ARTIST;
+
+        // role 별 name 검증
+        // - GROUP: 한글/영문/숫자 허용 (2자 이상)
+        // - ARTIST: 한글/영문만 허용 (2자 이상)
+        String name = request.name();
+        if (role == UserRole.GROUP) {
+            if (name == null || !name.matches("^[a-zA-Z가-힣0-9]{2,}$")) {
+                throw new BusinessException(UserErrorCode.INVALID_NAME_FORMAT);
+            }
+        } else {
+            if (name == null || !name.matches("^[a-zA-Z가-힣]{2,}$")) {
+                throw new BusinessException(UserErrorCode.INVALID_NAME_FORMAT);
+            }
+        }
+
+        // 개인 아티스트 계정 생성 시 그룹 지정 검증
+        if (role == UserRole.ARTIST && request.groupId() != null) {
+            // 그룹 유저 조회
+            User groupUser = userRepository.findById(request.groupId())
+                    .orElseThrow(() -> new BusinessException(UserErrorCode.GROUP_NOT_FOUND));
+            
+            // 그룹 역할인지 확인
+            if (groupUser.getRole() != UserRole.GROUP) {
+                throw new BusinessException(UserErrorCode.INVALID_GROUP_ROLE);
+            }
+        }
+
+        // User 엔티티 생성
         User user = User.of(
                 request.email(),
                 request.nickname(),
@@ -63,10 +97,28 @@ public class AdminService {
                 request.birth(),
                 request.phoneNumber(),
                 request.privacyPolicyAgreed(),
-                UserRole.ARTIST
+                role
         );
 
         User savedUser = userRepository.save(user);
+
+        // 개인 아티스트 계정이고 그룹이 지정된 경우 GroupMember 생성
+        if (role == UserRole.ARTIST && request.groupId() != null) {
+            User groupUser = userRepository.findById(request.groupId())
+                    .orElseThrow(() -> new BusinessException(UserErrorCode.GROUP_NOT_FOUND));
+            
+            // 이미 다른 그룹에 속해있는지 확인
+            if (groupMemberRepository.findByMember(savedUser).isPresent()) {
+                throw new BusinessException(UserErrorCode.ARTIST_ALREADY_IN_GROUP);
+            }
+
+            // GroupMember 엔티티 생성
+            GroupMember groupMember = new GroupMember();
+            groupMember.setGroup(groupUser);
+            groupMember.setMember(savedUser);
+            groupMember.setGroupName(groupUser.getNickname()); // 그룹명은 그룹 유저의 닉네임 사용
+            groupMemberRepository.save(groupMember);
+        }
         
         String accessToken = jwtTokenProvider.createAccessToken(savedUser.getEmail(), savedUser.getRole().getValue());
         String refreshToken = jwtTokenProvider.createRefreshToken(savedUser.getEmail(), savedUser.getRole().getValue());

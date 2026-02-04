@@ -100,11 +100,11 @@ public class UserService {
         Page<User> artists;
         
         if (nickname != null && !nickname.trim().isEmpty()) {
-            // 닉네임으로 검색
-            artists = userRepository.findByRoleAndNicknameContainingAndStatusAndDeletedAtIsNull(
+            // 닉네임 또는 그룹명으로 검색
+            artists = userRepository.findArtistsByNicknameOrGroupName(
                     UserRole.ARTIST,
-                    nickname.trim(),
                     UserStatus.ACTIVE,
+                    nickname.trim(),
                     pageable
             );
         } else {

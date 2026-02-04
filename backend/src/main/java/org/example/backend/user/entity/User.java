@@ -61,7 +61,7 @@ public class User {
     private String profileImageUrl; // TODO : URL주소 추가 필요
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "role", nullable = false, length = 20, columnDefinition = "varchar(20)")
     private UserRole role;
 
     @Column(name = "provider",  nullable = false)
