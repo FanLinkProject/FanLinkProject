@@ -2,7 +2,6 @@ package org.example.backend.chat.service;
 
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.chat.dto.request.ChatRoomRequest;
 import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.example.backend.chat.dto.response.ChatRoomResponse;
 import org.example.backend.chat.entity.ChatMessage;
@@ -61,6 +60,7 @@ public class ChatDMService {
 
 
     //chatroom 리스트
+    @Transactional(readOnly = true)
     public List<ChatRoomResponse> findChatDMRoomList(Long userId) {
         List<ChatRoom> chatRooms = chatRoomMemberRepository.findChatRoomsByUserId(userId);
         return chatRooms.stream().map(ChatRoomResponse::of).collect(Collectors.toList());
@@ -69,10 +69,11 @@ public class ChatDMService {
 
 
     // 팬 메세지 화면
+    @Transactional(readOnly = true)
     public List<ChatMessageResponse> getLatestMessagesByRole(Long roomId, Long userId) {
         ChatRoom chatRoom = chatRoomRepository.findById(roomId) // hostId는 Long 타입
                 .orElseThrow(() -> new ChatException(DMChatErrorCode.CHATROOM_NOT_FOUND));
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
 
         List<ChatMessage> messages;
@@ -89,10 +90,11 @@ public class ChatDMService {
     }
 
 
+    @Transactional(readOnly = true)
     public List<ChatMessageResponse> getMessagesBeforeByRole(Long roomId, Long userId, Long cursorId) {
         ChatRoom chatRoomBefore = chatRoomRepository.findById(roomId) // hostId는 Long 타입
                 .orElseThrow(() -> new ChatException(DMChatErrorCode.CHATROOM_NOT_FOUND));
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
 
         List<ChatMessage> messages;

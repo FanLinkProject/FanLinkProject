@@ -4,16 +4,22 @@ import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.example.backend.chat.dto.request.ChatMessageRequest;
 import org.example.backend.chat.entity.ChatMessage;
 import org.example.backend.chat.entity.ChatRoom;
+import org.example.backend.chat.entity.ChatRoomMember;
 import org.example.backend.chat.enums.MessageType;
 import org.example.backend.chat.repository.ChatMessageRepository;
+import org.example.backend.chat.repository.ChatRoomMemberRepository;
 import org.example.backend.chat.repository.ChatRoomRepository;
+import org.example.backend.notification.dto.request.NotificationSendRequest;
+import org.example.backend.notification.entity.NotificationType;
+import org.example.backend.notification.service.NotificationService;
 import org.example.backend.user.entity.User;
-import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.enums.UserRole;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 
 /**
  * 채팅 서비스
@@ -39,43 +45,16 @@ public class ChatService {
 	private final KafkaTemplate<String, ChatMessageResponse> kafkaTemplate;
 
 	private final ChatRoomRepository chatRoomRepository;
-	private final UserRepository userRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
+    private final NotificationService notificationService;
 
-	/**
+    /**
 	 * 채팅 메시지 처리
 	 *
 	 * 주의:
 	 * - request.senderId는 임시로 사용 중(테스트용)
 	 * - 실제 운영에서는 WebSocket 세션/JWT(SecurityContext)에서 사용자 식별해야 함
 	 */
-	/*@Transactional
-	public void handleMessage(User user, ChatMessageRequest request) {
-
-		// 1) 발신자 조회(현재는 senderId로 임시 조회)
-		User sender = getCurrentUser(user.getId());
-
-		// 2) 채팅방 조회
-		ChatRoom room = chatRoomRepository.findById(request.getRoomId())
-			.orElseThrow(() -> new IllegalArgumentException("채팅방이 없습니다. id=" + request.getRoomId()));
-
-		// 3) 메시지 타입 결정: 방 소유자면 ARTIST, 아니면 FAN
-		MessageType type = room.getOwner().getId().equals(sender.getId())
-			? MessageType.ARTIST
-			: MessageType.FAN;
-
-		// TODO: 구독/권한 체크(ArtistSubscription.isActive()) 추가
-
-		// 4) 메시지 생성 및 저장
-		ChatMessage message = ChatMessage.of(room, sender, type, request.getContent());
-		ChatMessage saved = chatMessageRepository.save(message);
-
-		// 5) Kafka 발행 (roomId를 key로 사용해 같은 방 메시지 파티션 정렬 유지)
-		ChatMessageResponse event = ChatMessageResponse.from(saved);
-		kafkaTemplate.send(
-			"chat-room",
-			room.getId().toString(),
-			event
-		);*/
 
 
     /** 팬 → 아티스트 */
@@ -102,6 +81,7 @@ public class ChatService {
     }
 
     /** 아티스트 → 팬 */
+    @Transactional
     public void sendToFans(User sender,ChatMessageRequest request) {
         // 1) 채팅방 조회
         ChatRoom room = chatRoomRepository.findById(request.getRoomId())
@@ -127,19 +107,22 @@ public class ChatService {
                 room.getId().toString(),
                 response
         );
-    }
 
-	/**
-	 * 현재 로그인 사용자 조회
-	 *
-	 * 현재:
-	 * - 테스트를 위해 request.senderId로 조회
-	 *
-	 * 추후:
-	 * - WebSocket 세션 attribute 또는 SecurityContext 기반으로 교체
-	 */
-/*	private User getCurrentUser(Long senderId) {
-		return userRepository.findById(senderId)
-			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-	}*/
+        // 6) SSE 발행 → 팬들
+        List<ChatRoomMember> fans = chatRoomMemberRepository.findByChatRoomAndUserRole(room, UserRole.USER);
+
+
+        for (ChatRoomMember member : fans) {
+            User fan = member.getUser();
+
+            //Notification 생성 + DB 저장
+            NotificationSendRequest notificationRequest = NotificationSendRequest.builder()
+                    .senderId(sender.getId())
+                    .receiverId(fan.getId())
+                    .type(NotificationType.ARTIST_MESSAGE)
+                    .content(sender.getNickname() + " 가 메세지를 남겼습니다")
+                    .build();
+            notificationService.sendNotification(notificationRequest); // DB 저장 + SSE 발송
+        }
+    }
 }
