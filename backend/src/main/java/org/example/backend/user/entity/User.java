@@ -40,18 +40,18 @@ public class User {
     @Column(name = "password", nullable = true)
     private String password;
 
-    @Column(name = "gender", nullable = false)
+    @Column(name = "gender", nullable = true)
     private String gender;
 
-    @Column(name = "birth", nullable = false)
+    @Column(name = "birth", nullable = true)
     private String birth;
 
     // 개인정보 처리 동의 여부
-    @Column(name = "privacy_policy_agreed", nullable = false)
+    @Column(name = "privacy_policy_agreed", nullable = false, columnDefinition = "TINYINT(1)")
     private Boolean privacyPolicyAgreed;
 
     @Convert(converter = StringEncryptor.class)
-    @Column(name = "phone_number", unique = true, nullable = false)
+    @Column(name = "phone_number", unique = true, nullable = true)
     private String phoneNumber;
 
     @Column(name = "candy")
@@ -61,7 +61,7 @@ public class User {
     private String profileImageUrl; // TODO : URL주소 추가 필요
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "role", nullable = false, length = 20, columnDefinition = "varchar(20)")
     private UserRole role;
 
     @Column(name = "provider",  nullable = false)
@@ -117,6 +117,42 @@ public class User {
     public void delete() {
         this.deletedAt = LocalDateTime.now();
         this.status = UserStatus.BANNED; // 탈퇴 시 상태를 BANNED로 변경
+    }
+
+    //OAuth2 사용자 생성을 위한 정적 팩토리 메서드
+    public static User ofOAuth2(
+            String email,
+            String nickname,
+            String name,
+            String profileImageUrl,
+            String provider,
+            String providerId,
+            String gender,
+            String phoneNumber
+    ) {
+        User user = new User();
+        user.setEmail(email);
+        user.setNickname(nickname);
+        user.setName(name != null ? name : nickname);
+        user.setPassword(""); // OAuth2 사용자는 비밀번호 없음
+        user.setGender(gender != null ? gender : "UNKNOWN");
+        // birth는 NOT NULL이라 기본값 넣어줬음.
+        // 실제 birth(YYYY-MM-DD)는 OAuth2 서비스에서 birthyear+birthday를 합쳐 setBirth로 갱신합니다.
+        user.setBirth("1900-01-01");
+        user.setPrivacyPolicyAgreed(true); // OAuth2 로그인 시 동의한 것으로 간주
+        // phone_number는 NOT NULL + UNIQUE라 기본값 설정 (없으면 providerId 기반으로 유니크하게 생성)
+        user.setPhoneNumber(phoneNumber != null && !phoneNumber.isBlank() ? phoneNumber : ("kakao_" + providerId));
+        user.setProfileImageUrl(profileImageUrl);
+        user.setRole(UserRole.USER); // 기본 역할은 USER
+        user.setProvider(provider);
+        user.setProviderId(providerId);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setCandy(0L);
+        return user;
+    }
+
+    public void updateOAuth2Info(String provider, String providerId) {
     }
 
     public void chargeCandy(Long amount) {

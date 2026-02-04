@@ -20,6 +20,11 @@ public enum UserErrorCode implements ErrorCode {
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "인증된 사용자가 없습니다."),
     ACCOUNT_ALREADY_DELETED(HttpStatus.BAD_REQUEST, "ACCOUNT_ALREADY_DELETED", "이미 탈퇴한 계정입니다."),
 
+    // OAuth2 관련
+    OAUTH2_PROVIDER_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "OAUTH_001", "지원하지 않는 소셜 로그인 플랫폼입니다."),
+    OAUTH2_EMAIL_NOT_FOUND(HttpStatus.BAD_REQUEST, "OAUTH_002", "소셜 로그인 제공자로부터 이메일 정보를 받아올 수 없습니다."),
+    OAUTH2_PROCESSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OAUTH_003", "소셜 로그인 처리 중 오류가 발생했습니다."),
+
     // 계좌 관련
     ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "계좌 정보를 찾을 수 없습니다."),
     ACCOUNT_ALREADY_EXISTS(HttpStatus.CONFLICT, "ACCOUNT_ALREADY_EXISTS", "이미 등록된 계좌 정보가 있습니다."),
@@ -34,7 +39,14 @@ public enum UserErrorCode implements ErrorCode {
 
     // 발송 관련
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_SEND_FAILED", "이메일 발송에 실패했습니다."),
-    SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS_SEND_FAILED", "SMS 발송에 실패했습니다.");
+    SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS_SEND_FAILED", "SMS 발송에 실패했습니다."),
+
+    // 그룹 관련
+    GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "존재하지 않는 그룹입니다."),
+    INVALID_GROUP_ROLE(HttpStatus.BAD_REQUEST, "INVALID_GROUP_ROLE", "해당 유저는 그룹 역할이 아닙니다."),
+    ARTIST_ALREADY_IN_GROUP(HttpStatus.CONFLICT, "ARTIST_ALREADY_IN_GROUP", "이미 다른 그룹에 소속된 아티스트입니다."),
+    GROUP_NAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "GROUP_NAME_ALREADY_EXISTS", "이미 존재하는 그룹명입니다."),
+    INVALID_NAME_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_NAME_FORMAT", "이름 형식이 올바르지 않습니다.");
 
     private final HttpStatus status;
     private final String code;

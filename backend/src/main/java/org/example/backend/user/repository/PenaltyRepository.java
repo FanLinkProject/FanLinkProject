@@ -8,9 +8,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
 @Repository
 public interface PenaltyRepository extends JpaRepository<Penalty, Long> {
     // 전체 조회
@@ -21,4 +18,7 @@ public interface PenaltyRepository extends JpaRepository<Penalty, Long> {
 
     // 패널티 타입으로 조회
     Page<Penalty> findByPenaltyType(PenaltyType penaltyType, Pageable pageable);
+
+    // 패널티 조회
+    Page<Penalty> findByAdminId(Long adminId, Pageable pageable);
 }
