@@ -5,12 +5,17 @@ import lombok.Getter;
 import lombok.Setter;
 import org.example.backend.user.enums.ReportCategory;
 import org.example.backend.user.enums.ReportType;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
 
 //신고 내용에 관한 엔티티
 @Entity
 @Getter
 @Setter
 @Table(name = "reports")
+@EntityListeners(AuditingEntityListener.class)
 public class Report {
 
     @Id
@@ -44,5 +49,9 @@ public class Report {
     //신고 패널티 결과
     @Column(name = "status", nullable = false)
     private boolean status;
+
+    @CreatedDate
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
 }

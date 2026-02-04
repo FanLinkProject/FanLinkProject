@@ -34,7 +34,14 @@ public enum UserErrorCode implements ErrorCode {
 
     // 발송 관련
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_SEND_FAILED", "이메일 발송에 실패했습니다."),
-    SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS_SEND_FAILED", "SMS 발송에 실패했습니다.");
+    SMS_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SMS_SEND_FAILED", "SMS 발송에 실패했습니다."),
+
+    // 그룹 관련
+    GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "존재하지 않는 그룹입니다."),
+    INVALID_GROUP_ROLE(HttpStatus.BAD_REQUEST, "INVALID_GROUP_ROLE", "해당 유저는 그룹 역할이 아닙니다."),
+    ARTIST_ALREADY_IN_GROUP(HttpStatus.CONFLICT, "ARTIST_ALREADY_IN_GROUP", "이미 다른 그룹에 소속된 아티스트입니다."),
+    GROUP_NAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "GROUP_NAME_ALREADY_EXISTS", "이미 존재하는 그룹명입니다."),
+    INVALID_NAME_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_NAME_FORMAT", "이름 형식이 올바르지 않습니다.");
 
     private final HttpStatus status;
     private final String code;
