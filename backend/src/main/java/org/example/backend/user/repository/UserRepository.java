@@ -28,7 +28,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     // 상태 조회
     Page<User> findByStatus(UserStatus status, Pageable pageable);
-    
+
     // 아티스트 검색 (닉네임 또는 그룹명으로 검색, ACTIVE 상태만)
     @Query("SELECT DISTINCT u FROM User u " +
            "LEFT JOIN GroupMember gm ON gm.member = u " +
@@ -42,11 +42,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("keyword") String keyword,
             Pageable pageable
     );
-    
+
     // 아티스트 전체 목록 조회 (ACTIVE 상태만)
     Page<User> findByRoleAndStatusAndDeletedAtIsNull(
             UserRole role,
             UserStatus status,
             Pageable pageable
     );
+
+    // OAuth2 사용자 조회
+    Optional<User> findByProviderAndProviderId(String provider, String providerId);
 }

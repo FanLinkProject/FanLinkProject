@@ -18,7 +18,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
     show-sql: true
-  # batch설정 추가
+  #====== batch설정 추가==========
   batch:
     jdbc:
       # 애플리케이션 시작 시 배치 테이블 자동 생성
@@ -26,6 +26,7 @@ spring:
     job:
       # 애플리케이션 시작 시 배치 job 자동 실행 방지 (필요할 때만 실행)
       enabled: false
+  #===============================
   data:
     redis:
       host: localhost
@@ -51,7 +52,7 @@ spring:
     # false: 실제 이메일 발송
     dev-mode: ${MAIL_DEV_MODE:true}
 
-# SMS API 설정 (실제 SMS 발송을 위한 설정 - CoolSMS)
+  # SMS API 설정 (실제 SMS 발송을 위한 설정 - CoolSMS)
   sms:
     api:
       # false: 개발 모드 (로그만 출력), true: 실제 SMS 발송
@@ -76,7 +77,8 @@ spring:
     # (선택) consumer가 Json으로 받을 거면 설정 필요
     listener:
       missing-topics-fatal: false
-  # OAuth2 및 시큐리티 넣을 예정
+
+  # 시큐리티 및 OAuth2 - 클라이언트 설정
   security:
     oauth2:
       client:
@@ -160,6 +162,7 @@ spring:
             token-uri: https://api.instagram.com/oauth/access_token
             user-info-uri: https://graph.instagram.com/me?fields=id,username,account_type
             user-name-attribute: id
+
 #커스텀설정-root레벨
 aws:
   region: ${AWS_REGION}

@@ -20,6 +20,11 @@ public enum UserErrorCode implements ErrorCode {
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "인증된 사용자가 없습니다."),
     ACCOUNT_ALREADY_DELETED(HttpStatus.BAD_REQUEST, "ACCOUNT_ALREADY_DELETED", "이미 탈퇴한 계정입니다."),
 
+    // OAuth2 관련
+    OAUTH2_PROVIDER_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "OAUTH_001", "지원하지 않는 소셜 로그인 플랫폼입니다."),
+    OAUTH2_EMAIL_NOT_FOUND(HttpStatus.BAD_REQUEST, "OAUTH_002", "소셜 로그인 제공자로부터 이메일 정보를 받아올 수 없습니다."),
+    OAUTH2_PROCESSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "OAUTH_003", "소셜 로그인 처리 중 오류가 발생했습니다."),
+
     // 계좌 관련
     ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "ACCOUNT_NOT_FOUND", "계좌 정보를 찾을 수 없습니다."),
     ACCOUNT_ALREADY_EXISTS(HttpStatus.CONFLICT, "ACCOUNT_ALREADY_EXISTS", "이미 등록된 계좌 정보가 있습니다."),

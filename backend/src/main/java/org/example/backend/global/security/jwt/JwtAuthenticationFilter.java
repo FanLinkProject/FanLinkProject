@@ -27,6 +27,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        // OAuth2 관련 경로는 JWT 필터를 건너뛰기
+        String requestPath = request.getRequestURI();
+        if (requestPath.startsWith("/oauth2/") || 
+            requestPath.startsWith("/login/oauth2/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String accessToken = resolveToken(request);
 
         try {
