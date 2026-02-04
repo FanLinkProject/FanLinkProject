@@ -1,7 +1,8 @@
 package org.example.backend.notification.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.example.backend.notification.config.EmitterRepository;
+import org.example.backend.notification.repository.EmitterRepository;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.dto.response.NotificationResponse;
 import org.example.backend.notification.entity.Notification;
@@ -20,15 +21,26 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class NotificationService {
 
     private final EmitterRepository emitterRepository;
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
     public SseEmitter subscribe(Long userId) {
-        SseEmitter emitter = new SseEmitter(60L * 1000 * 60); // 1시간
+        // 기존 emitter가 있으면 제거 (중복 구독 방지)
+        SseEmitter existingEmitter = emitterRepository.get(userId);
+        if (existingEmitter != null) {
+            try {
+                existingEmitter.complete();
+            } catch (Exception e) {
+                // 무시
+            }
+            emitterRepository.delete(userId);
+        }
+        
+        SseEmitter emitter = new SseEmitter(5L * 60 * 1000); // 5분
         emitterRepository.save(userId, emitter);
 
         // 연결 끊기면 제거
@@ -48,11 +60,11 @@ public class NotificationService {
     }
 
     // 알림 생성 + SSE 푸시
+    @Transactional
     public void sendNotification(NotificationSendRequest request) {
-        User receiver = userRepository.findById(request.getReceiverId())
-			.orElseThrow(() -> new NotificationException(NotificationErrorCode.RECEIVER_NOT_FOUND));
-        User sender = userRepository.findById(request.getSenderId())
-			.orElseThrow(() -> new NotificationException(NotificationErrorCode.SENDER_NOT_FOUND));
+        
+        User receiver = userRepository.getReferenceById(request.getReceiverId());
+        User sender = userRepository.getReferenceById(request.getSenderId());
 
         Notification notification = Notification.builder()
                 .receiver(receiver)
@@ -62,15 +74,21 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(notification);
+        // flush를 명시적으로 호출하여 ID가 생성되도록 보장
+        notificationRepository.flush();
 
-        SseEmitter emitter = emitterRepository.get(receiver.getId());
+        // SSE 전송 (트랜잭션 내에서 실행되지만 flush 후이므로 안전)
+        SseEmitter emitter = emitterRepository.get(request.getReceiverId());
         if (emitter != null) {
             try {
+                NotificationResponse response = NotificationResponse.from(notification);
+                // ObjectMapper를 사용하여 JSON 문자열로 명시적 변환
+                String jsonData = objectMapper.writeValueAsString(response);
                 emitter.send(SseEmitter.event()
                         .name("notification")
-                        .data(notification));
-            } catch (IOException e) {
-                emitterRepository.delete(receiver.getId());
+                        .data(jsonData));
+            } catch (Exception e) {
+                emitterRepository.delete(request.getReceiverId());
             }
         }
     }
@@ -79,33 +97,41 @@ public class NotificationService {
 
 
     // 단일 읽음 처리
+    @Transactional
     public void markAsRead(Long notificationId) {
-        Notification noti = notificationRepository.findById(notificationId)
-			.orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
-        noti.markAsRead();  // 엔티티에 markAsRead() 메서드 있어야 함
+        int updated = notificationRepository.markAsRead(notificationId);
+        if (updated == 0) {
+            throw new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND);
+        }
     }
 
     // 전체 읽음 처리
+    @Transactional
     public void markAllAsRead(Long userId) {
-        List<Notification> notifications = notificationRepository.findByReceiverIdAndIsReadFalseOrderByCreatedAtDesc(userId);
-        notifications.forEach(Notification::markAsRead);
+        notificationRepository.markAllAsRead(userId);
     }
 
     // 읽지 않은 알림 목록 조회
 	@Transactional(readOnly = true)
-    public List<NotificationResponse> getUnreadNotifications(Long userId) {
-        return notificationRepository.findByReceiverIdAndIsReadFalseOrderByCreatedAtDesc(userId)
+    public List<
+            NotificationResponse> getUnreadNotifications(Long userId) {
+        return notificationRepository.findByReceiver_IdAndIsReadFalseOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(n -> new NotificationResponse(n.getContent(), n.getCreatedAt()))
+                .map(NotificationResponse::from)
                 .collect(Collectors.toList());
     }
 
     // 전체 알림 목록 조회
 	@Transactional(readOnly = true)
 	public List<NotificationResponse> getAllNotifications(Long userId) {
-        return notificationRepository.findByReceiverIdOrderByCreatedAtDesc(userId)
+        return notificationRepository.findByReceiver_IdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(n -> new NotificationResponse(n.getContent(), n.getCreatedAt()))
+                .map(NotificationResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteReadNotifications(Long userId) {
+        notificationRepository.deleteReadByUserId(userId);
     }
 }

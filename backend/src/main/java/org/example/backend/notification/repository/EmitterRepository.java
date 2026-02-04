@@ -1,4 +1,4 @@
-package org.example.backend.notification.config;
+package org.example.backend.notification.repository;
 
 
 import org.springframework.stereotype.Component;
@@ -22,6 +22,14 @@ public class EmitterRepository {
 
     public SseEmitter get(Long userId) {
         return emitters.get(userId);
+    }
+
+    public int getCount() {
+        return emitters.size();
+    }
+
+    public java.util.Set<Long> getAllUserIds() {
+        return emitters.keySet();
     }
 }
 

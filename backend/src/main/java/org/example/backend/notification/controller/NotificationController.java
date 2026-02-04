@@ -26,7 +26,7 @@ public class NotificationController {
 
     // SSE 구독
 	@GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	public ResponseEntity<SseEmitter> subscribe(PrincipalDetails principal) {
+	public ResponseEntity<SseEmitter> subscribe(@AuthenticationPrincipal PrincipalDetails principal) {
 		SseEmitter emitter = notificationService.subscribe(principal.getUserId());
 		return ResponseEntity.ok(emitter);
 	}
@@ -49,14 +49,14 @@ public class NotificationController {
 
     // 모두 읽음 처리
 	@PostMapping("/read-all")
-	public ResponseEntity<Void> markAllAsRead(PrincipalDetails principal) {
+	public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal PrincipalDetails principal) {
 		notificationService.markAllAsRead(principal.getUserId());
 		return ResponseEntity.ok().build();
 	}
 
     // 읽지 않은 알람
 	@GetMapping("/unread")
-	public ResponseEntity<List<NotificationResponse>> getUnread(PrincipalDetails principal) {
+	public ResponseEntity<List<NotificationResponse>> getUnread(@AuthenticationPrincipal PrincipalDetails principal) {
 		return ResponseEntity.ok(
 			notificationService.getUnreadNotifications(principal.getUserId())
 		);
@@ -69,4 +69,12 @@ public class NotificationController {
 			notificationService.getAllNotifications(principal.getUserId())
 		);
 	}
+
+    // 읽은 알림 삭제
+    @DeleteMapping("/delete-read")
+    public ResponseEntity<Void> deleteReadNotifications(@AuthenticationPrincipal PrincipalDetails principal) {
+        notificationService.deleteReadNotifications(principal.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
 }

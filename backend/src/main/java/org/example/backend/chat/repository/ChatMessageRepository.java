@@ -1,6 +1,5 @@
 package org.example.backend.chat.repository;
 
-import org.example.backend.chat.dto.response.ChatMessageResponse;
 import org.example.backend.chat.entity.ChatMessage;
 import org.example.backend.chat.entity.ChatRoom;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,6 +30,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("""
         select m
         from ChatMessage m
+        join fetch m.sender
         where m.chatRoom = :chatRoom
         order by m.id desc
     """)
@@ -39,6 +39,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("""
         select m
         from ChatMessage m
+        join fetch m.sender
         where m.chatRoom = :chatRoom
         and m.id < :cursorId
         order by m.id desc
@@ -49,6 +50,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("""
         select m
         from ChatMessage m
+        join fetch m.sender
         where m.chatRoom = :chatRoom
         and (m.messageType = 'ARTIST' or m.sender.id = :userId)
         order by m.id desc
@@ -58,6 +60,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("""
         select m
         from ChatMessage m
+        join fetch m.sender
         where m.chatRoom = :chatRoom
         and m.id < :cursorId
         and (m.messageType = 'ARTIST' or m.sender.id = :userId)
