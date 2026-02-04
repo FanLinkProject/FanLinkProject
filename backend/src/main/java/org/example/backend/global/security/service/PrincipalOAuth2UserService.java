@@ -6,7 +6,10 @@ import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.global.security.oauth2.user.*;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.exception.UserErrorCode;
+import org.example.backend.user.exception.UserException;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,8 @@ import java.util.Map;
 public class PrincipalOAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder; // oauth2 관련 보안 - 임의비밀번호생성 암호화
+
 
     @Override
     @Transactional
@@ -49,11 +55,9 @@ public class PrincipalOAuth2UserService extends DefaultOAuth2UserService {
             // [신규] 인스타그램 추가
             oAuth2UserInfo = new InstagramUserInfo(attributes);
         } else {
-            throw new OAuth2AuthenticationException("지원하지 않는 소셜 로그인입니다: " + registrationId);
+            throw new UserException(UserErrorCode.OAUTH2_PROVIDER_NOT_SUPPORTED);
         }
 
-
-        
         // 4. 데이터 추출
         String provider = oAuth2UserInfo.getProvider();
         String providerId = oAuth2UserInfo.getProviderId();
@@ -61,11 +65,9 @@ public class PrincipalOAuth2UserService extends DefaultOAuth2UserService {
         String profileImage = oAuth2UserInfo.getProfileImageUrl();
         String email = oAuth2UserInfo.getEmail();
 
-        // [예외 처리] 이메일이 없는 경우 (인스타그램 등)
-        if (email == null) {
-            // 임시 이메일 생성 로직: id + provider@social.com
-            email = providerId + "@" + provider + ".com";
-            log.warn("이메일 정보가 없어 임시 이메일을 생성합니다: {}", email);
+        // 이메일정보 체크, 예외처리 수정
+        if (email == null || email.isBlank()) {
+            throw new UserException(UserErrorCode.OAUTH2_EMAIL_NOT_FOUND);
         }
 
         log.info("OAuth2 Login Request: provider={}, email={}", provider, email);
@@ -89,6 +91,10 @@ public class PrincipalOAuth2UserService extends DefaultOAuth2UserService {
     // OAuth2 신규 사용자 생성
     private User createOAuth2User(String email, String name, String picture, String provider, String providerId) {
         String nickname = generateUniqueNickname(name != null ? name : email.split("@")[0]);
+
+        // [보안] 소셜 로그인은 비밀번호가 없지만, DB 제약조건(Not Null)이나 보안을 위해 랜덤 비밀번호 생성
+        String randomPassword = UUID.randomUUID().toString();
+        String encodedPassword = passwordEncoder.encode(randomPassword);
 
         User user = User.builder()
                 .email(email)
