@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.dto.request.LiveChatMessageRequest;
 import org.example.backend.chat.exception.ChatException;
 import org.example.backend.chat.exception.LiveChatErrorCode;
+import org.example.backend.live_session.exception.LiveSessionException;
+import org.example.backend.live_session.service.LiveSessionService;
 import org.example.backend.user.entity.User;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ public class LiveChatService {
 
 	private static final String TOPIC = "live-chat";
 	private static final int MAX_CONTENT_LENGTH = 500;
+
+	private final LiveSessionService liveSessionService;
 
 	public void handleLiveMessage(User sender, LiveChatMessageRequest request) {
 		validate(sender, request);
@@ -63,6 +67,11 @@ public class LiveChatService {
 		}
 		if (req.getContent().length() > MAX_CONTENT_LENGTH) {
 			throw new ChatException(LiveChatErrorCode.LIVE_CHAT_CONTENT_TOO_LONG);
+		}
+		try {
+			liveSessionService.validateChatAllowed(req.getRoomId());
+		} catch (LiveSessionException e) {
+			throw new ChatException(LiveChatErrorCode.LIVE_CHAT_SESSION_INVALID);
 		}
 	}
 }
