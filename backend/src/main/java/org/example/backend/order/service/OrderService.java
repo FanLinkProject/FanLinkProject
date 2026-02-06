@@ -81,6 +81,9 @@ public class OrderService {
                                         .add(itemPrice.multiply(BigDecimal.valueOf(itemDto.quantity())));
                         calculatedTotalCandyAmount += itemCandyPrice * itemDto.quantity();
 
+                        // 재고 차감
+                        product.decreaseStock((long) itemDto.quantity());
+
                         // OrderItem 생성
                         OrderItem orderItem = OrderItem.builder()
                                         .product(product)
@@ -110,5 +113,20 @@ public class OrderService {
                 // 5. 저장
                 orderRepository.save(order);
                 return order.getOrderNo();
+        }
+
+        @Transactional
+        public void cancelOrder(Order order) {
+                if (order.getStatus() == OrderStatus.CANCELED) {
+                        return;
+                }
+
+                // 재고 복구
+                for (OrderItem item : order.getOrderItems()) {
+                        Product product = item.getProduct();
+                        product.increaseStock((long) item.getQuantity());
+                }
+
+                order.updateStatus(OrderStatus.CANCELED);
         }
 }
