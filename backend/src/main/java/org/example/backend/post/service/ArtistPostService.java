@@ -39,6 +39,7 @@ public class ArtistPostService {
                 .group(group)
                 .title(request.getTitle())
                 .content(request.getContent())
+                .isMembershipOnly(request.getIsMembershipOnly())
                 .status(false)
                 .build();
 
@@ -74,7 +75,7 @@ public class ArtistPostService {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
         }
 
-        artistPost.update(request.getTitle(), request.getContent());
+        artistPost.update(request.getTitle(), request.getContent(), request.getIsMembershipOnly());
 
         return ArtistPostResponse.from(artistPost);
     }

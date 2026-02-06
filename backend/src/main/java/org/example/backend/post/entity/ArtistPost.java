@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "artist_posts")
+// 아티스트, 관리자가 작성한 게시글
 public class ArtistPost {
 
     @Id
@@ -40,6 +41,9 @@ public class ArtistPost {
     @Column(nullable = false, columnDefinition = "TINYINT(1) default 0")
     private Boolean status; // 삭제 여부 (0: false, 1: true)
 
+    @Column(name = "is_membership_only", nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean isMembershipOnly; // 멤버십만 볼 수 있는 게시글 여부 (0: false, 1: true)
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -52,12 +56,13 @@ public class ArtistPost {
     private LocalDateTime deletedAt;
 
     @Builder
-    public ArtistPost(User user, User group, String title, String content, Boolean status) {
+    public ArtistPost(User user, User group, String title, String content, Boolean status, Boolean isMembershipOnly) {
         this.user = user;
         this.group = group;
         this.title = title;
         this.content = content;
         this.status = status != null ? status : false;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
     }
 
     public void delete() {
@@ -65,8 +70,9 @@ public class ArtistPost {
         this.deletedAt = LocalDateTime.now();
     }
 
-    public void update(String title, String content) {
+    public void update(String title, String content, Boolean isMembershipOnly) {
         this.title = title;
         this.content = content;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
     }
 }

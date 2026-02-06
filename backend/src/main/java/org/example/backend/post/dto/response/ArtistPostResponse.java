@@ -14,6 +14,7 @@ public class ArtistPostResponse {
     private String writerNickname;
     private String title;
     private String content;
+    private Boolean isMembershipOnly;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -24,6 +25,7 @@ public class ArtistPostResponse {
                 .writerNickname(post.getUser().getNickname())
                 .title(post.getTitle())
                 .content(post.getContent())
+                .isMembershipOnly(post.getIsMembershipOnly())
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();

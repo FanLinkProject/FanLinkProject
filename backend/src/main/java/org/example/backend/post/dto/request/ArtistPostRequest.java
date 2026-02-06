@@ -6,7 +6,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class ArtistPostRequest {
-    private Long groupId; // 자신의 그룹 ID (또는 타겟 그룹)
+    private Long groupId; // 자신의 그룹 ID
     private String title;
     private String content;
+    private Boolean isMembershipOnly;
 }
