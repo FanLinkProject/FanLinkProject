@@ -118,6 +118,28 @@ public class CommentService {
         comment.delete();
     }
 
+    /**
+     * 여러 게시물의 활성 댓글 수를 한 번에 조회 (게시물 목록용)
+     * - IN + GROUP BY 쿼리 1회로 처리
+     * - 댓글이 없는 게시물은 Map에 미포함 → getOrDefault(id, 0L) 사용
+     *
+     * @param targetType  게시판 타입 (FAN, ARTIST, MEDIA, LIVE)
+     * @param targetIds   게시물 ID 목록
+     * @return Map<게시물ID, 댓글수>
+     */
+    public Map<Long, Long> getCommentCounts(TargetType targetType, List<Long> targetIds) {
+        if (targetIds == null || targetIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return commentRepository.countByTargetTypeAndTargetIds(targetType, targetIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+    }
+
     // ──────────────────────────────────────────────
     // Private Helper Methods
     // ──────────────────────────────────────────────

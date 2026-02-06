@@ -15,6 +15,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/comments")
 @RequiredArgsConstructor
@@ -38,6 +41,14 @@ public class CommentController {
             @RequestParam(required = false) Long lastId,
             @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(commentService.getReplies(parentId, lastId, pageable));
+    }
+
+    // 여러 게시물의 댓글 수 일괄 조회 (게시물 목록 화면용)
+    @GetMapping("/counts")
+    public ResponseEntity<Map<Long, Long>> getCounts(
+            @RequestParam TargetType targetType,
+            @RequestParam List<Long> targetIds) {
+        return ResponseEntity.ok(commentService.getCommentCounts(targetType, targetIds));
     }
 
     @PostMapping

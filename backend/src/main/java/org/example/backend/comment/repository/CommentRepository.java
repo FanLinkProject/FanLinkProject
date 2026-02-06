@@ -54,6 +54,21 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
 
     /**
+     * 여러 게시물의 활성 댓글 수를 한 번에 조회 (Bulk Count)
+     * - 부모 댓글 + 대댓글 모두 포함 (활성 상태만)
+     * - 게시물 목록 화면에서 댓글 수 표시용
+     */
+    @Query("SELECT c.targetId, COUNT(c) FROM Comment c " +
+            "WHERE c.targetType = :targetType " +
+            "AND c.targetId IN :targetIds " +
+            "AND c.status = 1 " +
+            "GROUP BY c.targetId")
+    List<Object[]> countByTargetTypeAndTargetIds(
+            @Param("targetType") TargetType targetType,
+            @Param("targetIds") List<Long> targetIds
+    );
+
+    /**
      * 아티스트(ARTIST/GROUP) 역할 유저가 답글을 단 부모 댓글 ID 목록 조회
      * - 부모 댓글 목록 조회 시 "아티스트 답글 있음" 뱃지 표시용
      * - 쿼리 1회로 해당 페이지의 모든 부모 댓글에 대해 일괄 판별
