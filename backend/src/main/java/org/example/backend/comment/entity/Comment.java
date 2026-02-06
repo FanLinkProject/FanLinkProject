@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.backend.comment.enums.TargetType;
+import org.example.backend.comment.exception.CommentErrorCode;
+import org.example.backend.comment.exception.CommentException;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -62,4 +64,12 @@ public class Comment {
     }
 
     public void delete() { this.status = 0; }
+
+
+    public void update(String content) {
+        if (this.status == 0) {
+            throw new CommentException(CommentErrorCode.COMMENT_NOT_FOUND); // 이미 삭제된 댓글은 수정 불가
+        }
+        this.content = content;
+    }
 }

@@ -1,10 +1,13 @@
 package org.example.backend.comment.dto.requset;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.example.backend.comment.enums.TargetType;
 
 public record CommentCreateRequest(
-        Long targetId,
-        TargetType targetType,
-        String content,
-        Long parentId // null이면 댓글, 값이 있으면 대댓글
+        @NotNull Long targetId,
+        @NotNull TargetType targetType,
+        @NotBlank @Size(max = 1000) String content, // 글자수 제한 추가
+        Long parentId
 ) {}

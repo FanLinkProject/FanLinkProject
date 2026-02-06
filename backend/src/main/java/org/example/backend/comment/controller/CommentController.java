@@ -1,7 +1,9 @@
 package org.example.backend.comment.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.comment.dto.requset.CommentCreateRequest;
+import org.example.backend.comment.dto.requset.CommentUpdateRequest;
 import org.example.backend.comment.dto.response.CommentResponse;
 import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.service.CommentService;
@@ -18,8 +20,8 @@ public class CommentController {
     private final CommentService commentService;
 
     @PostMapping
-    public ResponseEntity<Long> create(@RequestBody CommentCreateRequest request) {
-        return ResponseEntity.ok(commentService.create(request, 1L)); // 유저ID는 인증세션에서 가져옴
+    public ResponseEntity<Long> create(@Valid @RequestBody CommentCreateRequest request) { // @Valid 추가
+        return ResponseEntity.ok(commentService.create(request, 1L));
     }
 
     @GetMapping
@@ -29,5 +31,16 @@ public class CommentController {
             @RequestParam(required = false) Long lastId,
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(commentService.getComments(targetType, targetId, lastId, pageable));
+    }
+
+
+    @PatchMapping("/{commentId}")
+    public ResponseEntity<Void> update(
+            @PathVariable Long commentId,
+            @Valid @RequestBody CommentUpdateRequest request) {
+
+        // 현재는 유저 ID를 1L로 고정해서 테스트 (나중에 인증 시스템 연결 시 변경)
+        commentService.update(commentId, request.content(), 1L);
+        return ResponseEntity.noContent().build();
     }
 }
