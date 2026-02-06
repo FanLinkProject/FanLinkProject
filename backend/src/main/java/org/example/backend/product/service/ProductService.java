@@ -33,6 +33,7 @@ public class ProductService {
                 .type(request.type())
                 .paymentMethod(request.paymentMethod())
                 .isSubscription(request.isSubscription())
+                .quantity(request.quantity())
                 .build();
 
         return productRepository.save(product);
@@ -53,9 +54,22 @@ public class ProductService {
                 request.candyPrice() != null ? request.candyPrice() : 0L,
                 request.type(),
                 request.paymentMethod(),
-                request.isSubscription());
+                request.isSubscription(),
+                request.quantity());
 
         return product;
+    }
+
+    @Transactional
+    public void increaseStock(Long id, Long amount) {
+        Product product = getProduct(id);
+        product.increaseStock(amount);
+    }
+
+    @Transactional
+    public void decreaseStock(Long id, Long amount) {
+        Product product = getProduct(id);
+        product.decreaseStock(amount);
     }
 
     @Transactional
