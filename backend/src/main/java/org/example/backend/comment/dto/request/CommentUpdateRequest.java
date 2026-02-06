@@ -1,4 +1,4 @@
-package org.example.backend.comment.dto.requset;
+package org.example.backend.comment.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

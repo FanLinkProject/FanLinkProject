@@ -8,13 +8,12 @@ import lombok.NoArgsConstructor;
 import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.exception.CommentErrorCode;
 import org.example.backend.comment.exception.CommentException;
+import org.hibernate.annotations.Formula;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Getter
@@ -50,9 +49,9 @@ public class Comment {
     @JoinColumn(name = "parent_id")
     private Comment parent;
 
-    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
-    @OrderBy("createdAt ASC")
-    private List<Comment> children = new ArrayList<>();
+    // 활성 상태인 자식 댓글 수 (DB 서브쿼리로 조회, children 컬렉션 로딩 불필요)
+    @Formula("(SELECT COUNT(*) FROM comments c WHERE c.parent_id = id AND c.status = 1)")
+    private int activeReplyCount;
 
     @Builder
     public Comment(Long userId, Long targetId, TargetType targetType, String content, Comment parent) {
