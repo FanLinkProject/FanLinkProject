@@ -60,6 +60,12 @@ public class Product {
     @Column(nullable = false)
     private Long quantity; // 재고 수량
 
+    @Column(name = "is_membership_only", nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean isMembershipOnly; // 유료 팬 가입자만 구매할 수 있는 상품 여부 (0: false, 1: true)
+
+    @Column(name = "is_exclusive", nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean isExclusive; // 팬링크 단독 상품 여부 (0: false, 1: true)
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -70,7 +76,8 @@ public class Product {
 
     @Builder
     public Product(Long artistId, String name, Long price, Long candyPrice, ProductType type,
-            ProductPaymentMethod paymentMethod, Boolean isSubscription, Long quantity) {
+            ProductPaymentMethod paymentMethod, Boolean isSubscription, Long quantity,
+            Boolean isMembershipOnly, Boolean isExclusive) {
         this.artistId = artistId;
         this.name = name;
         this.price = price;
@@ -79,6 +86,8 @@ public class Product {
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
         this.quantity = quantity != null ? quantity : 0L;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isExclusive = isExclusive != null ? isExclusive : false;
 
         validate();
     }
@@ -111,7 +120,7 @@ public class Product {
     }
 
     public void update(String name, Long price, Long candyPrice, ProductType type, ProductPaymentMethod paymentMethod,
-            Boolean isSubscription, Long quantity) {
+            Boolean isSubscription, Long quantity, Boolean isMembershipOnly, Boolean isExclusive) {
         this.name = name;
         this.price = price;
         this.candyPrice = candyPrice;
@@ -119,6 +128,8 @@ public class Product {
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
         this.quantity = quantity != null ? quantity : 0L;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isExclusive = isExclusive != null ? isExclusive : false;
 
         validate();
     }
