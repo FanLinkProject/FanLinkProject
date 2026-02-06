@@ -18,8 +18,8 @@ import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,25 +32,25 @@ public class CommentService {
 
     /**
      * 부모 댓글 목록 조회
-     * - DB 레벨에서 "활성 댓글 OR 활성 자식 있는 삭제 댓글" 필터링 처리
-     * - 유저 닉네임은 findAllById를 통한 Bulk Fetch
+     * - 유저 정보(닉네임, 역할, 프로필) Bulk Fetch
+     * - 아티스트 답글 존재 여부 일괄 조회
      */
     public Slice<CommentResponse> getComments(TargetType targetType, Long targetId, Long lastId, Pageable pageable) {
         Slice<Comment> comments = commentRepository.findRootComments(targetType, targetId, lastId, pageable);
 
-        // 1. 작성자 ID 목록 추출
-        List<Long> userIds = comments.getContent().stream()
-                .map(Comment::getUserId)
-                .distinct()
-                .toList();
+        // 1. 작성자 정보 일괄 조회 (ID -> User)
+        Map<Long, User> userMap = getUserMap(comments.getContent());
 
-        // 2. 유저 정보 한꺼번에 조회 및 Map 생성 (ID -> Nickname)
-        Map<Long, String> userNicknameMap = userRepository.findAllById(userIds).stream()
-                .collect(Collectors.toMap(User::getId, User::getNickname));
+        // 2. 아티스트 답글이 있는 부모 댓글 ID 일괄 조회
+        Set<Long> artistRepliedParentIds = getArtistRepliedParentIds(comments.getContent());
 
-        // 3. DTO 변환 시 닉네임 매핑 (필터링은 DB 쿼리에서 완료)
+        // 3. DTO 변환
         List<CommentResponse> content = comments.getContent().stream()
-                .map(comment -> CommentResponse.of(comment, userNicknameMap.get(comment.getUserId())))
+                .map(comment -> CommentResponse.of(
+                        comment,
+                        userMap.get(comment.getUserId()),
+                        artistRepliedParentIds.contains(comment.getId())
+                ))
                 .toList();
 
         return new SliceImpl<>(content, pageable, comments.hasNext());
@@ -62,16 +62,10 @@ public class CommentService {
     public Slice<CommentResponse> getReplies(Long parentId, Long lastId, Pageable pageable) {
         Slice<Comment> replies = commentRepository.findReplies(parentId, lastId, pageable);
 
-        List<Long> userIds = replies.getContent().stream()
-                .map(Comment::getUserId)
-                .distinct()
-                .toList();
-
-        Map<Long, String> userNicknameMap = userRepository.findAllById(userIds).stream()
-                .collect(Collectors.toMap(User::getId, User::getNickname));
+        Map<Long, User> userMap = getUserMap(replies.getContent());
 
         List<CommentResponse> content = replies.getContent().stream()
-                .map(reply -> CommentResponse.ofReply(reply, userNicknameMap.get(reply.getUserId())))
+                .map(reply -> CommentResponse.ofReply(reply, userMap.get(reply.getUserId())))
                 .toList();
 
         return new SliceImpl<>(content, pageable, replies.hasNext());
@@ -122,6 +116,39 @@ public class CommentService {
                 .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
         validateAuthority(comment, currentUser);
         comment.delete();
+    }
+
+    // ──────────────────────────────────────────────
+    // Private Helper Methods
+    // ──────────────────────────────────────────────
+
+    /**
+     * 댓글 작성자 정보 일괄 조회 (Bulk Fetch)
+     * - 닉네임뿐 아니라 역할(role), 프로필 이미지 등 전체 User 정보를 매핑
+     */
+    private Map<Long, User> getUserMap(List<Comment> comments) {
+        List<Long> userIds = comments.stream()
+                .map(Comment::getUserId)
+                .distinct()
+                .toList();
+
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+    }
+
+    /**
+     * 아티스트(ARTIST/GROUP) 역할 유저가 답글을 단 부모 댓글 ID Set 조회
+     * - 쿼리 1회로 해당 페이지 부모 댓글 전체에 대해 일괄 판별
+     * - 댓글이 없거나 부모 ID가 없으면 빈 Set 반환
+     */
+    private Set<Long> getArtistRepliedParentIds(List<Comment> parentComments) {
+        List<Long> parentIds = parentComments.stream()
+                .map(Comment::getId)
+                .toList();
+
+        if (parentIds.isEmpty()) return Set.of();
+
+        return new HashSet<>(commentRepository.findParentIdsWithArtistReply(parentIds));
     }
 
     /**

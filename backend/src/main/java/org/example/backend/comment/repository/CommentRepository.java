@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     /**
@@ -50,6 +52,16 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     void updateStatusByTarget(@Param("type") TargetType type, @Param("id") Long id, @Param("status") Integer status);
 
 
+
+    /**
+     * 아티스트(ARTIST/GROUP) 역할 유저가 답글을 단 부모 댓글 ID 목록 조회
+     * - 부모 댓글 목록 조회 시 "아티스트 답글 있음" 뱃지 표시용
+     * - 쿼리 1회로 해당 페이지의 모든 부모 댓글에 대해 일괄 판별
+     */
+    @Query("SELECT DISTINCT c.parent.id FROM Comment c " +
+            "WHERE c.parent.id IN :parentIds AND c.status = 1 " +
+            "AND c.userId IN (SELECT u.id FROM org.example.backend.user.entity.User u WHERE u.role = 'ARTIST' OR u.role = 'GROUP')")
+    List<Long> findParentIdsWithArtistReply(@Param("parentIds") List<Long> parentIds);
 
     /**
      * 내가 쓴 댓글 조회 (정상 상태인 것만)
