@@ -57,6 +57,9 @@ public class Product {
     @Column(name = "is_subscription", nullable = false)
     private Boolean isSubscription;
 
+    @Column(nullable = false)
+    private Long quantity; // 재고 수량
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -67,7 +70,7 @@ public class Product {
 
     @Builder
     public Product(Long artistId, String name, Long price, Long candyPrice, ProductType type,
-            ProductPaymentMethod paymentMethod, Boolean isSubscription) {
+            ProductPaymentMethod paymentMethod, Boolean isSubscription, Long quantity) {
         this.artistId = artistId;
         this.name = name;
         this.price = price;
@@ -75,6 +78,7 @@ public class Product {
         this.type = type;
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
+        this.quantity = quantity != null ? quantity : 0L;
 
         validate();
     }
@@ -107,14 +111,33 @@ public class Product {
     }
 
     public void update(String name, Long price, Long candyPrice, ProductType type, ProductPaymentMethod paymentMethod,
-            Boolean isSubscription) {
+            Boolean isSubscription, Long quantity) {
         this.name = name;
         this.price = price;
         this.candyPrice = candyPrice;
         this.type = type;
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
+        this.quantity = quantity != null ? quantity : 0L;
 
         validate();
+    }
+
+    public void increaseStock(Long quantity) {
+        if (quantity < 0) {
+            throw new ProductException(ProductErrorCode.INVALID_PRICE);
+        }
+        this.quantity += quantity;
+    }
+
+    public void decreaseStock(Long quantity) {
+        if (quantity < 0) {
+            throw new ProductException(ProductErrorCode.INVALID_PRICE);
+        }
+
+        if (this.quantity < quantity) {
+            throw new ProductException(ProductErrorCode.OUT_OF_STOCK);
+        }
+        this.quantity -= quantity;
     }
 }
