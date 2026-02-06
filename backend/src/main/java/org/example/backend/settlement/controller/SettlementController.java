@@ -2,7 +2,9 @@ package org.example.backend.settlement.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
+import org.example.backend.settlement.dto.request.ManualSettlementRequest;
 import org.example.backend.settlement.dto.response.*;
+import org.example.backend.settlement.service.SettlementBatchService;
 import org.example.backend.settlement.service.SettlementDashboardService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +22,7 @@ import java.util.List;
 public class SettlementController {
 
     private final SettlementDashboardService dashboardService;
+    private final SettlementBatchService batchService;
 
     // ===== [아티스트용 API] =====
 
@@ -121,5 +124,65 @@ public class SettlementController {
             @PathVariable Long settlementId
     ) {
         return ResponseEntity.ok(dashboardService.getAdminSettlementDetails(settlementId));
+    }
+
+    /**
+     * [관리자] 정산 실패 로그 요약 조회
+     * 전체 실패 건수, 미처리 건수, 복구 완료 건수를 반환합니다.
+     * GET /api/settlements/admin/failure-logs/summary
+     */
+    @GetMapping("/admin/failure-logs/summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AdminFailureLogSummaryResponse> getAdminFailureLogSummary() {
+        return ResponseEntity.ok(dashboardService.getAdminFailureLogSummary());
+    }
+
+    /**
+     * [관리자] 정산 실패 로그 목록 조회 (페이징)
+     * 복구 상태별 필터링을 지원합니다.
+     * GET /api/settlements/admin/failure-logs
+     * GET /api/settlements/admin/failure-logs?processed=false  (미처리만)
+     * GET /api/settlements/admin/failure-logs?processed=true   (복구 완료만)
+     */
+    @GetMapping("/admin/failure-logs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<AdminFailureLogResponse>> getAdminFailureLogs(
+            @RequestParam(required = false) Boolean processed,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        return ResponseEntity.ok(dashboardService.getAdminFailureLogs(processed, pageable));
+    }
+
+    /**
+     * [관리자] 수동 정산 배치 실행
+     * 관리자가 직접 정산 배치를 트리거합니다.
+     * startDate, endDate를 지정하지 않으면 전월 1일 ~ 전월 말일로 자동 설정됩니다.
+     *
+     * POST /api/settlements/admin/execute
+     *
+     * 요청 본문 예시 (기간 지정):
+     * {
+     *   "startDate": "2026-01-01",
+     *   "endDate": "2026-01-31"
+     * }
+     *
+     * 요청 본문 예시 (전월 자동):
+     * {} 또는 빈 본문
+     */
+    @PostMapping("/admin/execute")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ManualSettlementResponse> executeManualSettlement(
+            @RequestBody(required = false) ManualSettlementRequest request
+    ) {
+        if (request == null) {
+            request = new ManualSettlementRequest();
+        }
+
+        ManualSettlementResponse response = batchService.executeManualSettlement(
+                request.getResolvedStartDate(),
+                request.getResolvedEndDate()
+        );
+
+        return ResponseEntity.ok(response);
     }
 }

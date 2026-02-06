@@ -8,6 +8,7 @@ import org.example.backend.settlement.enums.SettlementSourceType;
 import org.example.backend.settlement.exception.SettlementErrorCode;
 import org.example.backend.settlement.exception.SettlementException;
 import org.example.backend.settlement.repository.SettlementDetailRepository;
+import org.example.backend.settlement.repository.SettlementFailureLogRepository;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.example.backend.settlement.repository.SettlementRepository;
 import org.example.backend.user.entity.User;
@@ -33,6 +34,7 @@ public class SettlementDashboardService {
     private final SettlementPendingRepository pendingRepository;
     private final SettlementRepository settlementRepository;
     private final SettlementDetailRepository detailRepository;
+    private final SettlementFailureLogRepository failureLogRepository;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
 
@@ -224,6 +226,32 @@ public class SettlementDashboardService {
                 .stream()
                 .map(SettlementDetailResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    // ===== [관리자 전용 — 실패 로그 조회] =====
+
+    /**
+     * [관리자] 실패 로그 요약 조회
+     * 전체 건수, 미처리 건수, 복구 완료 건수를 반환합니다.
+     */
+    public AdminFailureLogSummaryResponse getAdminFailureLogSummary() {
+        long totalCount = failureLogRepository.count();
+        long unprocessedCount = failureLogRepository.countByIsProcessed(false);
+
+        return AdminFailureLogSummaryResponse.of(totalCount, unprocessedCount);
+    }
+
+    /**
+     * [관리자] 실패 로그 목록 조회 (페이징)
+     * @param isProcessed null: 전체, true: 복구 완료, false: 미처리
+     */
+    public Page<AdminFailureLogResponse> getAdminFailureLogs(Boolean isProcessed, Pageable pageable) {
+        if (isProcessed != null) {
+            return failureLogRepository.findByIsProcessedOrderByCreatedAtDesc(isProcessed, pageable)
+                    .map(AdminFailureLogResponse::from);
+        }
+        return failureLogRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(AdminFailureLogResponse::from);
     }
 
     // ===== [내부 공용 메서드] =====
