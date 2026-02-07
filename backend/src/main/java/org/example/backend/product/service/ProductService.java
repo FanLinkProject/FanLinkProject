@@ -25,6 +25,10 @@ public class ProductService {
 
     @Transactional
     public Product createProduct(ProductRequestDto request) {
+        boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
+        // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
+        boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
+
         Product product = Product.builder()
                 .artistId(request.artistId())
                 .name(request.name())
@@ -34,6 +38,8 @@ public class ProductService {
                 .paymentMethod(request.paymentMethod())
                 .isSubscription(request.isSubscription())
                 .quantity(request.quantity())
+                .isMembershipOnly(isMembershipOnly)
+                .isExclusive(isExclusive)
                 .build();
 
         return productRepository.save(product);
@@ -48,6 +54,10 @@ public class ProductService {
     public Product updateProduct(Long id, ProductRequestDto request) {
         Product product = getProduct(id);
 
+        boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
+        // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
+        boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
+
         product.update(
                 request.name(),
                 request.price(),
@@ -55,7 +65,9 @@ public class ProductService {
                 request.type(),
                 request.paymentMethod(),
                 request.isSubscription(),
-                request.quantity());
+                request.quantity(),
+                isMembershipOnly,
+                isExclusive);
 
         return product;
     }
