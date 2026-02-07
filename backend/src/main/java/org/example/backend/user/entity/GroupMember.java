@@ -34,7 +34,7 @@ public class GroupMember {
     private User member;
 
     // 그룹명
-    @Column(name = "group_name", unique = true, nullable = false)
+    @Column(name = "group_name", nullable = false)
     private String groupName;
 
     @CreatedDate
