@@ -126,10 +126,15 @@ public class SettlementDashboardService {
         for (Long targetId : targetIds) {
             Object[] summary = settlementRepository.findSettlementSummaryByArtistId(targetId);
 
-            Long totalSales = (Long) summary[0];
-            Long totalFee = (Long) summary[1];
-            Long totalFinal = (Long) summary[2];
-            Long count = (Long) summary[3];
+            // JPA 쿼리가 이중 배열 [[value1, value2, value3, value4]]을 반환하므로
+            // summary[0]를 먼저 추출하여 실제 데이터 배열을 얻음
+            Object[] data = (Object[]) summary[0];
+
+            // JPA의 SUM() 함수는 Long이 아닌 Number 타입을 반환할 수 있으므로 안전하게 변환
+            Long totalSales = ((Number) data[0]).longValue();
+            Long totalFee = ((Number) data[1]).longValue();
+            Long totalFinal = ((Number) data[2]).longValue();
+            Long count = ((Number) data[3]).longValue();
 
             // 이번 달 예상 정산금 계산
             long pendingEstimate = calculatePendingEstimate(targetId);
