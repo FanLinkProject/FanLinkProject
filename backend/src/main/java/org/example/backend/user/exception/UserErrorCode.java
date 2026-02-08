@@ -46,7 +46,13 @@ public enum UserErrorCode implements ErrorCode {
     INVALID_GROUP_ROLE(HttpStatus.BAD_REQUEST, "INVALID_GROUP_ROLE", "해당 유저는 그룹 역할이 아닙니다."),
     ARTIST_ALREADY_IN_GROUP(HttpStatus.CONFLICT, "ARTIST_ALREADY_IN_GROUP", "이미 다른 그룹에 소속된 아티스트입니다."),
     GROUP_NAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "GROUP_NAME_ALREADY_EXISTS", "이미 존재하는 그룹명입니다."),
-    INVALID_NAME_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_NAME_FORMAT", "이름 형식이 올바르지 않습니다.");
+        INVALID_NAME_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_NAME_FORMAT", "이름 형식이 올바르지 않습니다."),
+
+        // 팔로우 관련
+        FOLLOW_TARGET_NOT_ARTIST(HttpStatus.BAD_REQUEST, "FOLLOW_TARGET_NOT_ARTIST", "팔로우 대상은 아티스트 또는 그룹만 가능합니다."),
+        FOLLOW_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "FOLLOW_SELF_NOT_ALLOWED", "자기 자신은 팔로우할 수 없습니다."),
+        FOLLOW_ALREADY_EXISTS(HttpStatus.CONFLICT, "FOLLOW_ALREADY_EXISTS", "이미 팔로우 중입니다."),
+        FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_NOT_FOUND", "팔로우 관계가 존재하지 않습니다.");
 
     private final HttpStatus status;
     private final String code;

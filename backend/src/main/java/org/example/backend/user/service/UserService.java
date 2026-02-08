@@ -9,12 +9,14 @@ import org.example.backend.user.dto.request.UserProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
+import org.example.backend.user.entity.Follow;
 import org.example.backend.user.entity.Block;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.enums.UserStatus;
 import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.BlockRepository;
+import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ public class UserService {
     
     private final UserRepository userRepository;
     private final BlockRepository blockRepository;
+    private final FollowRepository followRepository;
     private final VerificationCodeService verificationCodeService;
     private final PasswordEncoder passwordEncoder;
 
@@ -161,5 +164,56 @@ public class UserService {
     public Page<BlockedResponse> getBlockedUsers(User blocker, Pageable pageable) {
         Page<Block> blocks = blockRepository.findByBlocker(blocker, pageable);
         return blocks.map(BlockedResponse::from);
+    }
+
+    // 아티스트 팔로우
+    public void followArtist(User follower, Long artistId) {
+        if (follower.getId().equals(artistId)) {
+            throw new BusinessException(UserErrorCode.FOLLOW_SELF_NOT_ALLOWED);
+        }
+
+        User artist = userRepository.findById(artistId)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        // 팔로우 대상이 아티스트 또는 그룹인지 검증
+        if (artist.getRole() != UserRole.ARTIST && artist.getRole() != UserRole.GROUP) {
+            throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
+        }
+
+        // 이미 팔로우 중인지 확인
+        if (followRepository.existsByFollowerAndArtist(follower, artist)) {
+            throw new BusinessException(UserErrorCode.FOLLOW_ALREADY_EXISTS);
+        }
+
+        Follow follow = Follow.of(follower, artist);
+        followRepository.save(follow);
+    }
+
+    // 아티스트 팔로우 취소
+    public void unfollowArtist(User follower, Long artistId) {
+        User artist = userRepository.findById(artistId)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        Follow follow = followRepository.findByFollowerAndArtist(follower, artist)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.FOLLOW_NOT_FOUND));
+
+        followRepository.delete(follow);
+    }
+
+    // 내가 팔로우한 아티스트 목록 (페이징)
+    @Transactional(readOnly = true)
+    public Page<ArtistSearchResponse> getMyFollowings(User follower, Pageable pageable) {
+        Page<Follow> follows = followRepository.findByFollower(follower, pageable);
+        return follows.map(f -> ArtistSearchResponse.from(f.getArtist()));
+    }
+
+    // 팔로워 수 조회 (아티스트)
+    @Transactional(readOnly = true)
+    public long getMyFollowerCount(User artist) {
+        // 아티스트 또는 그룹만 허용
+        if (artist.getRole() != UserRole.ARTIST && artist.getRole() != UserRole.GROUP) {
+            throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
+        }
+        return followRepository.countByArtist(artist);
     }
 }
