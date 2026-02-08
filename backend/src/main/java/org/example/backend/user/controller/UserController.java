@@ -9,6 +9,7 @@ import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
+import org.example.backend.user.dto.response.UserMyPageResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
 import org.example.backend.user.service.UserService;
 import org.springframework.data.domain.Page;
@@ -141,5 +142,18 @@ public class UserController {
     ) {
         long count = userService.getMyFollowerCount(principalDetails.getUser());
         return ResponseEntity.ok(count);
+    }
+
+    // 유저 마이페이지 조회
+    @GetMapping("/mypage")
+    public ResponseEntity<UserMyPageResponse> getMyPage(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        UserMyPageResponse response = userService.getMyPage(
+                principalDetails.getUser(),
+                pageable
+        );
+        return ResponseEntity.ok(response);
     }
 }
