@@ -15,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.product.enums.ProductType;
+import org.example.backend.product.exception.ProductErrorCode;
+import org.example.backend.product.exception.ProductException;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -55,6 +57,15 @@ public class Product {
     @Column(name = "is_subscription", nullable = false)
     private Boolean isSubscription;
 
+    @Column(nullable = false)
+    private Long quantity; // 재고 수량
+
+    @Column(name = "is_membership_only", nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean isMembershipOnly; // 유료 팬 가입자만 구매할 수 있는 상품 여부 (0: false, 1: true)
+
+    @Column(name = "is_exclusive", nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean isExclusive; // 팬링크 단독 상품 여부 (0: false, 1: true)
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -65,7 +76,8 @@ public class Product {
 
     @Builder
     public Product(Long artistId, String name, Long price, Long candyPrice, ProductType type,
-            ProductPaymentMethod paymentMethod, Boolean isSubscription) {
+            ProductPaymentMethod paymentMethod, Boolean isSubscription, Long quantity,
+            Boolean isMembershipOnly, Boolean isExclusive) {
         this.artistId = artistId;
         this.name = name;
         this.price = price;
@@ -73,35 +85,70 @@ public class Product {
         this.type = type;
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
+        this.quantity = quantity != null ? quantity : 0L;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isExclusive = isExclusive != null ? isExclusive : false;
 
         validate();
     }
 
     private void validate() {
         if (type == null) {
-            throw new IllegalArgumentException("상품 타입은 필수입니다.");
+            throw new ProductException(ProductErrorCode.INVALID_PRODUCT_TYPE);
         }
 
         // 1. 정산 대상 여부 검증
         if (type.isSettlementTarget() && artistId == null) {
-            throw new IllegalArgumentException("정산 대상 상품(SETTLEMENT_*)은 아티스트 ID가 필수입니다.");
+            throw new ProductException(ProductErrorCode.SETTLEMENT_ARTIST_REQUIRED);
         }
 
         // 2. 결제 수단 검증
         if (paymentMethod != type.getPaymentMethod()) {
-            throw new IllegalArgumentException("상품 타입의 결제 수단과 입력된 결제 수단이 일치하지 않습니다. (Type: " + type + ", Method: "
-                    + type.getPaymentMethod() + ")");
+            throw new ProductException(ProductErrorCode.INVALID_PAYMENT_METHOD);
         }
 
         // 3. 가격 검증
         if (type.getPaymentMethod() == ProductPaymentMethod.CASH_ONLY) {
             if (price == null || price < 0) {
-                throw new IllegalArgumentException("현금 결제 상품은 가격(price)이 필수이며 0 이상이어야 합니다.");
+                throw new ProductException(ProductErrorCode.INVALID_PRICE);
             }
         } else if (type.getPaymentMethod() == ProductPaymentMethod.CANDY_ONLY) {
             if (candyPrice == null || candyPrice <= 0) {
-                throw new IllegalArgumentException("캔디 결제 상품은 캔디 가격(candyPrice)이 필수이며 0보다 커야 합니다.");
+                throw new ProductException(ProductErrorCode.INVALID_PRICE);
             }
         }
+    }
+
+    public void update(String name, Long price, Long candyPrice, ProductType type, ProductPaymentMethod paymentMethod,
+            Boolean isSubscription, Long quantity, Boolean isMembershipOnly, Boolean isExclusive) {
+        this.name = name;
+        this.price = price;
+        this.candyPrice = candyPrice;
+        this.type = type;
+        this.paymentMethod = paymentMethod;
+        this.isSubscription = isSubscription != null ? isSubscription : false;
+        this.quantity = quantity != null ? quantity : 0L;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isExclusive = isExclusive != null ? isExclusive : false;
+
+        validate();
+    }
+
+    public void increaseStock(Long quantity) {
+        if (quantity < 0) {
+            throw new ProductException(ProductErrorCode.INVALID_PRICE);
+        }
+        this.quantity += quantity;
+    }
+
+    public void decreaseStock(Long quantity) {
+        if (quantity < 0) {
+            throw new ProductException(ProductErrorCode.INVALID_PRICE);
+        }
+
+        if (this.quantity < quantity) {
+            throw new ProductException(ProductErrorCode.OUT_OF_STOCK);
+        }
+        this.quantity -= quantity;
     }
 }

@@ -32,7 +32,8 @@ import java.util.stream.Collectors;
 
 /**
  * [정산 배치 설정]
- * - 흐름: Reader(아티스트 조회) -> Processor(집계 및 계산) -> Writer(저장 및 정리)
+ * - 흐름: Reader(정산 대상 조회) -> Processor(집계 및 계산) -> Writer(저장 및 정리)
+ * - 정산 대상: ARTIST(개별 아티스트) + GROUP(그룹 공용 계정)
  */
 
 @Slf4j
@@ -82,8 +83,8 @@ public class SettlementBatchConfig {
         return new JpaPagingItemReaderBuilder<User>()
                 .name("artistReader")
                 .entityManagerFactory(entityManagerFactory)
-                // User 엔티티에서 role이 ARTIST인 사람만 조회 (ID순 정렬 필수)
-                .queryString("SELECT u FROM User u WHERE u.role = 'ARTIST' ORDER BY u.id ASC")
+                // 정산 대상: ARTIST(개별 아티스트) + GROUP(그룹 공용 계정) 모두 조회 (ID순 정렬 필수)
+                .queryString("SELECT u FROM User u WHERE u.role IN ('ARTIST', 'GROUP') ORDER BY u.id ASC")
                 .pageSize(10)
                 .build();
     }

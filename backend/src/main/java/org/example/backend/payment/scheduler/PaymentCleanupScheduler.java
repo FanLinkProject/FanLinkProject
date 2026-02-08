@@ -21,6 +21,7 @@ public class PaymentCleanupScheduler {
 
     private final OrderRepository orderRepository;
     private final TossPaymentAdapter tossPaymentAdapter;
+    private final org.example.backend.order.service.OrderService orderService;
 
     /**
      * 매 5분마다 실행되어 30분 이상 PENDING 상태인 주문을 정리합니다.
@@ -61,7 +62,7 @@ public class PaymentCleanupScheduler {
                 // ABORTED: 사용자 취소 (창 닫기 등)
                 log.info("Canceling pending order: orderNo={}, status={}", order.getOrderNo(),
                         (paymentInfo != null ? paymentInfo.getStatus() : "NULL"));
-                order.updateStatus(OrderStatus.CANCELED);
+                orderService.cancelOrder(order);
             } else {
                 // 결제 정보가 존재하고 완료된 상태 (DONE 등)인데 주문이 PENDING인 경우
                 // 이는 Toss에서 승인됐으나 우리 서버 로직이 실패을 가능성 -> 로그 남김 (수동 확인 필요)
