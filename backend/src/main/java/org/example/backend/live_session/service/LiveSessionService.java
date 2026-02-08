@@ -10,11 +10,16 @@ import org.example.backend.live_session.enums.LiveSessionStatus;
 import org.example.backend.live_session.exception.LiveSessionErrorCode;
 import org.example.backend.live_session.exception.LiveSessionException;
 import org.example.backend.live_session.repository.LiveSessionRepository;
+import org.example.backend.notification.dto.request.NotificationSendRequest;
+import org.example.backend.notification.entity.NotificationType;
+import org.example.backend.notification.service.NotificationService;
+import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -27,6 +32,8 @@ import java.util.List;
 public class LiveSessionService {
 
 	private final LiveSessionRepository liveSessionRepository;
+	private final NotificationService notificationService;
+	private final SubscriptionRepository subscriptionRepository;
 
 	/**
 	 * 라이브 시작(세션 생성). ARTIST만 허용.
@@ -47,6 +54,10 @@ public class LiveSessionService {
 			.build();
 		session.startNow();
 		session = liveSessionRepository.save(session);
+
+		// 라이브 시작 알림
+		notifyLiveStarted(loginUser, session);
+
 		return LiveSessionCreateResponse.builder()
 			.id(session.getId())
 			.channelArn(session.getChannelArn())
@@ -96,7 +107,6 @@ public class LiveSessionService {
 
 	/**
 	 * 아티스트별 라이브 세션 목록 조회
-	 *
 	 * - status == null:
 	 *   → status in (RECORDED, READY), expiresAt 미만료
 	 * - status != null:
@@ -124,13 +134,66 @@ public class LiveSessionService {
 			.toList();
 	}
 
+	/**
+	 * 유료 라이브라면 "구독자만" 채팅 가능하도록 검증
+	 * - LIVE 상태여야 함
+	 * - isPaid=true 이면 (viewer=user) 가 artist를 구독 중이어야 함
+	 */
 	@Transactional(readOnly = true)
-	public void validateChatAllowed(Long liveSessionId) {
+	public void validateChatAllowed(User loginUser, Long liveSessionId) {
 		LiveSession session = liveSessionRepository.findById(liveSessionId)
 			.orElseThrow(() -> new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_NOT_FOUND));
 
 		if (session.getStatus() != LiveSessionStatus.LIVE) {
 			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_NOT_LIVE);
+		}
+
+		// 유료 라이브면 구독 검증
+		validatePaidAccess(loginUser, session);
+	}
+
+	private void validatePaidAccess(User loginUser, LiveSession session) {
+		// 유료가 아니면 통과
+		if (!session.isPaid()) return;
+
+		// 아티스트 본인/관리자는 통과
+		if (loginUser.getRole() == UserRole.ARTIST && session.getArtistId().equals(loginUser.getId())) return;
+		if (loginUser.getRole() == UserRole.ADMIN) return; // 있으면
+
+		// 팬(일반 유저)은 구독 필요
+		boolean subscribed = subscriptionRepository.existsActiveSubscriptionForArtist(
+			loginUser.getId(),
+			session.getArtistId(),
+			LocalDateTime.now()
+		);
+		if (!subscribed) {
+			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_SUBSCRIPTION_REQUIRED);
+		}
+	}
+
+	/**
+	 * 라이브 시작 알림 (구독 팬들에게 SSE 발송)
+	 * - receiverId: 구독 중인 팬 userId
+	 * - senderId: 아티스트 userId
+	 */
+	private void notifyLiveStarted(User artist, LiveSession session) {
+		List<Long> fanIds = subscriptionRepository.findActiveSubscriberUserIdsByArtistId(
+			session.getArtistId(),
+			LocalDateTime.now()
+		);
+
+		String title = session.getTitle();
+		String shortTitle = (title != null && title.length() > 20) ? title.substring(0, 20) + "…" : title;
+
+		for (Long fanId : fanIds) {
+			NotificationSendRequest notificationRequest = NotificationSendRequest.builder()
+				.senderId(artist.getId())
+				.receiverId(fanId)
+				.type(NotificationType.LIVE_STARTED)
+				.content(artist.getNickname() + " 님이 라이브를 시작했어요!" + " <" + shortTitle + ">")
+				.build();
+			// DB 저장 + SSE 발송 (DM과 동일)
+			notificationService.sendNotification(notificationRequest);
 		}
 	}
 

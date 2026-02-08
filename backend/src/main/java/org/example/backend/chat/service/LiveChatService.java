@@ -68,8 +68,9 @@ public class LiveChatService {
 		if (req.getContent().length() > MAX_CONTENT_LENGTH) {
 			throw new ChatException(LiveChatErrorCode.LIVE_CHAT_CONTENT_TOO_LONG);
 		}
+		// sender를 같이 넘겨서 유료 라이브 구독 검증까지 수행
 		try {
-			liveSessionService.validateChatAllowed(req.getRoomId());
+			liveSessionService.validateChatAllowed(sender, req.getRoomId());
 		} catch (LiveSessionException e) {
 			throw new ChatException(LiveChatErrorCode.LIVE_CHAT_SESSION_INVALID);
 		}
