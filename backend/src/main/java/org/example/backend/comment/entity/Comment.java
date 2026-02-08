@@ -20,7 +20,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "comments", indexes = {
-        @Index(name = "idx_target", columnList = "target_type, target_id")
+        @Index(name = "idx_target", columnList = "target_type, target_id"),
+        @Index(name = "idx_parent", columnList = "parent_id")
 })
 public class Comment {
     @Id
