@@ -51,6 +51,7 @@ public class CommentController {
         return ResponseEntity.ok(commentService.getCommentCounts(targetType, targetIds));
     }
 
+    //댓글 작성
     @PostMapping
     public ResponseEntity<Long> create(
             @AuthenticationPrincipal PrincipalDetails principal,
@@ -58,6 +59,7 @@ public class CommentController {
         return ResponseEntity.ok(commentService.create(request, principal.getUserId()));
     }
 
+    //댓글 수정
     @PatchMapping("/{commentId}")
     public ResponseEntity<Void> update(
             @PathVariable Long commentId,
@@ -67,11 +69,11 @@ public class CommentController {
         return ResponseEntity.noContent().build();
     }
 
+    //댓글 삭제
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> delete(
             @PathVariable Long commentId,
             @AuthenticationPrincipal PrincipalDetails principal) {
-        // PrincipalDetails에서 User 객체를 직접 전달하여 역할 기반 권한 검증
         commentService.delete(commentId, principal.getUser());
         return ResponseEntity.noContent().build();
     }
