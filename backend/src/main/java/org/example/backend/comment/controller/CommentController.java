@@ -5,9 +5,11 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.comment.dto.request.CommentCreateRequest;
 import org.example.backend.comment.dto.request.CommentUpdateRequest;
 import org.example.backend.comment.dto.response.CommentResponse;
+import org.example.backend.comment.dto.response.MyCommentResponse;
 import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.service.CommentService;
 import org.example.backend.global.security.details.PrincipalDetails;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.web.PageableDefault;
@@ -76,5 +78,13 @@ public class CommentController {
             @AuthenticationPrincipal PrincipalDetails principal) {
         commentService.delete(commentId, principal.getUser());
         return ResponseEntity.noContent().build();
+    }
+
+    // 내가 작성한 댓글 목록 조회 (페이징 방식)
+    @GetMapping("/my")
+    public ResponseEntity<Page<MyCommentResponse>> getMyComments(
+            @AuthenticationPrincipal PrincipalDetails principal,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(commentService.getMyComments(principal.getUserId(), pageable));
     }
 }

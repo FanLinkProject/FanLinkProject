@@ -3,6 +3,7 @@ package org.example.backend.comment.service;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.comment.dto.request.CommentCreateRequest;
 import org.example.backend.comment.dto.response.CommentResponse;
+import org.example.backend.comment.dto.response.MyCommentResponse;
 import org.example.backend.comment.entity.Comment;
 import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.exception.CommentErrorCode;
@@ -16,6 +17,8 @@ import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -146,6 +149,30 @@ public class CommentService {
                         row -> (Long) row[0],
                         row -> (Long) row[1]
                 ));
+    }
+
+    /**
+     * 내가 작성한 댓글 목록 조회 (페이징 방식)
+     * - 부모 댓글과 대댓글 모두 포함
+     * - 활성 상태(status=1)인 것만 조회
+     * - 최신순 정렬
+     * - targetType, targetId 정보 포함하여 어떤 게시물에 달린 댓글인지 식별 가능
+     *
+     * @param userId 조회할 유저 ID
+     * @param pageable 페이징 정보 (page, size)
+     * @return Page<MyCommentResponse>
+     */
+    public Page<MyCommentResponse> getMyComments(Long userId, Pageable pageable) {
+        Page<Comment> comments = commentRepository.findMyComments(userId, pageable);
+
+        // 작성자 정보 조회 (본인이지만 닉네임, 프로필 등 정보 필요)
+        Map<Long, User> userMap = getUserMap(comments.getContent());
+
+        List<MyCommentResponse> content = comments.getContent().stream()
+                .map(comment -> MyCommentResponse.of(comment, userMap.get(comment.getUserId())))
+                .toList();
+
+        return new PageImpl<>(content, pageable, comments.getTotalElements());
     }
 
     // ──────────────────────────────────────────────

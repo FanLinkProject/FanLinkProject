@@ -2,6 +2,7 @@ package org.example.backend.comment.repository;
 
 import org.example.backend.comment.entity.Comment;
 import org.example.backend.comment.enums.TargetType;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -79,7 +80,16 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Long> findParentIdsWithArtistReply(@Param("parentIds") List<Long> parentIds);
 
     /**
-     * 내가 쓴 댓글 조회 (정상 상태인 것만)
+     * 내가 쓴 댓글 조회 (페이징 방식)
+     * - 부모 댓글과 대댓글 모두 포함
+     * - 활성 상태(status=1)인 것만 조회
+     * - 최신순 정렬 (id DESC)
      */
-    Slice<Comment> findAllByUserIdAndStatusOrderByIdDesc(Long userId, Integer status, Pageable pageable);
+    @Query("SELECT c FROM Comment c " +
+            "WHERE c.userId = :userId AND c.status = 1 " +
+            "ORDER BY c.id DESC")
+    Page<Comment> findMyComments(
+            @Param("userId") Long userId,
+            Pageable pageable
+    );
 }
