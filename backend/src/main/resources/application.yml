@@ -17,7 +17,6 @@ spring:
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
       idle-timeout: ${DB_IDLE_TIMEOUT_MS:600000}
       max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
-
       leak-detection-threshold: ${DB_LEAK_DETECT_MS:0}
   jpa:
     open-in-view: false
@@ -68,6 +67,12 @@ spring:
   # 프로덕션 환경에서는 반드시 환경 변수로 설정하세요
   encryption:
     key: ${ENCRYPTION_KEY}
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
