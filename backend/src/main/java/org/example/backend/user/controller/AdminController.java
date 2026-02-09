@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.ArtistCreateRequest;
 import org.example.backend.user.dto.request.PenaltyCreateRequest;
+import org.example.backend.user.dto.response.AdminHomeResponse;
 import org.example.backend.user.dto.response.AdminPenaltyResponse;
 import org.example.backend.user.dto.response.ReportResponse;
 import org.example.backend.user.dto.response.SignupResponse;
@@ -24,6 +25,15 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+
+    // 관리자 메인 홈 화면 조회
+    @GetMapping("/home")
+    public ResponseEntity<AdminHomeResponse> getHome(
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        AdminHomeResponse response = adminService.getHome();
+        return ResponseEntity.ok(response);
+    }
 
     // 아티스트 계정 생성
     @PostMapping("/artists")

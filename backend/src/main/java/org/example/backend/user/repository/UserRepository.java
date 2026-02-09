@@ -52,4 +52,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // OAuth2 사용자 조회
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
+
+    // 관리자 홈 : 전체 가입자 수 (탈퇴하지 않은 유저)
+    long countByDeletedAtIsNull();
+
+    // 관리자 홈 : 오늘 신규 가입자 수
+    @Query("SELECT COUNT(u) FROM User u WHERE DATE(u.createdAt) = CURRENT_DATE AND u.deletedAt IS NULL")
+    long countNewUsersToday();
+
+    // 관리자 홈 : 오늘 가입한 유저 수 (DAU 근사치)
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u WHERE DATE(u.createdAt) = CURRENT_DATE AND u.deletedAt IS NULL")
+    long countDau();
+
+    // 관리자 홈 : 최근 30일간 가입한 유저 수 (MAU 근사치)
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u WHERE u.createdAt >= :startDate AND u.deletedAt IS NULL")
+    long countMau(@Param("startDate") java.time.LocalDateTime startDate);
+
+    // 관리자 홈 : 개인 아티스트 수 (GROUP 제외)
+    long countByRoleAndDeletedAtIsNull(UserRole role);
 }
