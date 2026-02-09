@@ -8,6 +8,10 @@ import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.exception.CommentErrorCode;
 import org.example.backend.comment.exception.CommentException;
 import org.example.backend.comment.repository.CommentRepository;
+import org.example.backend.post.entity.ArtistPost;
+import org.example.backend.post.entity.FanPost;
+import org.example.backend.post.repository.ArtistPostRepository;
+import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.GroupMemberRepository;
@@ -29,7 +33,8 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
-
+    private final FanPostRepository fanPostRepository;
+    private final ArtistPostRepository artistPostRepository;
     /**
      * 부모 댓글 목록 조회
      * - 유저 정보(닉네임, 역할, 프로필) Bulk Fetch
@@ -73,6 +78,9 @@ public class CommentService {
 
     @Transactional
     public Long create(CommentCreateRequest request, Long userId) {
+        // targetId 유효성 검증
+        validateTargetExists(request.targetType(), request.targetId());
+
         Comment parent = null;
         if (request.parentId() != null) {
             parent = commentRepository.findById(request.parentId())
@@ -145,6 +153,59 @@ public class CommentService {
     // ──────────────────────────────────────────────
 
     /**
+     * targetId가 실제로 존재하는 게시물인지 검증
+     */
+    private void validateTargetExists(TargetType targetType, Long targetId) {
+        switch (targetType) {
+            case FAN -> fanPostRepository.findById(targetId)
+                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
+            case ARTIST -> artistPostRepository.findById(targetId)
+                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
+//            case MEDIA -> artistMusicVideoRepository.findById(targetId)
+//                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
+//            case LIVE -> chatRoomRepository.findById(targetId)
+//                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
+        }
+    }
+
+    /**
+     * 댓글 대상 게시물이 소속된 그룹 ID 조회
+     * - 권한 검증 시 게시판 주체와 소속 아티스트 판별에 사용
+     */
+    private Long getGroupIdFromTarget(TargetType targetType, Long targetId) {
+        return switch (targetType) {
+            case FAN -> fanPostRepository.findById(targetId)
+                    .map(FanPost::getGroup)
+                    .map(User::getId)
+                    .orElse(null);
+            case ARTIST -> artistPostRepository.findById(targetId)
+                    .map(ArtistPost::getGroup)
+                    .map(User::getId)
+                    .orElse(null);
+            case MEDIA -> {
+                // TODO: ArtistMusicVideo의 artistId로 아티스트가 속한 그룹 조회 필요
+                // 현재는 ArtistMusicVideo → User(Artist) → GroupMember → Group 순으로 조회해야 함
+//                ArtistMusicVideo video = artistMusicVideoRepository.findById(targetId).orElse(null);
+//                if (video == null) yield null;
+//                yield userRepository.findById(video.getArtistId())
+//                        .flatMap(artist -> groupMemberRepository.findByMember(artist)
+//                                .map(gm -> gm.getGroup().getId()))
+//                        .orElse(null);
+                yield null;
+            }
+            case LIVE -> {
+                // TODO: ChatRoom의 owner(아티스트)로 아티스트가 속한 그룹 조회 필요
+//                ChatRoom chatRoom = chatRoomRepository.findById(targetId).orElse(null);
+//                if (chatRoom == null) yield null;
+//                yield groupMemberRepository.findByMember(chatRoom.getOwner())
+//                        .map(gm -> gm.getGroup().getId())
+//                        .orElse(null);
+                yield null;
+            }
+        };
+    }
+
+    /**
      * 댓글 작성자 정보 일괄 조회 (Bulk Fetch)
      * - 닉네임뿐 아니라 역할(role), 프로필 이미지 등 전체 User 정보를 매핑
      */
@@ -177,8 +238,8 @@ public class CommentService {
      * 도메인 특화 권한 검증
      * 1) 작성자 본인
      * 2) 관리자 (ADMIN 역할)
-     * 3) 게시판 주체 — 그룹 역할 유저이며 targetId가 본인 ID와 일치
-     * 4) 소속 아티스트 — 아티스트 역할이며 자신이 속한 그룹의 ID가 targetId와 일치
+     * 3) 게시판 주체 — 그룹 역할 유저이며 게시물의 그룹 ID가 본인 ID와 일치
+     * 4) 소속 아티스트 — 아티스트 역할이며 자신이 속한 그룹의 ID가 게시물의 그룹 ID와 일치
      */
     private void validateAuthority(Comment comment, User currentUser) {
         // 1. 작성자 본인
@@ -187,16 +248,19 @@ public class CommentService {
         // 2. 관리자
         if (currentUser.getRole() == UserRole.ADMIN) return;
 
+        // 3, 4. 게시판 주체 또는 소속 아티스트 권한 검증을 위해 그룹 ID 조회
+        Long groupId = getGroupIdFromTarget(comment.getTargetType(), comment.getTargetId());
+
         // 3. 게시판 주체 (그룹 유저)
         if (currentUser.getRole() == UserRole.GROUP
-                && currentUser.getId().equals(comment.getTargetId())) {
+                && currentUser.getId().equals(groupId)) {
             return;
         }
 
         // 4. 소속 아티스트
         if (currentUser.getRole() == UserRole.ARTIST) {
             boolean isSameGroup = groupMemberRepository.findByMember(currentUser)
-                    .map(gm -> gm.getGroup().getId().equals(comment.getTargetId()))
+                    .map(gm -> gm.getGroup().getId().equals(groupId))
                     .orElse(false);
             if (isSameGroup) return;
         }
