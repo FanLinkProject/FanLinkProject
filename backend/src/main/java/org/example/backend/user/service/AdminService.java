@@ -6,6 +6,7 @@ import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.jwt.RefreshTokenStore;
 import org.example.backend.user.dto.request.ArtistCreateRequest;
 import org.example.backend.user.dto.request.PenaltyCreateRequest;
+import org.example.backend.user.dto.response.AdminHomeResponse;
 import org.example.backend.user.dto.response.AdminPenaltyResponse;
 import org.example.backend.user.dto.response.ReportResponse;
 import org.example.backend.user.dto.response.SignupResponse;
@@ -170,5 +171,44 @@ public class AdminService {
     public Page<AdminPenaltyResponse> getMyGivenPenalties(User admin, Pageable pageable) {
         Page<Penalty> penalties = penaltyRepository.findByAdminId(admin.getId(), pageable);
         return penalties.map(AdminPenaltyResponse::from);
+    }
+
+    // 관리자 메인 홈 화면 데이터 조회
+    @Transactional(readOnly = true)
+    public AdminHomeResponse getHome() {
+        // 1) 유저 통계
+        long totalUsers = userRepository.countByDeletedAtIsNull();
+        long newUsersToday = userRepository.countNewUsersToday();
+        long dau = userRepository.countDau();
+        // MAU: 최근 30일간 가입한 유저 수
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        long mau = userRepository.countMau(thirtyDaysAgo);
+
+        AdminHomeResponse.UserStatistics userStats = new AdminHomeResponse.UserStatistics(
+                totalUsers,
+                newUsersToday,
+                dau,
+                mau
+        );
+
+        // 2) 아티스트 통계
+        long totalArtists = userRepository.countByRoleAndDeletedAtIsNull(UserRole.ARTIST);
+        long totalGroups = userRepository.countByRoleAndDeletedAtIsNull(UserRole.GROUP);
+
+        AdminHomeResponse.ArtistStatistics artistStats = new AdminHomeResponse.ArtistStatistics(
+                totalArtists,
+                totalGroups
+        );
+
+        // 3) 신고 통계
+        long pendingReports = reportRepository.countByStatusFalse();
+        long completedReports = reportRepository.countByStatusTrue();
+
+        AdminHomeResponse.ReportStatistics reportStats = new AdminHomeResponse.ReportStatistics(
+                pendingReports,
+                completedReports
+        );
+
+        return new AdminHomeResponse(userStats, artistStats, reportStats);
     }
 }

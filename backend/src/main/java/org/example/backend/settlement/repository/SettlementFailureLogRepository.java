@@ -1,8 +1,11 @@
 package org.example.backend.settlement.repository;
 
 import org.example.backend.settlement.entity.SettlementFailureLog;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -38,4 +41,23 @@ public interface SettlementFailureLogRepository extends JpaRepository<Settlement
      * @return 존재 여부
      */
     boolean existsByPaymentIdAndIsProcessedFalse(Long paymentId);
+
+    // ===== [관리자용] =====
+
+    /**
+     * [관리자] 전체 실패 로그 조회 (최신순, 페이징)
+     */
+    Page<SettlementFailureLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * [관리자] 복구 상태별 실패 로그 조회 (최신순, 페이징)
+     *
+     * @param isProcessed true: 복구 완료, false: 미처리
+     */
+    Page<SettlementFailureLog> findByIsProcessedOrderByCreatedAtDesc(Boolean isProcessed, Pageable pageable);
+
+    /**
+     * [관리자] 미처리 실패 로그 건수
+     */
+    long countByIsProcessed(Boolean isProcessed);
 }

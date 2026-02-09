@@ -18,5 +18,9 @@ public record ProductRequestDto(
 
         @NotNull(message = "결제 방식은 필수입니다.") ProductPaymentMethod paymentMethod,
 
-        Boolean isSubscription) {
+        Boolean isSubscription,
+
+        Long quantity,
+        Boolean isMembershipOnly,
+        Boolean isExclusive) {
 }

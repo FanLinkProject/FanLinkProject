@@ -9,6 +9,7 @@ import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
+import org.example.backend.user.dto.response.UserMyPageResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
 import org.example.backend.user.service.UserService;
 import org.springframework.data.domain.Page;
@@ -101,6 +102,58 @@ public class UserController {
             @PageableDefault(size = 10) Pageable pageable
     ) {
         Page<BlockedResponse> response = userService.getBlockedUsers(principalDetails.getUser(), pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    // 아티스트 팔로우
+    @PostMapping("/follow/{artistId}")
+    public ResponseEntity<Void> followArtist(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PathVariable Long artistId
+    ) {
+        userService.followArtist(principalDetails.getUser(), artistId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 아티스트 팔로우 취소
+    @DeleteMapping("/follow/{artistId}")
+    public ResponseEntity<Void> unfollowArtist(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PathVariable Long artistId
+    ) {
+        userService.unfollowArtist(principalDetails.getUser(), artistId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 내가 팔로우한 아티스트 목록 (페이징)
+    @GetMapping("/followings")
+    public ResponseEntity<Page<ArtistSearchResponse>> getMyFollowings(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        Page<ArtistSearchResponse> response = userService.getMyFollowings(principalDetails.getUser(), pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    // 팔로워 수 조회 (아티스트)
+    @GetMapping("/followers/count")
+    public ResponseEntity<Long> getMyFollowerCount(
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        long count = userService.getMyFollowerCount(principalDetails.getUser());
+        return ResponseEntity.ok(count);
+    }
+
+    // 유저 마이페이지 조회
+    @GetMapping("/mypage")
+    public ResponseEntity<UserMyPageResponse> getMyPage(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        UserMyPageResponse response = userService.getMyPage(
+                principalDetails.getUser(),
+                pageable
+        );
         return ResponseEntity.ok(response);
     }
 }
