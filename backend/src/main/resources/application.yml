@@ -12,7 +12,6 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
     hikari:
-
       maximum-pool-size: ${DB_MAX_POOL_SIZE:30}
       minimum-idle: ${DB_MIN_IDLE:10}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
@@ -69,12 +68,6 @@ spring:
   # 프로덕션 환경에서는 반드시 환경 변수로 설정하세요
   encryption:
     key: ${ENCRYPTION_KEY}
-
-  batch:
-    jdbc:
-      initialize-schema: always
-    job:
-      enabled: false
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
