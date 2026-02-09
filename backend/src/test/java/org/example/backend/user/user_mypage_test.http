@@ -1,0 +1,116 @@
+### 유저 마이페이지 API 테스트 파일
+### IntelliJ IDEA / VS Code REST Client에서 사용 가능합니다.
+###
+### 순서:
+### 1) 관리자 로그인 → 아티스트 계정 생성
+### 2) 유저 로그인
+### 3) 아티스트 팔로우
+### 4) (선택) 주문 생성
+### 5) (선택) 유저 차단
+### 6) 마이페이지 조회
+
+@baseUrl = http://localhost:8080
+
+@adminEmail = admin@example.com
+@adminPassword = admin123
+
+@userEmail = user1@example.com
+@userPassword = password123
+
+# 응답을 보고 직접 채우는 값들
+@adminAccessToken =
+@userAccessToken =
+@artistId =
+@targetUserId =
+
+
+### ============================================
+### 1) 관리자 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### 응답의 accessToken을 복사해서 @adminAccessToken에 넣으세요.
+
+
+### ============================================
+### 2) 관리자 - 아티스트 계정 생성
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "artist-mypage-test@example.com",
+  "nickname": "마이페이지테스트아티스트",
+  "name": "김마이페이지",
+  "password": "password123",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-9000-0001",
+  "isGroup": false,
+  "groupId": null
+}
+
+### 응답의 id를 확인해서 @artistId에 넣으세요.
+
+
+### ============================================
+### 3) 일반 유저 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}"
+}
+
+### 응답의 accessToken을 복사해서 @userAccessToken에 넣으세요.
+
+
+### ============================================
+### 4) 아티스트 팔로우
+### ============================================
+POST {{baseUrl}}/api/user/follow/{{artistId}}
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 5) (선택) 유저 차단
+###    - @targetUserId 필요 (내 id 말고 다른 유저 id)
+### ============================================
+POST {{baseUrl}}/api/user/block
+Authorization: Bearer {{userAccessToken}}
+Content-Type: application/json
+
+{
+  "userId": {{targetUserId}}
+}
+
+
+### ============================================
+### 6) 유저 마이페이지 조회 (기본 페이징)
+### ============================================
+GET {{baseUrl}}/api/user/mypage?page=0&size=10
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 7) 유저 마이페이지 조회 (페이징 - 2페이지)
+### ============================================
+GET {{baseUrl}}/api/user/mypage?page=1&size=5
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 8) 유저 마이페이지 조회 (큰 사이즈)
+### ============================================
+GET {{baseUrl}}/api/user/mypage?page=0&size=20
+Authorization: Bearer {{userAccessToken}}

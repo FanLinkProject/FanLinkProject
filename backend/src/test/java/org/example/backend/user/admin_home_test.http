@@ -1,0 +1,43 @@
+### 관리자 메인 홈 화면 API 테스트 파일
+### IntelliJ IDEA / VS Code REST Client에서 사용 가능합니다.
+###
+### 순서:
+### 1) 관리자 로그인
+### 2) 관리자 홈 화면 조회
+
+@baseUrl = http://localhost:8080
+
+@adminEmail = admin@example.com
+@adminPassword = admin123
+
+# 응답을 보고 직접 채우는 값들
+@adminAccessToken =
+
+
+### ============================================
+### 1) 관리자 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### 응답의 accessToken을 복사해서 @adminAccessToken에 넣으세요.
+
+
+### ============================================
+### 2) 관리자 메인 홈 화면 조회
+### ============================================
+GET {{baseUrl}}/api/admin/home
+Authorization: Bearer {{adminAccessToken}}
+
+
+### ============================================
+### 3) 일반 유저로 홈 조회 시도 (에러 테스트)
+###    - 403 Forbidden 예상
+### ============================================
+# GET {{baseUrl}}/api/admin/home
+# Authorization: Bearer {일반유저토큰}
