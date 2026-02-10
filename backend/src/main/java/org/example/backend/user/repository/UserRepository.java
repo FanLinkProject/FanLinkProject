@@ -70,4 +70,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 관리자 홈 : 개인 아티스트 수 (GROUP 제외)
     long countByRoleAndDeletedAtIsNull(UserRole role);
+
+    // 비로그인 홈용: 새로운 아티스트 (최근 가입한 아티스트, ACTIVE 상태, 탈퇴하지 않은 유저)
+    Page<User> findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+            UserRole role,
+            UserStatus status,
+            Pageable pageable
+    );
+
+    // 비로그인 홈용: 추천 아티스트 (랜덤 아티스트, ACTIVE 상태, 탈퇴하지 않은 유저)
+    // ARTIST 또는 GROUP 역할인 유저를 랜덤으로 조회
+    @Query(value = "SELECT * FROM users u " +
+           "WHERE (u.role = :artistRole OR u.role = :groupRole) " +
+           "AND u.status = :status " +
+           "AND u.deleted_at IS NULL " +
+           "ORDER BY RAND()",
+           nativeQuery = true)
+    Page<User> findRecommendedArtists(
+            @Param("artistRole") String artistRole,
+            @Param("groupRole") String groupRole,
+            @Param("status") String status,
+            Pageable pageable
+    );
 }
