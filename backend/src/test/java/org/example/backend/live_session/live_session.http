@@ -1,0 +1,107 @@
+### LiveSession API 테스트 (.http)
+### 계약: roomId = liveSessionId = LiveSession.id (PK)
+###
+### 사용법(권장):
+### 1) 로그인으로 accessToken 발급: `backend/src/test/java/org/example/backend/oauth/oauth.http` 참고
+### 2) 아래 @accessToken 값에 토큰 넣기
+### 3) 아래 (C1~C3)로 라이브 여러 개 생성
+### 4) (C10) LIVE 목록 조회해서 생성된 id들 확인
+### 5) 원하는 id를 @liveSessionId에 넣고 단건조회/종료 호출
+###
+### 전역 변수
+@host = http://localhost:8080
+@accessToken = <PUT_YOUR_JWT_HERE>
+@artistId = 1
+@liveSessionId = 1
+
+
+### (C1) 라이브 시작(세션 생성) - #1
+### POST /api/live-sessions
+### - Authorization 필요(아티스트)
+### - 응답의 id가 liveSessionId == roomId
+### ============================================================
+POST {{host}}/api/live-sessions
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "channelArn": "arn:aws:ivs:ap-northeast-2:123456789012:channel/abc001",
+  "title": "2026 컴백 기념 라이브 #1",
+  "isPaid": true
+}
+
+
+### (C2) 라이브 시작(세션 생성) - #2
+### ============================================================
+POST {{host}}/api/live-sessions
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "channelArn": "arn:aws:ivs:ap-northeast-2:123456789012:channel/abc002",
+  "title": "팬 Q&A 라이브 #2",
+  "isPaid": false
+}
+
+
+### (C3) 라이브 시작(세션 생성) - #3
+### ============================================================
+POST {{host}}/api/live-sessions
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "channelArn": "arn:aws:ivs:ap-northeast-2:123456789012:channel/abc003",
+  "title": "굿즈 언박싱 라이브 #3",
+  "isPaid": false
+}
+
+
+### (C4) 단건 조회
+### GET /api/live-sessions/{id}
+### - 채팅/Replay에서 liveSessionId(roomId)로 조회
+### ============================================================
+GET {{host}}/api/live-sessions/{{liveSessionId}}
+
+
+### (C5) 아티스트별 목록 조회 (기본: RECORDED/READY + expiresAt 미만료)
+### GET /api/live-sessions?artistId=...
+### - status 파라미터 없으면: status in (RECORDED, READY)
+### ============================================================
+GET {{host}}/api/live-sessions?artistId={{artistId}}
+
+
+### (C6) 아티스트별 목록 조회 (LIVE만)
+### GET /api/live-sessions?artistId=...&status=LIVE
+### - 채팅 테스트용: "현재 입장 가능한 liveSessionId(roomId)" 리스트 확인
+### ============================================================
+GET {{host}}/api/live-sessions?artistId={{artistId}}&status=LIVE
+
+
+### (C7) 아티스트별 목록 조회 (RECORDED만)
+### ============================================================
+GET {{host}}/api/live-sessions?artistId={{artistId}}&status=RECORDED
+
+
+### (C8) 아티스트별 목록 조회 (READY만)
+### ============================================================
+GET {{host}}/api/live-sessions?artistId={{artistId}}&status=READY
+
+
+### (C9) 라이브 종료(논리 종료)
+### PATCH /api/live-sessions/{id}/end
+### - Authorization 필요(세션 소유 아티스트)
+### - 멱등: 이미 종료 상태여도 200 OK
+### ============================================================
+PATCH {{host}}/api/live-sessions/{{liveSessionId}}/end
+Authorization: Bearer {{accessToken}}
+
+
+### (C10) (검증) 종료 후 단건 조회로 status 확인
+### ============================================================
+GET {{host}}/api/live-sessions/{{liveSessionId}}
+
+
+### (C11) (검증) 종료 후 LIVE 목록에서 빠졌는지 확인
+### ============================================================
+GET {{host}}/api/live-sessions?artistId={{artistId}}&status=LIVE

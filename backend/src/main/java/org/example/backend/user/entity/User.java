@@ -60,6 +60,18 @@ public class User {
     @Column(name = "profile_image_url")
     private String profileImageUrl; // TODO : URL주소 추가 필요
 
+    // 아티스트 소개
+    @Column(name = "bio", length = 1000)
+    private String bio;
+
+    // 아티스트 배너 이미지 URL
+    @Column(name = "banner_image_url")
+    private String bannerImageUrl;
+
+    // 아티스트 공식 링크 (JSON 형식으로 여러 링크 저장 가능, 예: {"instagram": "url", "youtube": "url"})
+    @Column(name = "official_links", columnDefinition = "TEXT")
+    private String officialLinks;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20, columnDefinition = "varchar(20)")
     private UserRole role;

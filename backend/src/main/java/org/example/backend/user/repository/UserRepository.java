@@ -52,4 +52,44 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // OAuth2 사용자 조회
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
+
+    // 관리자 홈 : 전체 가입자 수 (탈퇴하지 않은 유저)
+    long countByDeletedAtIsNull();
+
+    // 관리자 홈 : 오늘 신규 가입자 수
+    @Query("SELECT COUNT(u) FROM User u WHERE DATE(u.createdAt) = CURRENT_DATE AND u.deletedAt IS NULL")
+    long countNewUsersToday();
+
+    // 관리자 홈 : 오늘 가입한 유저 수 (DAU 근사치)
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u WHERE DATE(u.createdAt) = CURRENT_DATE AND u.deletedAt IS NULL")
+    long countDau();
+
+    // 관리자 홈 : 최근 30일간 가입한 유저 수 (MAU 근사치)
+    @Query("SELECT COUNT(DISTINCT u.id) FROM User u WHERE u.createdAt >= :startDate AND u.deletedAt IS NULL")
+    long countMau(@Param("startDate") java.time.LocalDateTime startDate);
+
+    // 관리자 홈 : 개인 아티스트 수 (GROUP 제외)
+    long countByRoleAndDeletedAtIsNull(UserRole role);
+
+    // 비로그인 홈용: 새로운 아티스트 (최근 가입한 아티스트, ACTIVE 상태, 탈퇴하지 않은 유저)
+    Page<User> findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+            UserRole role,
+            UserStatus status,
+            Pageable pageable
+    );
+
+    // 비로그인 홈용: 추천 아티스트 (랜덤 아티스트, ACTIVE 상태, 탈퇴하지 않은 유저)
+    // ARTIST 또는 GROUP 역할인 유저를 랜덤으로 조회
+    @Query(value = "SELECT * FROM users u " +
+           "WHERE (u.role = :artistRole OR u.role = :groupRole) " +
+           "AND u.status = :status " +
+           "AND u.deleted_at IS NULL " +
+           "ORDER BY RAND()",
+           nativeQuery = true)
+    Page<User> findRecommendedArtists(
+            @Param("artistRole") String artistRole,
+            @Param("groupRole") String groupRole,
+            @Param("status") String status,
+            Pageable pageable
+    );
 }

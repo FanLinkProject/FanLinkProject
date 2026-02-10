@@ -16,7 +16,7 @@ public class EncryptionUtil {
     
     private final SecretKeySpec secretKey;
 
-    public EncryptionUtil(@Value("${encryption.key:default-encryption-key-32bytes!!}") String encryptionKey) {
+    public EncryptionUtil(@Value("${encryption.key}") String encryptionKey) {
         // 키가 32바이트가 아니면 32바이트로 맞춤 (패딩 또는 잘라내기)
         byte[] keyBytes = new byte[32];
         byte[] inputBytes = encryptionKey.getBytes(StandardCharsets.UTF_8);

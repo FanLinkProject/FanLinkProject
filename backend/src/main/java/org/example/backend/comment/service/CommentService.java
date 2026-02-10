@@ -9,10 +9,12 @@ import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.exception.CommentErrorCode;
 import org.example.backend.comment.exception.CommentException;
 import org.example.backend.comment.repository.CommentRepository;
+import org.example.backend.music_video.entity.ArtistMusicVideo;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.entity.FanPost;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.FanPostRepository;
+import org.example.backend.music_video.repository.ArtistMusicVideoRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.GroupMemberRepository;
@@ -38,6 +40,7 @@ public class CommentService {
     private final GroupMemberRepository groupMemberRepository;
     private final FanPostRepository fanPostRepository;
     private final ArtistPostRepository artistPostRepository;
+    private final ArtistMusicVideoRepository artistMusicVideoRepository;
     /**
      * 부모 댓글 목록 조회
      * - 유저 정보(닉네임, 역할, 프로필) Bulk Fetch
@@ -188,10 +191,10 @@ public class CommentService {
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case ARTIST -> artistPostRepository.findById(targetId)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
-//            case MEDIA -> artistMusicVideoRepository.findById(targetId)
-//                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
-//            case LIVE -> chatRoomRepository.findById(targetId)
-//                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
+            case MEDIA -> artistMusicVideoRepository.findById(targetId)
+                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
+            //TODO live 다시보기 엔티티 작업 이후 추가
+            case LIVE -> throw new CommentException(CommentErrorCode.INVALID_TARGET_TYPE);
         }
     }
 
@@ -210,25 +213,14 @@ public class CommentService {
                     .map(User::getId)
                     .orElse(null);
             case MEDIA -> {
-                // TODO: ArtistMusicVideo의 artistId로 아티스트가 속한 그룹 조회 필요
-                // 현재는 ArtistMusicVideo → User(Artist) → GroupMember → Group 순으로 조회해야 함
-//                ArtistMusicVideo video = artistMusicVideoRepository.findById(targetId).orElse(null);
-//                if (video == null) yield null;
-//                yield userRepository.findById(video.getArtistId())
-//                        .flatMap(artist -> groupMemberRepository.findByMember(artist)
-//                                .map(gm -> gm.getGroup().getId()))
-//                        .orElse(null);
-                yield null;
+                ArtistMusicVideo video = artistMusicVideoRepository.findById(targetId).orElse(null);
+                if (video == null) yield null;
+                yield userRepository.findById(video.getArtistId())
+                        .flatMap(artist -> groupMemberRepository.findByMember(artist)
+                                .map(gm -> gm.getGroup().getId()))
+                        .orElse(null);
             }
-            case LIVE -> {
-                // TODO: ChatRoom의 owner(아티스트)로 아티스트가 속한 그룹 조회 필요
-//                ChatRoom chatRoom = chatRoomRepository.findById(targetId).orElse(null);
-//                if (chatRoom == null) yield null;
-//                yield groupMemberRepository.findByMember(chatRoom.getOwner())
-//                        .map(gm -> gm.getGroup().getId())
-//                        .orElse(null);
-                yield null;
-            }
+            case LIVE -> throw new CommentException(CommentErrorCode.INVALID_TARGET_TYPE);
         };
     }
 

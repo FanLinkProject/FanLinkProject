@@ -34,4 +34,10 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     
     // 신고 타입과 카테고리로 조회
     Page<Report> findByTypeAndCategory(ReportType type, ReportCategory category, Pageable pageable);
+
+    // 관리자 홈용: 대기 중인 신고 건수 (status = false)
+    long countByStatusFalse();
+
+    // 관리자 홈용: 처리 완료된 신고 건수 (status = true)
+    long countByStatusTrue();
 }

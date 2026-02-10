@@ -17,7 +17,10 @@ public class EmailService {
     private final JavaMailSender mailSender;
 
     @Value("${mail.dev-mode:true}")
-    private boolean devMode;
+    private boolean mailDevMode;
+
+    @Value("${sms.api.enabled:false}")
+    private boolean smsApiEnabled;
 
     @Value("${spring.mail.username:}")
     private String fromEmail;
@@ -25,7 +28,10 @@ public class EmailService {
     // 이메일 인증 코드 발송
     public void sendVerificationCode(String toEmail, String code) {
         try {
-            if (devMode) {
+            // 개발 모드: mail.dev-mode가 false일 때 개발 모드
+            boolean isDevMode = !mailDevMode;
+            
+            if (isDevMode) {
                 // 개발 모드: 콘솔에 인증 코드 출력
                 log.info("========================================");
                 log.info("=== 이메일 인증 코드 발송 (개발 모드) ===");
@@ -33,7 +39,11 @@ public class EmailService {
                 log.info("수신자: {}", toEmail);
                 log.info("인증 코드: {}", code);
                 log.info("이 코드는 5분간 유효합니다.");
-                log.info("실제 이메일 발송을 위해서는 application.yml에 mail.dev-mode=false로 설정하세요.");
+                if (!mailDevMode && !smsApiEnabled) {
+                    log.info("개발 모드: mail.dev-mode와 sms.api.enabled가 모두 false입니다.");
+                } else {
+                    log.info("실제 이메일 발송을 위해서는 application.yml에 mail.dev-mode=true로 설정하세요.");
+                }
                 log.info("========================================");
             } else {
                 // 실제 이메일 발송
