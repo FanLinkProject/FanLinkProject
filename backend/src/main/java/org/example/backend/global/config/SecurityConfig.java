@@ -1,5 +1,7 @@
 package org.example.backend.global.config;
 
+import static org.apache.tomcat.util.http.Method.*;
+
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
@@ -79,6 +81,7 @@ public class SecurityConfig {
 					"/ws-chat/**",
 					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
                 ).permitAll()
+				.requestMatchers(GET, "/api/live-sessions/**").permitAll()
 
                     // 관리자
                     .requestMatchers("/api/admin/**")
