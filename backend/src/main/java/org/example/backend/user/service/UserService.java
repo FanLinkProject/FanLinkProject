@@ -6,8 +6,16 @@ import org.example.backend.user.dto.request.BlockRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
+import org.example.backend.chat.entity.ChatMessage;
+import org.example.backend.chat.entity.ChatRoom;
+import org.example.backend.chat.enums.MessageType;
+import org.example.backend.chat.repository.ChatMessageRepository;
+import org.example.backend.chat.repository.ChatRoomRepository;
+import org.example.backend.notification.repository.NotificationRepository;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
+import org.example.backend.user.dto.response.GuestHomeResponse;
+import org.example.backend.user.dto.response.UserHomeResponse;
 import org.example.backend.user.dto.response.UserMyPageResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
 import org.example.backend.user.entity.Follow;
@@ -21,11 +29,19 @@ import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.UserRepository;
 import org.example.backend.order.entity.Order;
 import org.example.backend.order.repository.OrderRepository;
+import org.example.backend.post.entity.FanPost;
+import org.example.backend.post.repository.FanPostRepository;
+import org.example.backend.subscription.entity.Subscription;
+import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,8 +52,13 @@ public class UserService {
     private final BlockRepository blockRepository;
     private final FollowRepository followRepository;
     private final OrderRepository orderRepository;
+    private final FanPostRepository fanPostRepository;
+    private final SubscriptionRepository subscriptionRepository;
     private final VerificationCodeService verificationCodeService;
     private final PasswordEncoder passwordEncoder;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final NotificationRepository notificationRepository;
 
     // 전화번호 수정
     public void updatePhoneNumber(User user, PhoneNumberUpdateRequest request) {
@@ -240,7 +261,31 @@ public class UserService {
                 f.getArtist().getProfileImageUrl()
         )).getContent();
 
-        // 3) 구매 내역 (페이징)
+        // 3) 내가 쓴 글 (페이징)
+        Page<FanPost> postsPage = fanPostRepository.findByUserAndStatusOrderByCreatedAtDesc(
+                user, false, pageable);
+        var myPosts = postsPage.map(post -> new UserMyPageResponse.MyPost(
+                post.getId(),
+                post.getTitle(),
+                post.getContent() != null && post.getContent().length() > 100
+                        ? post.getContent().substring(0, 100) + "..."
+                        : post.getContent(),
+                post.getCreatedAt().toString()
+        )).getContent();
+
+        // 4) 멤버십 상태 (활성 구독만)
+        List<Subscription> activeSubscriptions = subscriptionRepository
+                .findByUserIdAndIsActive(user.getId(), true);
+        var memberships = activeSubscriptions.stream()
+                .map(sub -> new UserMyPageResponse.MembershipStatus(
+                        sub.getId(),
+                        sub.getProduct().getName(),
+                        sub.getIsActive(),
+                        sub.getEndDate().toString()
+                ))
+                .toList();
+
+        // 5) 구매 내역 (페이징)
         Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
         var purchaseHistory = ordersPage.map(order -> new UserMyPageResponse.PurchaseHistory(
                 order.getId(),
@@ -252,7 +297,7 @@ public class UserService {
                 order.getCreatedAt().toString()
         )).getContent();
 
-        // 4) 차단 목록 (페이징)
+        // 6) 차단 목록 (페이징)
         Page<Block> blocks = blockRepository.findByBlocker(user, pageable);
         var blockedUsers = blocks.map(b -> new UserMyPageResponse.BlockedUser(
                 b.getBlocked().getId(),
@@ -263,11 +308,152 @@ public class UserService {
         return new UserMyPageResponse(
                 profile,
                 followedArtists,
+                myPosts,
+                memberships,
                 purchaseHistory,
                 blockedUsers,
                 follows.getTotalElements(),
+                postsPage.getTotalElements(),
+                (long) activeSubscriptions.size(),
                 ordersPage.getTotalElements(),
                 blocks.getTotalElements()
         );
+    }
+
+    // 비로그인 유저 메인 홈 화면 조회
+    @Transactional(readOnly = true)
+    public GuestHomeResponse getGuestHome() {
+        // 1) 로그인 정보
+        GuestHomeResponse.LoginInfo loginInfo = new GuestHomeResponse.LoginInfo(
+                "/api/auth/login",
+                "/api/auth/signup"
+        );
+
+        // 2) 추천 아티스트 (랜덤, 최대 10개)
+        Pageable recommendedPageable = PageRequest.of(0, 10);
+        List<User> recommendedArtists = userRepository.findRecommendedArtists(
+                UserRole.ARTIST.name(),
+                UserRole.GROUP.name(),
+                UserStatus.ACTIVE.name(),
+                recommendedPageable
+        ).getContent();
+
+        List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedArtists.stream()
+                .map(artist -> {
+                    long followerCount = followRepository.countByArtist(artist);
+                    return new GuestHomeResponse.ArtistCard(
+                            artist.getId(),
+                            artist.getNickname(),
+                            artist.getProfileImageUrl(),
+                            followerCount
+                    );
+                })
+                .toList();
+
+        // 3) 새로운 아티스트 (최근 가입한 순서, 최대 10개)
+        Pageable newArtistsPageable = PageRequest.of(0, 10);
+        List<User> newArtists = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                UserRole.ARTIST,
+                UserStatus.ACTIVE,
+                newArtistsPageable
+        ).getContent();
+
+        List<User> newGroups = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                UserRole.GROUP,
+                UserStatus.ACTIVE,
+                newArtistsPageable
+        ).getContent();
+
+        // ARTIST와 GROUP을 합쳐서 최신순으로 정렬 (createdAt 기준, 최대 10개)
+        List<User> allNewArtists = new java.util.ArrayList<>();
+        allNewArtists.addAll(newArtists);
+        allNewArtists.addAll(newGroups);
+        allNewArtists.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        allNewArtists = allNewArtists.stream().limit(10).toList();
+
+        List<GuestHomeResponse.ArtistCard> newArtistsCards = allNewArtists.stream()
+                .map(artist -> {
+                    long followerCount = followRepository.countByArtist(artist);
+                    return new GuestHomeResponse.ArtistCard(
+                            artist.getId(),
+                            artist.getNickname(),
+                            artist.getProfileImageUrl(),
+                            followerCount
+                    );
+                })
+                .toList();
+
+        return new GuestHomeResponse(
+                loginInfo,
+                recommendedCards,
+                newArtistsCards
+        );
+    }
+
+    // 로그인 유저 메인 홈 화면 조회
+    @Transactional(readOnly = true)
+    public UserHomeResponse getUserHome(User user) {
+        List<Follow> follows = followRepository.findByFollower(user, PageRequest.of(0, 10))
+                .getContent();
+
+        List<UserHomeResponse.FollowedArtist> followedArtists = follows.stream()
+                .map(f -> new UserHomeResponse.FollowedArtist(
+                        f.getArtist().getId(),
+                        f.getArtist().getNickname(),
+                        f.getArtist().getProfileImageUrl()
+                ))
+                .collect(Collectors.toList());
+
+        List<UserHomeResponse.DmNotification> dmNotifications = follows.stream()
+                .map(Follow::getArtist)
+                .flatMap(this::getArtistLastMessage)
+                .limit(5)
+                .collect(Collectors.toList());
+
+        List<UserHomeResponse.NotificationItem> notifications = notificationRepository
+                .findByReceiver_IdOrderByCreatedAtDesc(user.getId())
+                .stream()
+                .limit(10)
+                .map(n -> new UserHomeResponse.NotificationItem(
+                        n.getId(),
+                        n.getType().name(),
+                        n.getContent(),
+                        n.getCreatedAt().toString(),
+                        n.isRead()
+                ))
+                .collect(Collectors.toList());
+
+        return new UserHomeResponse(followedArtists, dmNotifications, notifications);
+    }
+
+    private java.util.stream.Stream<UserHomeResponse.DmNotification> getArtistLastMessage(User artist) {
+        ChatRoom chatRoom = chatRoomRepository.findByOwner(artist).orElse(null);
+        if (chatRoom == null) {
+            return java.util.stream.Stream.empty();
+        }
+
+        List<ChatMessage> artistMessages = chatMessageRepository.findTop50ByChatRoomOrderByIdDesc(chatRoom)
+                .stream()
+                .filter(m -> m.getMessageType() == MessageType.ARTIST)
+                .limit(1)
+                .collect(Collectors.toList());
+
+        if (artistMessages.isEmpty()) {
+            return java.util.stream.Stream.empty();
+        }
+
+        ChatMessage lastMessage = artistMessages.get(0);
+        String content = lastMessage.getContent();
+        String truncatedContent = content.length() > 50 ? content.substring(0, 50) + "..." : content;
+
+        return java.util.stream.Stream.of(new UserHomeResponse.DmNotification(
+                chatRoom.getId(),
+                artist.getId(),
+                artist.getNickname(),
+                artist.getProfileImageUrl(),
+                truncatedContent,
+                lastMessage.getCreatedAt().toString(),
+                false
+        ));
     }
 }

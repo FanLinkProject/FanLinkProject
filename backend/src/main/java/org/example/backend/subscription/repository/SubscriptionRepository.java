@@ -32,4 +32,36 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     // 캔디 구독만 조회 (빌링키 없음)
     @Query("SELECT s FROM Subscription s WHERE s.billingKey IS NULL AND s.isActive = true AND s.nextPaymentDate <= :date")
     List<Subscription> findCandySubscriptionsDue(@Param("date") LocalDateTime date);
+
+	// 유저가 해당 아티스트를 현재 구독 중인지 여부 확인 (유료 라이브 채팅/접근 권한 검증용)
+	@Query("""
+		select (count(s) > 0)
+		from Subscription s
+		where s.userId = :userId
+		  and s.isActive = true
+		  and s.startDate <= :now
+		  and s.endDate > :now
+		  and s.product.isSubscription = true
+		  and s.product.artistId = :artistId
+	""")
+	boolean existsActiveSubscriptionForArtist(
+		@Param("userId") Long userId,
+		@Param("artistId") Long artistId,
+		@Param("now") LocalDateTime now
+	);
+
+	// 해당 아티스트를 구독 중인 팬 userId 목록 조회 (라이브 시작 알림 발송용)
+	@Query("""
+		select distinct s.userId
+		from Subscription s
+		where s.isActive = true
+		  and s.startDate <= :now
+		  and s.endDate > :now
+		  and s.product.isSubscription = true
+		  and s.product.artistId = :artistId
+	""")
+	List<Long> findActiveSubscriberUserIdsByArtistId(
+		@Param("artistId") Long artistId,
+		@Param("now") LocalDateTime now
+	);
 }
