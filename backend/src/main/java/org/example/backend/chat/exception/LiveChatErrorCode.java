@@ -19,7 +19,9 @@ public enum LiveChatErrorCode implements ErrorCode {
 
 	SUBSCRIPTION_REQUIRED(HttpStatus.FORBIDDEN, "SUBSCRIPTION_REQUIRED", "구독자만 이용할 수 있는 라이브 채팅입니다."),
 	SUBSCRIPTION_EXPIRED(HttpStatus.FORBIDDEN, "SUBSCRIPTION_EXPIRED", "구독이 만료되어 라이브 채팅에 참여할 수 없습니다."),
-	LIVE_CHAT_ARTIST_ID_REQUIRED(HttpStatus.BAD_REQUEST, "LIVE_CHAT_ARTIST_ID_REQUIRED", "artistId는 필수입니다.")
+	LIVE_CHAT_ARTIST_ID_REQUIRED(HttpStatus.BAD_REQUEST, "LIVE_CHAT_ARTIST_ID_REQUIRED", "artistId는 필수입니다."),
+
+	LIVE_CHAT_SESSION_INVALID(HttpStatus.BAD_REQUEST, "LIVE_CHAT_SESSION_INVALID", "유효하지 않거나 채팅할 수 없는 라이브 세션입니다."),
 
 	;
 	private final HttpStatus status;
