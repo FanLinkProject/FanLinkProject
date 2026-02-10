@@ -7,10 +7,14 @@ import org.example.backend.user.dto.request.BlockRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
+import org.example.backend.user.dto.response.ArtistDashboardResponse;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
+import org.example.backend.user.dto.response.UserHomeResponse;
 import org.example.backend.user.dto.response.UserMyPageResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
+import org.example.backend.user.entity.User;
+import org.example.backend.user.service.ArtistDashboardService;
 import org.example.backend.user.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final ArtistDashboardService artistDashboardService;
 
     // 프로필 조회
     @GetMapping("/profile")
@@ -154,6 +159,26 @@ public class UserController {
                 principalDetails.getUser(),
                 pageable
         );
+        return ResponseEntity.ok(response);
+    }
+
+    // 유저 메인 홈 화면 조회
+    @GetMapping("/home")
+    public ResponseEntity<UserHomeResponse> getUserHome(
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        UserHomeResponse response = userService.getUserHome(principalDetails.getUser());
+        return ResponseEntity.ok(response);
+    }
+
+    // 특정 아티스트 대시보드 조회 (비로그인 유저도 접근 가능)
+    @GetMapping("/artists/{artistId}/dashboard")
+    public ResponseEntity<ArtistDashboardResponse> getArtistDashboard(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PathVariable Long artistId
+    ) {
+        User viewer = principalDetails != null ? principalDetails.getUser() : null;
+        ArtistDashboardResponse response = artistDashboardService.getArtistDashboard(viewer, artistId);
         return ResponseEntity.ok(response);
     }
 }

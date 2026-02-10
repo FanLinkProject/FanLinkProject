@@ -8,15 +8,21 @@ import java.util.List;
  *
  * - 내 프로필 (닉네임, 프로필 사진)
  * - 팔로우 중인 아티스트
+ * - 내가 쓴 글
+ * - 멤버십 상태
  * - 구매 내역
  * - 차단 목록
  */
 public record UserMyPageResponse(
         UserProfileResponse profile,
         List<FollowedArtist> followedArtists,
+        List<MyPost> myPosts,
+        List<MembershipStatus> memberships,
         List<PurchaseHistory> purchaseHistory,
         List<BlockedUser> blockedUsers,
         Long totalFollowingsCount,
+        Long totalPostsCount,
+        Long totalMembershipsCount,
         Long totalOrdersCount,
         Long totalBlockedUsersCount
 ) {
@@ -52,6 +58,28 @@ public record UserMyPageResponse(
             Long userId,
             String nickname,
             String profileImageUrl
+    ) {
+    }
+
+    /**
+     * 내가 쓴 글
+     */
+    public record MyPost(
+            Long postId,
+            String title,
+            String content,
+            String createdAt
+    ) {
+    }
+
+    /**
+     * 멤버십 상태
+     */
+    public record MembershipStatus(
+            Long subscriptionId,
+            String productName,
+            Boolean isActive,
+            String endDate
     ) {
     }
 }
