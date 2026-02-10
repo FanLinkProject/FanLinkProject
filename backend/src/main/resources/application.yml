@@ -68,11 +68,6 @@ spring:
     encryption:
       key: ${ENCRYPTION_KEY}
 
-    # Spring Batch 설정
-    batch:
-      jdbc:
-        initialize-schema: always
-
   #batch 실행 프로그램-테스트모드 삭제
   batch:
     jdbc:
