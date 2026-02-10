@@ -28,6 +28,7 @@ public class ProductService {
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
         boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
+        boolean isMembership = request.isMembership() != null && request.isMembership();
 
         Product product = Product.builder()
                 .artistId(request.artistId())
@@ -40,6 +41,7 @@ public class ProductService {
                 .quantity(request.quantity())
                 .isMembershipOnly(isMembershipOnly)
                 .isExclusive(isExclusive)
+                .isMembership(isMembership)
                 .build();
 
         return productRepository.save(product);
@@ -57,6 +59,7 @@ public class ProductService {
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
         boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
+        boolean isMembership = request.isMembership() != null && request.isMembership();
 
         product.update(
                 request.name(),
@@ -67,7 +70,8 @@ public class ProductService {
                 request.isSubscription(),
                 request.quantity(),
                 isMembershipOnly,
-                isExclusive);
+                isExclusive,
+                isMembership);
 
         return product;
     }
