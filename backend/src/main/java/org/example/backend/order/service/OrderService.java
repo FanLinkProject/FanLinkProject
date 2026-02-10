@@ -2,6 +2,7 @@ package org.example.backend.order.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.backend.delivery.entity.Delivery;
 import org.example.backend.order.dto.request.OrderItemDto;
 import org.example.backend.order.dto.request.OrderRequestDto;
 import org.example.backend.order.entity.Order;
@@ -94,8 +95,17 @@ public class OrderService {
 
                         orderItems.add(orderItem);
                 }
+                // 3. 배송 정보(Delivery) 생성(변경/추가)
+                // 변경추가 이유: 주문 시 입력받은 주소 정보로 배송 엔티티를 먼저 만듭니다. (아직 송장번호 없음)
+                // 주의: OrderRequestDto에 recipientName, address, detailAddress 등의 필드가 추가되어야 합니다.
+                Delivery delivery = Delivery.createPendingDelivery(
+                        request.recipientName(),  // DTO에 추가 필요
+                        request.recipientPhone(), // DTO에 추가 필요
+                        request.address(),        // DTO에 추가 필요
+                        request.detailAddress()   // DTO에 추가 필요
+                );
 
-                // 3. Order 생성
+                // 4. Order 생성
                 Order order = Order.builder()
                                 .userId(user.getId())
                                 .name(request.name())
@@ -103,14 +113,15 @@ public class OrderService {
                                 .totalCandyAmount(calculatedTotalCandyAmount)
                                 .status(OrderStatus.PENDING)
                                 .orderNo(java.util.UUID.randomUUID().toString())
+                                .delivery(delivery) // 배송정보연결
                                 .build();
 
-                // 4. 관계 설정 (Order <-> OrderItem)
+                // 5. 관계 설정 (Order <-> OrderItem)
                 for (OrderItem item : orderItems) {
                         order.addOrderItem(item);
                 }
 
-                // 5. 저장
+                // 6. 저장
                 orderRepository.save(order);
                 return order.getOrderNo();
         }
