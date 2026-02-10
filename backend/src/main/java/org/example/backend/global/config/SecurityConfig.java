@@ -1,5 +1,7 @@
 package org.example.backend.global.config;
 
+import static org.apache.tomcat.util.http.Method.*;
+
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
@@ -79,6 +81,7 @@ public class SecurityConfig {
 					"/ws-chat/**",
 					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
                 ).permitAll()
+				.requestMatchers(GET, "/api/live-sessions/**").permitAll()
 
                     // 관리자
                     .requestMatchers("/api/admin/**")
@@ -87,6 +90,14 @@ public class SecurityConfig {
                 // 아티스트, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "ADMIN")
+
+                // 마일스톤(등급) - 아티스트 전용
+                .requestMatchers("/api/milestones/**", "/api/milestone/**")
+                    .hasAnyRole("ARTIST", "ADMIN")
+
+                // 팬 프로필(등급 현황) - 인증된 사용자
+                .requestMatchers("/api/fan-profiles/**")
+                    .authenticated()
                 
                 // 유저(팬), 아티스트, 그룹, 관리자
                 .requestMatchers("/api/user/**")
