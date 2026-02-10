@@ -6,19 +6,17 @@ spring:
     # 한글 깨짐 방지
     # - characterEncoding은 "utf8mb4"가 아니라 자바 charset 이름인 "UTF-8"을 써야 합니다.
     # - 실제 저장/정렬은 서버/테이블의 utf8mb4 + connectionCollation으로 처리됩니다.
-    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE:fanlinkdb}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&useSSL=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&useSSL=true&serverTimezone=Asia/Seoul
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
     hikari:
-
       maximum-pool-size: ${DB_MAX_POOL_SIZE:30}
       minimum-idle: ${DB_MIN_IDLE:10}
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
       idle-timeout: ${DB_IDLE_TIMEOUT_MS:600000}
       max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
-
       leak-detection-threshold: ${DB_LEAK_DETECT_MS:0}
   jpa:
     open-in-view: false
@@ -31,7 +29,6 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
     show-sql: true
 
-  #===============================
   data:
     redis:
       host: localhost
@@ -69,13 +66,7 @@ spring:
   # 암호화 키 설정 (환경 변수 ENCRYPTION_KEY로 설정 가능, 32바이트 권장)
   # 프로덕션 환경에서는 반드시 환경 변수로 설정하세요
   encryption:
-    key: ${ENCRYPTION_KEY:default-encryption-key-32bytes!!}
-
-  batch:
-    jdbc:
-      initialize-schema: always
-    job:
-      enabled: false
+    key: ${ENCRYPTION_KEY}
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
@@ -225,3 +216,10 @@ jwt:
   secret: ${JWT_SECRET}
 oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
+
+#배송시스템 aftership api연동
+external:
+  aftership:
+    api-key: YOUR_AFTERSHIP_API_KEY_HERE
+    # 발급받은 키를 여기에 붙여넣으세요 (sandbox 키 추천)
+    base-url: https://api.aftership.com/v4

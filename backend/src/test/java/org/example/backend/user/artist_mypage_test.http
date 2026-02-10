@@ -1,0 +1,92 @@
+### 아티스트 마이페이지 API 테스트 파일
+### IntelliJ IDEA / VS Code REST Client에서 사용 가능합니다.
+
+@baseUrl = http://localhost:8080
+@adminEmail = admin@example.com
+@adminPassword = admin123
+@userEmail = user1@example.com
+@userPassword = password123
+
+# 응답을 보고 직접 채우는 값들
+@adminAccessToken =
+@artistId =
+@artistEmail = artist-mypage-test@example.com
+@artistPassword = password123
+@artistAccessToken =
+@userAccessToken =
+
+
+### ============================================
+### 1) 관리자 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+
+### ============================================
+### 2) 관리자 - 아티스트 계정 생성
+### ============================================
+POST {{baseUrl}}/api/admin/artists
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "{{artistEmail}}",
+  "nickname": "아티스트마이페이지테스트",
+  "name": "김아티스트",
+  "password": "{{artistPassword}}",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "privacyPolicyAgreed": true,
+  "phoneNumber": "010-9555-0001",
+  "isGroup": false,
+  "groupId": null
+}
+
+### 응답의 id를 확인해서 @artistId에 넣으세요.
+
+
+### ============================================
+### 3) 아티스트 로그인
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{artistEmail}}",
+  "password": "{{artistPassword}}"
+}
+
+### 응답의 accessToken을 복사해서 @artistAccessToken에 넣으세요.
+
+
+### ============================================
+### 4) 일반 유저 로그인 (팔로우로 daily 변화 만들기용)
+### ============================================
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}"
+}
+
+
+### ============================================
+### 5) (선택) 유저가 아티스트 팔로우
+### ============================================
+POST {{baseUrl}}/api/user/follow/{{artistId}}
+Authorization: Bearer {{userAccessToken}}
+
+
+### ============================================
+### 6) 아티스트 마이페이지 조회
+### ============================================
+GET {{baseUrl}}/api/artist/mypage
+Authorization: Bearer {{artistAccessToken}}
+

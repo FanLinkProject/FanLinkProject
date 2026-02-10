@@ -90,6 +90,14 @@ public class SecurityConfig {
                 // 아티스트, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "ADMIN")
+
+                // 마일스톤(등급) - 아티스트 전용
+                .requestMatchers("/api/milestones/**", "/api/milestone/**")
+                    .hasAnyRole("ARTIST", "ADMIN")
+
+                // 팬 프로필(등급 현황) - 인증된 사용자
+                .requestMatchers("/api/fan-profiles/**")
+                    .authenticated()
                 
                 // 유저(팬), 아티스트, 그룹, 관리자
                 .requestMatchers("/api/user/**")
