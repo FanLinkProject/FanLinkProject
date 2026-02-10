@@ -20,7 +20,6 @@ spring:
       leak-detection-threshold: ${DB_LEAK_DETECT_MS:0}
   jpa:
     open-in-view: false
-
     hibernate:
       ddl-auto: update
     properties:
@@ -28,7 +27,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
     show-sql: true
-
+  # redis 디폴트(기본기능)-슬레이브(읽기만가능)모드 전환시 별도 작업필요
   data:
     redis:
       host: localhost
@@ -50,29 +49,37 @@ spring:
           timeout: 5000
           writetimeout: 5000
     # 이메일 개발 모드 설정
-    # true: 개발 모드 (콘솔에 인증 코드 출력, 실제 이메일 발송 안 함)
-    # false: 실제 이메일 발송
-    dev-mode: ${MAIL_DEV_MODE:true}
+    # false: 개발 모드 (콘솔에 인증 코드 출력, 실제 이메일 발송 안 함)
+    # true: 실제 이메일 발송
+    dev-mode: ${MAIL_DEV_MODE:false}
 
   # SMS API 설정 (실제 SMS 발송을 위한 설정 - CoolSMS)
   sms:
     api:
-      # false: 개발 모드 (로그만 출력), true: 실제 SMS 발송
+      # false: 개발 모드 (로그만 출력, 실제 SMS 발송 안 함)
+      # true: 실제 SMS 발송
       enabled: ${SMS_API_ENABLED:false}
       key: ${SMS_API_KEY}
       secret: ${SMS_API_SECRET}
       # 발신번호 (CoolSMS에 등록된 번호)
       from: ${SMS_FROM}
-  # 암호화 키 설정 (환경 변수 ENCRYPTION_KEY로 설정 가능, 32바이트 권장)
-  # 프로덕션 환경에서는 반드시 환경 변수로 설정하세요
-  encryption:
-    key: ${ENCRYPTION_KEY}
+
+    # 암호화 키 설정(32자 이상)
+    encryption:
+      key: ${ENCRYPTION_KEY}
+
+  #batch 실행 프로그램-테스트모드 삭제
+  batch:
+    jdbc:
+      initialize-schema: always
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
-      group-id: ${KAFKA_GROUP_ID:chat-server}
-      auto-offset-reset: earliest
+      group-id: ${KAFKA_GROUP_ID}
+      auto-offset-reset: latest # 수정
+      enable-auto-commit: true # 추가
+
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -209,6 +216,7 @@ payment:
 
   frontend-url: ${FRONTEND_URL}
 
+# 프론트 연동 후 success uri 사용예정
 # OAuth2 로그인 성공 후 프론트엔드로 리다이렉트할 URI
 # 환경 변수 OAUTH2_REDIRECT_URI로 설정 가능
 #oauth2:
@@ -221,9 +229,14 @@ jwt:
 oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
 
-#배송시스템 aftership api연동
+##배송시스템 aftership api연동 - 추가예정
 external:
   aftership:
     api-key: YOUR_AFTERSHIP_API_KEY_HERE
     # 발급받은 키를 여기에 붙여넣으세요 (sandbox 키 추천)
     base-url: https://api.aftership.com/v4
+
+app:
+  kafka:
+    trusted-packages: org.example.backend.chat.dto
+    live-group-id: ${KAFKA_LIVE_GROUP_ID}
