@@ -50,23 +50,29 @@ spring:
           timeout: 5000
           writetimeout: 5000
     # 이메일 개발 모드 설정
-    # true: 개발 모드 (콘솔에 인증 코드 출력, 실제 이메일 발송 안 함)
-    # false: 실제 이메일 발송
-    dev-mode: ${MAIL_DEV_MODE:true}
+    # false: 개발 모드 (콘솔에 인증 코드 출력, 실제 이메일 발송 안 함)
+    # true: 실제 이메일 발송
+    dev-mode: ${MAIL_DEV_MODE:false}
 
   # SMS API 설정 (실제 SMS 발송을 위한 설정 - CoolSMS)
   sms:
     api:
-      # false: 개발 모드 (로그만 출력), true: 실제 SMS 발송
+      # false: 개발 모드 (로그만 출력, 실제 SMS 발송 안 함)
+      # true: 실제 SMS 발송
       enabled: ${SMS_API_ENABLED:false}
       key: ${SMS_API_KEY}
       secret: ${SMS_API_SECRET}
       # 발신번호 (CoolSMS에 등록된 번호)
       from: ${SMS_FROM}
-  # 암호화 키 설정 (환경 변수 ENCRYPTION_KEY로 설정 가능, 32바이트 권장)
-  # 프로덕션 환경에서는 반드시 환경 변수로 설정하세요
-  encryption:
-    key: ${ENCRYPTION_KEY}
+
+    # 암호화 키 설정(32자 이상)
+    encryption:
+      key: ${ENCRYPTION_KEY}
+
+    # Spring Batch 설정
+    batch:
+      jdbc:
+        initialize-schema: always
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
