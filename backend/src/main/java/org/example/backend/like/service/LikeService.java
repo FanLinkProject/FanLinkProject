@@ -74,17 +74,6 @@ public class LikeService {
     }
 
     /**
-     * 특정 대상의 좋아요 개수 조회
-     *
-     * @param targetType 좋아요 대상 타입
-     * @param targetId 좋아요 대상 ID
-     * @return 좋아요 개수
-     */
-    public long getLikeCount(LikeTarget targetType, Long targetId) {
-        return likeRepository.countByTargetTypeAndTargetId(targetType, targetId);
-    }
-
-    /**
      * 사용자가 특정 대상에 좋아요를 눌렀는지 확인
      *
      * @param userId 사용자 ID

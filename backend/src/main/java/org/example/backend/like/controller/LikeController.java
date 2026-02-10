@@ -60,21 +60,6 @@ public class LikeController {
         return ResponseEntity.ok(status);
     }
 
-    /**
-     * 특정 대상의 좋아요 개수 조회 (비로그인 사용자도 가능)
-     *
-     * @param targetType 좋아요 대상 타입
-     * @param targetId 좋아요 대상 ID
-     * @return 좋아요 개수
-     */
-    @GetMapping("/count")
-    public ResponseEntity<Long> getLikeCount(
-            @RequestParam LikeTarget targetType,
-            @RequestParam Long targetId) {
-
-        long count = likeService.getLikeCount(targetType, targetId);
-        return ResponseEntity.ok(count);
-    }
 
     /**
      * 여러 게시물의 좋아요 수 일괄 조회 (N+1 문제 해결)
