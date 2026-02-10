@@ -26,6 +26,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+        default_batch_fetch_size: 100
     show-sql: true
   # redis 디폴트(기본기능)-슬레이브(읽기만가능)모드 전환시 별도 작업필요
   data:
