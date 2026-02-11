@@ -10,7 +10,7 @@ import org.example.backend.user.entity.User;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 라이브 채팅 서비스
@@ -36,7 +36,7 @@ public class LiveChatService {
 			.senderId(sender.getId())
 			.nickname(sender.getNickname())
 			.content(request.getContent())
-			.sentAt(LocalDateTime.now())
+			.sentAt(Instant.now())
 			.build();
 
 		liveKafkaTemplate.send(TOPIC, String.valueOf(toSend.getRoomId()), toSend)

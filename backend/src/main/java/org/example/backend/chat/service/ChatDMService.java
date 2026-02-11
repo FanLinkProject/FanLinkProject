@@ -15,6 +15,7 @@ import org.example.backend.chat.repository.ChatRoomMemberRepository;
 import org.example.backend.chat.repository.ChatRoomRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class ChatDMService {
     private final ChatRoomRepository chatRoomRepository;
     private final UserRepository userRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
+    private final GroupMemberRepository groupMemberRepository;
 
 	@Transactional
 	public Long getCurrentUserId(String email) {
@@ -59,11 +61,29 @@ public class ChatDMService {
     }
 
 
-    //chatroom 리스트
+    //chatroom 리스트 (그룹 소속 아티스트는 groupName 포함)
     @Transactional(readOnly = true)
     public List<ChatRoomResponse> findChatDMRoomList(Long userId) {
+        // 사용자 존재 여부 확인 (없으면 예외 발생)
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
+        
+        // 사용자가 속한 채팅방 목록 조회
         List<ChatRoom> chatRooms = chatRoomMemberRepository.findChatRoomsByUserId(userId);
-        return chatRooms.stream().map(ChatRoomResponse::of).collect(Collectors.toList());
+        
+        // 채팅방 목록을 응답 DTO로 변환 (그룹명 포함)
+        return chatRooms.stream()
+            .map(room -> {
+                try {
+                    Long ownerId = room.getOwner().getId();
+                    String groupName = groupMemberRepository.findGroupNameByMemberId(ownerId).orElse(null);
+                    return ChatRoomResponse.of(room, groupName);
+                } catch (Exception e) {
+                    // 개별 방 처리 중 오류 발생 시 그룹명 없이 반환
+                    return ChatRoomResponse.of(room);
+                }
+            })
+            .collect(Collectors.toList());
     }
 
 
