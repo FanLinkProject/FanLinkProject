@@ -9,6 +9,9 @@ import org.example.backend.notification.entity.Notification;
 import org.example.backend.notification.exception.NotificationErrorCode;
 import org.example.backend.notification.exception.NotificationException;
 import org.example.backend.notification.repository.NotificationRepository;
+import org.example.backend.chat.entity.ChatRoom;
+import org.example.backend.chat.repository.ChatRoomRepository;
+import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,7 @@ public class NotificationService {
     private final EmitterRepository emitterRepository;
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final ChatRoomRepository chatRoomRepository;
     private final ObjectMapper objectMapper;
 
     public SseEmitter subscribe(Long userId) {
@@ -81,7 +85,7 @@ public class NotificationService {
         SseEmitter emitter = emitterRepository.get(request.getReceiverId());
         if (emitter != null) {
             try {
-                NotificationResponse response = NotificationResponse.from(notification);
+                NotificationResponse response = toResponse(notification);
                 // ObjectMapper를 사용하여 JSON 문자열로 명시적 변환
                 String jsonData = objectMapper.writeValueAsString(response);
                 emitter.send(SseEmitter.event()
@@ -113,11 +117,10 @@ public class NotificationService {
 
     // 읽지 않은 알림 목록 조회
 	@Transactional(readOnly = true)
-    public List<
-            NotificationResponse> getUnreadNotifications(Long userId) {
+    public List<NotificationResponse> getUnreadNotifications(Long userId) {
         return notificationRepository.findByReceiver_IdAndIsReadFalseOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(NotificationResponse::from)
+                .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
@@ -126,8 +129,19 @@ public class NotificationService {
 	public List<NotificationResponse> getAllNotifications(Long userId) {
         return notificationRepository.findByReceiver_IdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(NotificationResponse::from)
+                .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    private NotificationResponse toResponse(Notification n) {
+        Long roomId = null;
+        if ((n.getType() == NotificationType.ARTIST_MESSAGE || n.getType() == NotificationType.FAN_MESSAGE)
+                && n.getSender() != null) {
+            roomId = chatRoomRepository.findByOwner(n.getSender())
+                    .map(ChatRoom::getId)
+                    .orElse(null);
+        }
+        return NotificationResponse.from(n, roomId);
     }
 
     @Transactional

@@ -240,4 +240,4 @@ external:
 app:
   kafka:
     trusted-packages: org.example.backend.chat.dto
-    live-group-id: ${KAFKA_LIVE_GROUP_ID}
+    live-group-id: live-chat-group

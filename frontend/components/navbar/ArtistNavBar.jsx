@@ -33,9 +33,33 @@ export default function ArtistNavBar() {
           }`}>
           Artist Console
         </Link>
+        <Link
+          href="/milestone"
+          className={`inline-flex items-center leading-none h-8 text-[15px] font-bold transition-colors ${
+            pathname === "/milestone" || pathname?.startsWith("/milestone/")
+              ? "text-violet-300"
+              : "text-white/80 hover:text-violet-300"
+          }`}>
+          등급 관리
+        </Link>
+        <Link
+          href="/dm/artist"
+          className={`inline-flex items-center leading-none h-8 text-[15px] font-bold transition-colors ${
+            pathname === "/dm/artist" || pathname?.startsWith("/dm/artist")
+              ? "text-violet-300"
+              : "text-white/80 hover:text-violet-300"
+          }`}>
+          DM
+        </Link>
       </nav>
 
       <div className="flex items-center gap-6 shrink-0">
+        <Link
+          href="/dm/artist"
+          className="p-2 text-white/80 hover:bg-white/10 rounded-full transition-colors"
+          aria-label="DM">
+          <span className="material-symbols-outlined">mail</span>
+        </Link>
         <Link
           href="/notifications"
           className="p-2 text-white/80 hover:bg-white/10 rounded-full transition-colors relative"
