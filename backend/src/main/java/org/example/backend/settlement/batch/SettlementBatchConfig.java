@@ -109,9 +109,9 @@ public class SettlementBatchConfig {
                 return null; // Writer로 넘기지 않고 스킵
             }
 
-            // 대기열 조회
+            // 대기열 조회 (반개방 구간: startDate 00:00:00 이상 ~ endDate+1 00:00:00 미만)
             List<SettlementPending> pendings = pendingRepository.findAllByArtistIdAndDateRange(
-                    user.getId(), startDate.atStartOfDay(), endDate.atTime(23, 59, 59));
+                    user.getId(), startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay());
 
             // [안전장치 2] 정산할 내역이 없으면 스킵
             if (pendings.isEmpty()) return null;

@@ -9,7 +9,6 @@ import org.example.backend.payment.entity.Payment;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.product.enums.ProductType;
-import org.example.backend.settlement.entity.SettlementPending;
 import org.example.backend.settlement.enums.SettlementSourceType;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.springframework.stereotype.Service;
@@ -28,6 +27,13 @@ public class SettlementPendingService {
 
     /**
      * 정산 대기 데이터를 생성합니다.
+     *
+     * <p>중복 방지 전략: MySQL INSERT IGNORE</p>
+     * <ul>
+     *   <li>Unique Constraint(payment_id, artist_id, order_name) 위반 시 해당 행만 무시</li>
+     *   <li>JPA 영속성 컨텍스트를 거치지 않는 Native Query 사용</li>
+     *   <li>Hibernate 세션 오염 없이 트랜잭션 내에서 안전하게 부분 저장 가능</li>
+     * </ul>
      *
      * @param payment 결제 정보
      * @param order   주문 정보
@@ -56,30 +62,28 @@ public class SettlementPendingService {
                 continue;
             }
 
-            // [중복 방지] 이미 해당 결제 건으로 생성된 대기열이 있는지 확인 (Item 단위가 아닌 Payment 단위 체크)
-            // 주의: 루프 안에서 체크하면 N번 쿼리 발생 가능하지만,
-            // 호출부(Listener/Recovery)에서 이미 Payment 단위 체크를 수행하므로 여기서는 생략 가능.
-            // 안전을 위해 Repository.save() 호출 시 Unique Constraint 충돌 가능성 염두.
-
             // [정산 원천 결정]
             SettlementSourceType sourceType = determineSourceType(product.getType());
 
             // [금액 계산]
             long settlementAmount = calculateSettlementAmount(product, item);
 
-            // SettlementPending 저장
-            SettlementPending pending = SettlementPending.builder()
-                    .paymentId(payment.getId())
-                    .artistId(product.getArtistId())
-                    .amount(settlementAmount)
-                    .orderName(product.getName())
-                    .sourceType(sourceType)
-                    .build();
+            // [INSERT IGNORE] 중복 시 해당 행만 무시, 나머지는 정상 저장
+            int inserted = settlementPendingRepository.insertIgnore(
+                    payment.getId(),
+                    product.getArtistId(),
+                    settlementAmount,
+                    product.getName(),
+                    sourceType.name()
+            );
 
-            settlementPendingRepository.save(pending);
-
-            log.info("정산 대기열 생성: artistId={}, amount={}, product={}, sourceType={}",
-                    product.getArtistId(), settlementAmount, product.getName(), sourceType);
+            if (inserted > 0) {
+                log.info("정산 대기열 생성: artistId={}, amount={}, product={}, sourceType={}",
+                        product.getArtistId(), settlementAmount, product.getName(), sourceType);
+            } else {
+                log.info("정산 대기열이 이미 존재합니다 (중복 스킵): paymentId={}, artistId={}, orderName={}",
+                        payment.getId(), product.getArtistId(), product.getName());
+            }
         }
     }
 

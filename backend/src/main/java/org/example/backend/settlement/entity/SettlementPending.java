@@ -20,9 +20,17 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Getter
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "settlement_pendings", indexes = {
+@Table(name = "settlement_pendings",
+    indexes = {
         @Index(name = "idx_pending_artist", columnList = "artist_id") // 조회 성능 최적화
-})
+    },
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_pending_payment_artist_item",
+            columnNames = {"payment_id", "artist_id", "order_name"}
+        )
+    }
+)
 public class SettlementPending {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
