@@ -9,7 +9,7 @@ import org.example.backend.like.enums.LikeTarget;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "likes",
@@ -21,8 +21,6 @@ import java.time.LocalDateTime;
     },
     indexes = {
         @Index(name = "idx_target", columnList = "target_type, target_id"),
-        @Index(name = "idx_user_created", columnList = "user_id, created_at"),
-        @Index(name = "idx_created", columnList = "created_at")
     }
 )
 @Getter
@@ -39,14 +37,14 @@ public class Like {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private LikeTarget targetType; // FAN_POST, ARTIST_POST, COMMENT
+    private LikeTarget targetType; // 좋아요의 대상 FAN_POST, ARTIST_POST, COMMENT
 
     @Column(nullable = false)
     private Long targetId; // 대상의 PK
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Builder
     public Like(Long userId, LikeTarget targetType, Long targetId) {

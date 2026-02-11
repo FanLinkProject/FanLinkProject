@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.example.backend.like.exception.LikeErrorCode; // 추가됨
-import org.example.backend.like.exception.LikeException; // 추가됨
+import org.example.backend.like.exception.LikeErrorCode;
+import org.example.backend.like.exception.LikeException;
 
 @Getter
 @RequiredArgsConstructor
