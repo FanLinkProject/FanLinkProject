@@ -8,6 +8,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.example.backend.chat.dto.response.ChatMessageResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -46,7 +47,14 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 @Configuration
 @EnableKafka
 public class KafkaConfig {
+	@Value("${spring.kafka.bootstrap-servers}")
+	private String bootstrapServers;
 
+	@Value("${spring.kafka.consumer.group-id}")
+	private String groupId;
+
+	@Value("${app.kafka.trusted-packages:org.example.backend.chat.dto}")
+	private String trustedPackages;
 	/**
 	 * Kafka Producer Factory
 	 *
@@ -64,7 +72,7 @@ public class KafkaConfig {
 	@Bean
 	public ProducerFactory<String, ChatMessageResponse> producerFactory() {
 		Map<String, Object> config = new HashMap<>();
-		config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
+		config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
 		config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 		config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 		return new DefaultKafkaProducerFactory<>(config);
@@ -103,18 +111,27 @@ public class KafkaConfig {
 	@Bean
 	public ConsumerFactory<String, ChatMessageResponse> consumerFactory() {
 		Map<String, Object> config = new HashMap<>();
-		config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:29092");
-		config.put(ConsumerConfig.GROUP_ID_CONFIG, "chat-server");
+		config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+		config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
 		config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
 		config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-		config.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-
-		config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, ChatMessageResponse.class.getName());
 
 		return new DefaultKafkaConsumerFactory<>(
 			config,
 			new StringDeserializer(),
-			new JsonDeserializer<>(ChatMessageResponse.class, false));
+			buildValueDeserializer());
+	}
+
+	private JsonDeserializer<ChatMessageResponse> buildValueDeserializer() {
+			JsonDeserializer<ChatMessageResponse> deserializer =
+					new JsonDeserializer<>(ChatMessageResponse.class, false);
+			deserializer.addTrustedPackages(splitTrustedPackages(trustedPackages));
+			deserializer.setUseTypeMapperForKey(false);
+			return deserializer;
+	}
+
+	private String[] splitTrustedPackages(String raw) {
+			return raw == null ? new String[0] : raw.trim().split("\\s*,\\s*");
 	}
 
 	/**
