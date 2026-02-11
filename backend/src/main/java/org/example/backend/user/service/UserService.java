@@ -12,6 +12,8 @@ import org.example.backend.chat.enums.MessageType;
 import org.example.backend.chat.repository.ChatMessageRepository;
 import org.example.backend.chat.repository.ChatRoomRepository;
 import org.example.backend.notification.repository.NotificationRepository;
+import org.example.backend.comment.entity.Comment;
+import org.example.backend.comment.repository.CommentRepository;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.GuestHomeResponse;
@@ -59,6 +61,7 @@ public class UserService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final NotificationRepository notificationRepository;
+    private final CommentRepository commentRepository;
 
     // 전화번호 수정
     public void updatePhoneNumber(User user, PhoneNumberUpdateRequest request) {
@@ -273,7 +276,19 @@ public class UserService {
                 post.getCreatedAt().toString()
         )).getContent();
 
-        // 4) 멤버십 상태 (활성 구독만)
+        // 4) 내가 쓴 댓글 (페이징)
+        Page<Comment> commentsPage = commentRepository.findMyComments(user.getId(), pageable);
+        var myComments = commentsPage.map(comment -> new UserMyPageResponse.MyComment(
+                comment.getId(),
+                comment.getContent() != null && comment.getContent().length() > 100
+                        ? comment.getContent().substring(0, 100) + "..."
+                        : comment.getContent(),
+                comment.getTargetType().name(),
+                comment.getTargetId(),
+                comment.getCreatedAt().toString()
+        )).getContent();
+
+        // 5) 멤버십 상태 (활성 구독만)
         List<Subscription> activeSubscriptions = subscriptionRepository
                 .findByUserIdAndIsActive(user.getId(), true);
         var memberships = activeSubscriptions.stream()
@@ -285,7 +300,7 @@ public class UserService {
                 ))
                 .toList();
 
-        // 5) 구매 내역 (페이징)
+        // 6) 구매 내역 (페이징)
         Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
         var purchaseHistory = ordersPage.map(order -> new UserMyPageResponse.PurchaseHistory(
                 order.getId(),
@@ -297,7 +312,7 @@ public class UserService {
                 order.getCreatedAt().toString()
         )).getContent();
 
-        // 6) 차단 목록 (페이징)
+        // 7) 차단 목록 (페이징)
         Page<Block> blocks = blockRepository.findByBlocker(user, pageable);
         var blockedUsers = blocks.map(b -> new UserMyPageResponse.BlockedUser(
                 b.getBlocked().getId(),
@@ -309,11 +324,13 @@ public class UserService {
                 profile,
                 followedArtists,
                 myPosts,
+                myComments,
                 memberships,
                 purchaseHistory,
                 blockedUsers,
                 follows.getTotalElements(),
                 postsPage.getTotalElements(),
+                commentsPage.getTotalElements(),
                 (long) activeSubscriptions.size(),
                 ordersPage.getTotalElements(),
                 blocks.getTotalElements()
