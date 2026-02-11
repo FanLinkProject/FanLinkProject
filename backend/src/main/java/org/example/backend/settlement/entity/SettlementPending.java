@@ -42,7 +42,7 @@ public class SettlementPending {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SettlementSourceType sourceType; // PRODUCT or CANDY
+    private SettlementSourceType sourceType; // CASH or CANDY
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

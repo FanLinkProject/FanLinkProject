@@ -141,7 +141,7 @@ public class SettlementBatchConfig {
                         .paymentId(pending.getPaymentId())
                         .sourceType(pending.getSourceType())
                         .titleSnapshot(pending.getOrderName())
-                        .salesAmount(pending.getAmount()) // 원금 전달
+                        .salesAmount(pending.getAmount()) // 정산 기준금 (캔디의 경우 -> 환율 반영된 KRW 금액)
                         .shareRatio(ratio)
                         .build();
 

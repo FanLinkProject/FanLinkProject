@@ -44,7 +44,7 @@ public class SettlementDashboardService {
      */
     public SettlementEstimateResponse getEstimatedAmount(Long artistId) {
         // 1. 소스 타입별 매출 합계 조회 (GROUP BY)
-        // totalSales는 '매출 총액(KRW)'이어야 함
+        // totalSales는 '매출 총액(KRW)'
         List<Object[]> results = pendingRepository.findTotalAmountGroupBySourceType(artistId);
 
         long totalEstimatedAmount = 0;
@@ -54,9 +54,9 @@ public class SettlementDashboardService {
             SettlementSourceType type = (SettlementSourceType) row[0];
             Long totalSales = (Long) row[1];
 
-            // 캔디(CANDY) 처리 주의사항
-            // DB의 amount(totalSales)는 '캔디 개수'가 아닌 '(개수 * 단가)'로 환산된 '금액(KRW)'이어야 함
-            // 예: 캔디 100개(개당 100원) 사용 -> DB amount: 10,000원 -> 정산금: 10,000 * 0.2 = 2,000원
+            // 정산 타입별 비율 적용: CASH(90%), CANDY(20%)
+            // totalSales는 이미 KRW 환산된 금액 (캔디는 EventListener에서 환율 적용됨)
+            // 예: 현금 10,000원 -> 9,000원 / 캔디 10,000원 -> 2,000원
             long settlementAmount = BigDecimal.valueOf(totalSales)
                     .multiply(type.getDefaultShareRatio())
                     .setScale(0, RoundingMode.FLOOR)

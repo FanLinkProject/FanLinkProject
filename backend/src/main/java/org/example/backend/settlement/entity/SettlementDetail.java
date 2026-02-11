@@ -45,7 +45,7 @@ public class SettlementDetail {
     @Column(nullable = false)
     private Long salesAmount; // 판매 금액
 
-    // 당시 적용된 배분율 박제 (0.9 or 0.2)
+    // 당시 적용된 배분율 박제: CASH=0.9(90%), CANDY=0.2(20%)
     @Column(nullable = false, precision = 3, scale = 2)
     private BigDecimal shareRatio; // 정산 시점의 적용 비율 (예: 0.9)
 
