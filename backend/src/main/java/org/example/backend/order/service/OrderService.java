@@ -31,25 +31,6 @@ public class OrderService {
         private final UserRepository userRepository;
 
         /**
-         * 테스트를 위한 PENDING 상태의 주문 번호를 조회합니다.
-         * 실제 운영 환경에서는 사용되지 않으며, 결제 테스트 시 유효한 orderNo를 제공하기 위함입니다.
-         *
-         * @return 테스트용 주문 번호 (PENDING 상태)
-         * @throws OrderException 테스트 데이터가 없을 경우 or 주문이 이미 처리된 경우
-         */
-        public String getTestPendingOrderNo() {
-                // PENDING 상태의 첫 번째 주문 조회 (테스트용)
-                Order order = orderRepository.findById(3L)
-                                .orElseThrow(() -> new OrderException(OrderErrorCode.TEST_ORDER_NOT_FOUND));
-
-                if (order.getStatus() != OrderStatus.PENDING) {
-                        throw new OrderException(OrderErrorCode.ORDER_ALREADY_PROCESSED);
-                }
-
-                return order.getOrderNo();
-        }
-
-        /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
          * 
          * 로직 흐름:
@@ -71,6 +52,18 @@ public class OrderService {
                 for (OrderItemDto itemDto : request.orderItems()) {
                         Product product = productRepository.findById(itemDto.productId())
                                         .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
+
+                        // 유료 팬 가입 상품 중복 구매 확인 (10개월 내)
+                        if (Boolean.TRUE.equals(product.getIsMembership())) {
+                                boolean exists = orderRepository.existsPaidMembershipOrder(
+                                                user.getId(),
+                                                product.getArtistId(),
+                                                OrderStatus.COMPLETED,
+                                                java.time.LocalDateTime.now().minusMonths(10));
+                                if (exists) {
+                                        throw new OrderException(OrderErrorCode.DUPLICATE_MEMBERSHIP_ORDER);
+                                }
+                        }
 
                         // 가격 정책: 상품의 현재 가격 사용
                         BigDecimal itemPrice = BigDecimal.valueOf(product.getPrice());

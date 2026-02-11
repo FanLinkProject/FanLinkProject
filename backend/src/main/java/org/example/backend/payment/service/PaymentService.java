@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 
 import org.example.backend.payment.exception.PaymentErrorCode;
 import org.example.backend.payment.exception.PaymentException;
+import org.example.backend.payment.config.PaymentExchangeConfig;
 
 @Slf4j
 @Service
@@ -166,7 +167,9 @@ public class PaymentService {
         for (OrderItem item : order.getOrderItems()) {
             if (item.getProduct().getType() == ProductType.CASH) {
                 // 충전량 계산 규칙: 100원당 1캔디
-                long candyAmount = item.getPrice().longValue() / 100 * item.getQuantity();
+                long candyAmount = item.getPrice().longValue()
+                        / PaymentExchangeConfig.CANDY_EXCHANGE_RATE
+                        * item.getQuantity();
 
                 // 유저 조회 후 충전
                 User user = userRepository.findById(order.getUserId())
@@ -195,7 +198,8 @@ public class PaymentService {
     @Transactional
     public Payment createCandyPayment(Order order) {
         // 캔디 결제는 금액(amount)을 원화 가치로 환산하여 저장 (1캔디 = 100원 기준)
-        long krwAmount = order.getTotalCandyAmount() * 100L;
+        long krwAmount = order.getTotalCandyAmount()
+                * PaymentExchangeConfig.CANDY_EXCHANGE_RATE;
 
         Payment payment = Payment.builder()
                 .userId(order.getUserId())

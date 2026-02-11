@@ -30,8 +30,6 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class SubscriptionService {
 
-        private final int CANDY_PRICE = 100;
-
         private final OrderRepository orderRepository;
         private final SubscriptionRepository subscriptionRepository;
         private final UserRepository userRepository;
