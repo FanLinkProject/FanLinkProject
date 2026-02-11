@@ -16,4 +16,10 @@ public class TossPaymentConfig {
 
     @Value("${payment.toss.base-url}")
     private String baseUrl;
+
+    @Value("${payment.toss.success-url}")
+    private String successUrl;
+
+    @Value("${payment.toss.fail-url}")
+    private String failUrl;
 }

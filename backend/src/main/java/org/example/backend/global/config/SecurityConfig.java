@@ -1,5 +1,7 @@
 package org.example.backend.global.config;
 
+import static org.apache.tomcat.util.http.Method.*;
+
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
@@ -60,10 +62,14 @@ public class SecurityConfig {
                     .requestMatchers(
                         "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
                         "/api/verification/**",   // 인증 코드 발송/검증 API
+                        "/api/home",               // 통합 홈 화면 API (역할별 응답)
+                        "/api/guest/**",          // 비로그인 유저 메인 홈 화면 API (하위 호환)
+                        "/api/user/artists/*/dashboard",  // 특정 아티스트 대시보드 (비로그인 접근 가능)
                         "/login/oauth2/**",       // OAuth2 로그인 콜백 URL
                         "/oauth2/**",             // OAuth2 관련 URL
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )
                     ).permitAll()
+                    .requestMatchers("/api/payments/toss/**").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)
                     .requestMatchers("/api/settlements/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -79,6 +85,7 @@ public class SecurityConfig {
 					"/ws-chat/**",
 					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
                 ).permitAll()
+				.requestMatchers(GET, "/api/live-sessions/**").permitAll()
 
                     // 관리자
                     .requestMatchers("/api/admin/**")
@@ -95,7 +102,7 @@ public class SecurityConfig {
                 // 팬 프로필(등급 현황) - 인증된 사용자
                 .requestMatchers("/api/fan-profiles/**")
                     .authenticated()
-                
+
                 // 유저(팬), 아티스트, 그룹, 관리자
                 .requestMatchers("/api/user/**")
                     .hasAnyRole("USER", "ARTIST", "GROUP", "ADMIN")

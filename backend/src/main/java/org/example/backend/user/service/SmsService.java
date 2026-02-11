@@ -20,6 +20,9 @@ public class SmsService {
     @Value("${sms.api.enabled:false}")
     private boolean smsApiEnabled;
 
+    @Value("${mail.dev-mode:true}")
+    private boolean mailDevMode;
+
     @Value("${sms.api.key:}")
     private String apiKey;
 
@@ -34,11 +37,17 @@ public class SmsService {
     // CoolSMS SDK 초기화
     @PostConstruct
     public void init() {
+        // 둘 다 false일 때 개발 모드
+        boolean isDevMode = !mailDevMode && !smsApiEnabled;
+        
         if (smsApiEnabled && !apiKey.isEmpty() && !apiSecret.isEmpty()) {
             this.messageService = NurigoApp.INSTANCE.initialize(apiKey, apiSecret, "https://api.coolsms.co.kr");
             log.info("CoolSMS 초기화 완료");
-        } else if (!smsApiEnabled) {
+        } else if (isDevMode || !smsApiEnabled) {
             log.info("SMS 개발 모드: 실제 SMS 발송 없이 로그만 출력합니다.");
+            if (isDevMode) {
+                log.info("개발 모드: mail.dev-mode와 sms.api.enabled가 모두 false입니다.");
+            }
         } else {
             log.warn("CoolSMS API 키가 설정되지 않았습니다. SMS 발송이 불가능합니다.");
         }
@@ -47,7 +56,10 @@ public class SmsService {
     // 전화번호로 인증번호 발송
     public void sendVerificationCode(String phoneNumber, String code) {
         try {
-            if (smsApiEnabled && messageService != null) {
+            // 개발 모드: sms.api.enabled가 false일 때 개발 모드
+            boolean isDevMode = !smsApiEnabled;
+            
+            if (smsApiEnabled && messageService != null && !isDevMode) {
                 // 실제 SMS API 호출
                 sendSmsViaApi(phoneNumber, code);
             } else {
@@ -55,7 +67,11 @@ public class SmsService {
                 log.info("=== SMS 인증번호 발송 (개발 모드) ===");
                 log.info("수신자: {}", phoneNumber);
                 log.info("인증번호: {}", code);
-                log.info("실제 SMS 발송을 위해서는 application.yml에 sms.api.enabled=true로 설정하세요.");
+                if (!mailDevMode && !smsApiEnabled) {
+                    log.info("개발 모드: mail.dev-mode와 sms.api.enabled가 모두 false입니다.");
+                } else {
+                    log.info("실제 SMS 발송을 위해서는 application.yml에 sms.api.enabled=true로 설정하세요.");
+                }
             }
         } catch (BusinessException e) {
             throw e;

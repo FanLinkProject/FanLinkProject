@@ -16,7 +16,8 @@ public record ArtistMyPageResponse(
             String nickname,
             String profileImageUrl,
             String bannerImageUrl,
-            String bio
+            String bio,
+            String officialLinks  // 공식 링크 (JSON 형식)
     ) {
     }
 
