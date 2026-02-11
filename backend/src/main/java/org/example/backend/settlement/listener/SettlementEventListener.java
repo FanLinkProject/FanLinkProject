@@ -37,10 +37,8 @@ public class SettlementEventListener {
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
         Long paymentId = event.getPayment().getId();
         Long orderId = event.getOrder().getId();
-        Long failureLogId = event.getFailureLogId(); // 복구 컨텍스트
 
-        log.debug("결제 완료 이벤트 수신: paymentId={}, orderId={}, isRecovery={}",
-            paymentId, orderId, failureLogId != null);
+        log.debug("결제 완료 이벤트 수신: paymentId={}, orderId={}", paymentId, orderId);
 
         try {
             // [LazyInitializationException 방지]
@@ -49,6 +47,7 @@ public class SettlementEventListener {
                     .orElseThrow(() -> new IllegalStateException("Payment not found: " + paymentId));
             Order order = orderRepository.findById(orderId)
                     .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+            
             // [중복 방지] 이미 처리된 결제인지 확인
             if (settlementPendingRepository.existsByPaymentId(paymentId)) {
                 log.info("이미 정산 대기열에 존재하는 결제입니다. 스킵: paymentId={}", paymentId);
@@ -60,11 +59,6 @@ public class SettlementEventListener {
 
         } catch (Exception e) {
             log.error("정산 대기 데이터 생성 실패: paymentId={}, error={}", paymentId, e.getMessage());
-
-            // [복구 모드]
-            if (failureLogId != null) {
-                throw new RuntimeException("Recovery failed", e);
-            }
 
             // [일반 모드]
             // Detached 상태의 엔티티를 사용하여 로그 저장 (ID 및 기본 정보는 있음)
