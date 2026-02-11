@@ -21,6 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.payment.config.PaymentExchangeConfig;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -70,7 +71,6 @@ public class SubscriptionScheduler {
             } catch (Exception e) {
                 log.error("현금 구독 처리 실패: subscriptionId={}, error={}",
                         subscription.getId(), e.getMessage(), e);
-                // TODO: 실패 횟수 카운트, 3회 실패 시 isActive = false
             }
         }
     }
@@ -134,7 +134,7 @@ public class SubscriptionScheduler {
                 savedOrder.getOrderNo());
 
         // 3. 다음 결제일 갱신
-        // TODO: Subscription 엔티티에 renewNextPaymentDate() 메서드 추가 권장
+        subscription.renewNextPaymentDate();
         subscriptionRepository.save(subscription);
 
         log.info("현금 구독 갱신 성공: subscriptionId={}, userId={}",
@@ -174,11 +174,15 @@ public class SubscriptionScheduler {
         Order savedOrder = orderRepository.save(order);
 
         // 3. Payment 생성
+        // 캔디 가치를 환산하여 저장 (GlobalConfig 상수 사용)
+        long krwAmount = product.getCandyPrice()
+                * PaymentExchangeConfig.CANDY_EXCHANGE_RATE;
+
         Payment payment = Payment.builder()
                 .userId(subscription.getUserId())
                 .orderId(savedOrder.getId())
                 .paymentKey("CANDY_RENEW_" + java.util.UUID.randomUUID().toString())
-                .amount(BigDecimal.valueOf(product.getCandyPrice() * 100L)) // 1캔디=100원 환산 가치
+                .amount(BigDecimal.valueOf(krwAmount))
                 .status(PaymentStatus.DONE)
                 .method(PaymentMethod.CARD)
                 .paidAt(LocalDateTime.now())
@@ -190,6 +194,7 @@ public class SubscriptionScheduler {
         eventPublisher.publishEvent(new PaymentCompletedEvent(this, savedPayment, savedOrder));
 
         // 5. 다음 결제일 갱신
+        subscription.renewNextPaymentDate();
         subscriptionRepository.save(subscription);
 
         log.info("캔디 구독 갱신 성공 (이벤트 발행 완료): subscriptionId={}, userId={}",

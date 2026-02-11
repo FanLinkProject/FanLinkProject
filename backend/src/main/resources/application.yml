@@ -212,6 +212,10 @@ payment:
     base-url: https://api.tosspayments.com/v1
     client-key: ${PAYMENTS_CLIENT_KEY}
     secret-key: ${PAYMENTS_SECRET_KEY}
+    success-url: ${PAYMENT_SUCCESS_URL}
+    fail-url: ${PAYMENT_FAIL_URL}
+
+  frontend-url: ${FRONTEND_URL}
 
 # 프론트 연동 후 success uri 사용예정
 # OAuth2 로그인 성공 후 프론트엔드로 리다이렉트할 URI
