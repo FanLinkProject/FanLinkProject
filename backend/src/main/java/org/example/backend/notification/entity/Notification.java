@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.example.backend.user.entity.User;
 import org.hibernate.annotations.CreationTimestamp;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 
 @Entity
@@ -34,7 +34,7 @@ public class Notification {
     private boolean isRead = false;
 
     @CreationTimestamp
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
 
     public void markAsRead() {
