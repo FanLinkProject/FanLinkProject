@@ -2,7 +2,7 @@ package org.example.backend.chat.dto.request;
 
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 라이브 채팅 메시지 DTO
@@ -48,9 +48,8 @@ public class LiveChatMessageRequest {
 	private String content;
 
 	/**
-	 * 메시지 전송 시각
-	 * - 서버 기준 (LocalDateTime.now())
-	 * - 클라이언트 시간 동기화용
+	 * 메시지 전송 시각 (ISO-8601 UTC).
+	 * Jackson이 문자열 → Instant 자동 변환. 프론트엔드에서 현지화.
 	 */
-	private LocalDateTime sentAt;
+	private Instant sentAt;
 }

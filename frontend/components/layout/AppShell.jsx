@@ -16,7 +16,12 @@ const AUTH_PREFIX = "/signup/";
 function getNavbarVariant(pathname) {
   if (!pathname) return "fan";
   if (pathname.startsWith("/admin")) return "admin";
-  if (pathname.startsWith("/artist-console")) return "artist";
+  if (
+    pathname.startsWith("/artist-console") ||
+    pathname.startsWith("/milestone") ||
+    pathname.startsWith("/dm/artist")
+  )
+    return "artist";
   if (pathname.startsWith("/group") || pathname.startsWith("/studio"))
     return "group";
   return "fan";
@@ -25,7 +30,12 @@ function getNavbarVariant(pathname) {
 function getSidebarVariant(pathname) {
   if (!pathname) return "fan";
   if (pathname.startsWith("/admin")) return "admin";
-  if (pathname.startsWith("/artist-console")) return "artist";
+  if (
+    pathname.startsWith("/artist-console") ||
+    pathname.startsWith("/milestone") ||
+    pathname.startsWith("/dm/artist")
+  )
+    return "artist";
   if (pathname.startsWith("/group") || pathname.startsWith("/studio"))
     return "group";
   return "fan";

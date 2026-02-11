@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import axios from "axios";
 
 function SocialLoginButton({ provider, onClick }) {
   const configs = {
@@ -35,24 +36,46 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setError("이메일과 비밀번호를 모두 입력해주세요.");
       return;
     }
-    let role = "FAN";
-    if (email.startsWith("artist")) role = "ARTIST";
-    if (email.startsWith("group")) role = "GROUP";
-    if (email.startsWith("admin")) role = "ADMIN";
-    if (role === "ARTIST") router.push("/artist-console");
-    else if (role === "GROUP") router.push("/artist-console/dashboard");
-    else if (role === "ADMIN") router.push("/admin");
-    else router.push("/home");
+    setError("");
+    try {
+      const { data } = await axios.post("http://localhost:8080/api/auth/login", {
+        email,
+        password,
+      });
+      const token = data.accessToken?.startsWith("Bearer")
+        ? data.accessToken
+        : `Bearer ${data.accessToken}`;
+      localStorage.setItem("accessToken", token);
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
+      let role = "FAN";
+      if (email.startsWith("artist")) role = "ARTIST";
+      if (email.startsWith("group")) role = "GROUP";
+      if (email.startsWith("admin")) role = "ADMIN";
+      if (role === "ARTIST") router.push("/artist-console");
+      else if (role === "GROUP") router.push("/artist-console/dashboard");
+      else if (role === "ADMIN") router.push("/admin");
+      else router.push("/home");
+    } catch (err) {
+      const msg =
+        err.response?.data?.message ||
+        err.response?.status === 401
+          ? "이메일 또는 비밀번호가 올바르지 않습니다."
+          : "로그인에 실패했습니다. 다시 시도해주세요.";
+      setError(msg);
+    }
   };
 
-  const handleOAuth = () => {
-    router.push("/home");
+  const handleOAuth = (provider) => {
+    const registrationId = provider === "kakao" ? "kakao" : "google";
+    window.location.href = `http://localhost:8080/oauth2/authorization/${registrationId}`;
   };
 
   return (

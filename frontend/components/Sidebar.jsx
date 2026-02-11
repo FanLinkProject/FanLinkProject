@@ -72,7 +72,7 @@ export default function Sidebar({ userRole = "FAN", canManageBusiness = false })
                 {dmArtists.map((a) => (
                   <Link
                     key={`dm-${a.id}`}
-                    href="/dm"
+                    href="/dm/fan"
                     className="flex items-center gap-3 px-2 py-2.5 rounded-2xl hover:bg-slate-50 transition-all text-left group"
                   >
                     <img
@@ -85,7 +85,7 @@ export default function Sidebar({ userRole = "FAN", canManageBusiness = false })
                         {a.name}
                       </p>
                       <p className="text-[10px] text-slate-400 font-normal uppercase tracking-wider truncate leading-tight">
-                        최근 대화 보기
+                        아티스트
                       </p>
                     </div>
                   </Link>

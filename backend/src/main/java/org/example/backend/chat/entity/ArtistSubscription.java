@@ -7,7 +7,7 @@ import org.example.backend.chat.enums.SubscriptionStatus;
 import org.example.backend.user.entity.User;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 아티스트 채널 구독 엔티티
@@ -57,14 +57,14 @@ public class ArtistSubscription {
 	 */
 	@CreationTimestamp
 	@Column(name = "subscribed_at", nullable = false, updatable = false)
-	private LocalDateTime subscribedAt;
+	private Instant subscribedAt;
 
 	/**
 	 * 구독 종료 시점
 	 * - 만료되지 않았다면 null 가능
 	 */
 	@Column(name = "expired_at")
-	private LocalDateTime expiredAt;
+	private Instant expiredAt;
 
 	/**
 	 * 구독 상태
@@ -87,13 +87,13 @@ public class ArtistSubscription {
 		if (expiredAt == null) {
 			return true;
 		}
-		return expiredAt.isAfter(LocalDateTime.now());
+		return expiredAt.isAfter(Instant.now());
 	}
 
 	/**
 	 * 구독 만료 처리
 	 */
-	public void expire(LocalDateTime expiredAt) {
+	public void expire(Instant expiredAt) {
 		this.expiredAt = expiredAt;
 		this.status = SubscriptionStatus.EXPIRED;
 	}
