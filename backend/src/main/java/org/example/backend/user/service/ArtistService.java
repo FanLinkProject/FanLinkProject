@@ -2,6 +2,9 @@ package org.example.backend.user.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
+import org.example.backend.post.entity.ArtistPost;
+import org.example.backend.post.repository.ArtistPostRepository;
+import org.example.backend.user.dto.response.ArtistHomeResponse;
 import org.example.backend.user.dto.response.ArtistMyPageResponse;
 import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.User;
@@ -9,6 +12,7 @@ import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +31,7 @@ public class ArtistService {
 
     private final FollowRepository followRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final ArtistPostRepository artistPostRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -41,7 +47,8 @@ public class ArtistService {
                 artistOrGroup.getNickname(),
                 artistOrGroup.getProfileImageUrl(),
                 artistOrGroup.getBannerImageUrl(),
-                artistOrGroup.getBio()
+                artistOrGroup.getBio(),
+                artistOrGroup.getOfficialLinks()
         );
 
         // 2) 팬 수 변화 그래프 (최근 7일 daily 신규 팔로워 수)
@@ -119,6 +126,26 @@ public class ArtistService {
                 security,
                 settlementSummary
         );
+    }
+
+    // 아티스트 메인 홈 화면 조회
+    @Transactional(readOnly = true)
+    public ArtistHomeResponse getArtistHome(User artist) {
+        // 최근 게시글 조회 (최대 10개, 삭제되지 않은 글만)
+        List<ArtistPost> recentPosts = artistPostRepository
+                .findByUserAndStatusOrderByCreatedAtDesc(artist, false, PageRequest.of(0, 10))
+                .getContent();
+
+        List<ArtistHomeResponse.PostStatistics> postStatistics = recentPosts.stream()
+                .map(post -> new ArtistHomeResponse.PostStatistics(
+                        post.getId(),
+                        post.getTitle(),
+                        post.getCreatedAt().toString(),
+                        0L   // 댓글 수 (추후 구현)
+                ))
+                .collect(Collectors.toList());
+
+        return new ArtistHomeResponse(postStatistics);
     }
 }
 

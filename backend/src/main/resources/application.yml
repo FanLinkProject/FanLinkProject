@@ -64,9 +64,9 @@ spring:
       # 발신번호 (CoolSMS에 등록된 번호)
       from: ${SMS_FROM}
 
-  # 암호화 키 설정(32자 이상)
-  encryption:
-    key: ${ENCRYPTION_KEY}
+    # 암호화 키 설정(32자 이상)
+    encryption:
+      key: ${ENCRYPTION_KEY}
 
   #batch 실행 프로그램-테스트모드 삭제
   batch:
@@ -102,15 +102,15 @@ spring:
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
             scope:
-              - profile_nickname  # 프로필 닉네임
-              - profile_image     # 프로필 사진
-              - account_email      # 계정 이메일
-              - name              # 이름
-              - gender            # 성별
-              - age_range         # 연령대
-              - birthday          # 생일
-              - birthyear         # 출생 연도
-              - phone_number      # 전화번호
+              - profile_nickname # 프로필 닉네임
+              - profile_image # 프로필 사진
+              - account_email # 계정 이메일
+              - name # 이름
+              - gender # 성별
+              - age_range # 연령대
+              - birthday # 생일
+              - birthyear # 출생 연도
+              - phone_number # 전화번호
             client-name: Kakao
 
           # 구글 + ?
