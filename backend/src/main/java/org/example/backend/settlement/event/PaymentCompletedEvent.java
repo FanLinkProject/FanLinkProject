@@ -22,9 +22,25 @@ public class PaymentCompletedEvent extends ApplicationEvent {
      * @param payment 완료된 결제 정보
      * @param order   주문 정보 (구독 결제인 경우 가상 주문)
      */
+    private final Long failureLogId; // 복구 시에만 존재
+
+    /**
+     * 결제 완료 이벤트 생성자 (일반)
+     */
     public PaymentCompletedEvent(Object source, Payment payment, Order order) {
         super(source);
         this.payment = payment;
         this.order = order;
+        this.failureLogId = null;
+    }
+
+    /**
+     * 결제 완료 이벤트 생성자 (복구용)
+     */
+    public PaymentCompletedEvent(Object source, Payment payment, Order order, Long failureLogId) {
+        super(source);
+        this.payment = payment;
+        this.order = order;
+        this.failureLogId = failureLogId;
     }
 }

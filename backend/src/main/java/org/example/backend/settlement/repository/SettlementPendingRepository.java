@@ -25,14 +25,23 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
     @Query("DELETE FROM SettlementPending sp WHERE sp.id IN :ids")
     void deleteAllByIdIn(@Param("ids") List<Long> ids);
 
+    // [중복 방지] 이미 처리된 결제인지 확인
+    boolean existsByPaymentId(Long paymentId);
+
+
     /**
      * [Dashboard] 정산 예상 금액 계산용
      * 아티스트의 대기열 데이터를 소스 타입(상품, 캔디 등)별로 그룹핑하여 합계를 구함
-     * 결과 예시: [[PRODUCT, 100000], [CANDY, 5000]]
      */
     @Query("SELECT sp.sourceType, COALESCE(SUM(sp.amount), 0) " +
             "FROM SettlementPending sp " +
             "WHERE sp.artistId = :artistId " +
             "GROUP BY sp.sourceType")
     List<Object[]> findTotalAmountGroupBySourceType(@Param("artistId") Long artistId);
+
+    // [Dashboard Bulk] 전체 아티스트 예상 금액 조회
+    @Query("SELECT sp.artistId, sp.sourceType, COALESCE(SUM(sp.amount), 0) " +
+            "FROM SettlementPending sp " +
+            "GROUP BY sp.artistId, sp.sourceType")
+    List<Object[]> findAllEstimatedAmountsGroupByArtist();
 }
