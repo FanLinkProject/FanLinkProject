@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.order.entity.Order;
 import org.example.backend.order.entity.OrderItem;
+import org.example.backend.payment.config.PaymentExchangeConfig;
 import org.example.backend.payment.entity.Payment;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductPaymentMethod;
@@ -66,8 +67,8 @@ public class SettlementEventListener {
      *
      * 정산 금액 계산
      * - ProductPaymentMethod.CASH_ONLY: settlementAmount = price * quantity
-     * - ProductPaymentMethod.CANDY_ONLY: settlementAmount = candyPrice * 100 * quantity
-     *   (1 캔디 = 100원 고정 환율)
+     * - ProductPaymentMethod.CANDY_ONLY: settlementAmount = candyPrice * CANDY_EXCHANGE_RATE * quantity
+     *   (환율은 PaymentExchangeConfig.CANDY_EXCHANGE_RATE 참조)
      *
      *  비율 적용 (SettlementSourceType)
      * - CASH (0.9): 현금 판매액의 90% 아티스트 지급
@@ -217,9 +218,9 @@ public class SettlementEventListener {
         ProductPaymentMethod paymentMethod = product.getType().getPaymentMethod();
 
         if (paymentMethod == ProductPaymentMethod.CANDY_ONLY) {
-            // 캔디 결제: 1캔디당 100원으로 환산
+            // 캔디 결제: 1캔디당 환율로 환산
             long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
-            return candyPrice * 100 * item.getQuantity();
+            return candyPrice * PaymentExchangeConfig.CANDY_EXCHANGE_RATE * item.getQuantity();
         } else {
             // 현금 결제: 단가 × 수량
             return item.getPrice().longValue() * item.getQuantity();
