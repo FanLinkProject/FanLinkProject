@@ -14,10 +14,13 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import jakarta.persistence.Convert;
+
 import org.example.backend.product.entity.Product;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.example.backend.global.util.StringEncryptor;
 
 import java.time.LocalDateTime;
 
@@ -51,13 +54,13 @@ public class Subscription {
     @Column(name = "next_payment_date")
     private LocalDateTime nextPaymentDate;
 
+    @Convert(converter = StringEncryptor.class)
     @Column(name = "billing_key")
-
     private String billingKey; // 현금 정기 결제용 (Candy 구독 시 null)
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-            
+
     private LocalDateTime createdAt;
 
     @LastModifiedDate
@@ -65,7 +68,8 @@ public class Subscription {
     private LocalDateTime updatedAt;
 
     @Builder
-    public Subscription(Long userId, Product product, LocalDateTime startDate, LocalDateTime endDate, Boolean isActive, LocalDateTime nextPaymentDate, String billingKey) {
+    public Subscription(Long userId, Product product, LocalDateTime startDate, LocalDateTime endDate, Boolean isActive,
+            LocalDateTime nextPaymentDate, String billingKey) {
         this.userId = userId;
         this.product = product;
         this.startDate = startDate;
@@ -73,5 +77,10 @@ public class Subscription {
         this.isActive = isActive;
         this.nextPaymentDate = nextPaymentDate;
         this.billingKey = billingKey;
+    }
+
+    public void renewNextPaymentDate() {
+        this.nextPaymentDate = this.nextPaymentDate.plusMonths(1);
+        this.updatedAt = LocalDateTime.now();
     }
 }

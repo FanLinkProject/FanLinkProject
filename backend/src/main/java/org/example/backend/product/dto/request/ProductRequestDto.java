@@ -6,21 +6,22 @@ import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.product.enums.ProductType;
 
 public record ProductRequestDto(
-        Long artistId, // 플랫폼 상품일 경우 null
+    Long artistId, // 플랫폼 상품일 경우 null
 
-        @NotBlank(message = "상품명은 필수입니다.") String name,
+    @NotBlank(message = "상품명은 필수입니다.") String name,
 
-        @NotNull(message = "가격은 필수입니다.") Long price,
+    @NotNull(message = "가격은 필수입니다.") Long price,
 
-        Long candyPrice,
+    Long candyPrice,
 
-        @NotNull(message = "상품 타입은 필수입니다.") ProductType type,
+    @NotNull(message = "상품 타입은 필수입니다.") ProductType type,
 
-        @NotNull(message = "결제 방식은 필수입니다.") ProductPaymentMethod paymentMethod,
+    @NotNull(message = "결제 방식은 필수입니다.") ProductPaymentMethod paymentMethod,
 
-        Boolean isSubscription,
+    Boolean isSubscription,
 
-        Long quantity,
+    Long quantity,
         Boolean isMembershipOnly,
-        Boolean isExclusive) {
+        Boolean isExclusive,
+        Boolean isMembership) {
 }
