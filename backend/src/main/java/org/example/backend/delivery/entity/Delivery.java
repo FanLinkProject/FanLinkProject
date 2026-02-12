@@ -25,9 +25,10 @@ public class Delivery {
     private String recipientPhone;
     private String address;
     private String detailAddress;
+    private String country;        // 국가 코드 (예: "KR", "US") - 해외/국내 판단용
 
-    // --- AfterShip 연동 정보 (나중에 업데이트됨) ---
-    private String courierCode;    // 택배사 코드 (cj-gls 등)
+    // --- 배송 추적 정보 (나중에 업데이트됨) ---
+    private String courierCode;    // 택배사 코드 (cj-gls, 04 등)
     private String trackingNumber; // 운송장 번호
 
     @Enumerated(EnumType.STRING)
@@ -40,8 +41,33 @@ public class Delivery {
         delivery.recipientPhone = phone;
         delivery.address = address;
         delivery.detailAddress = detail;
+        delivery.country = extractCountryFromAddress(address); // 주소에서 국가 추출
         delivery.status = DeliveryStatus.READY; // 기본 상태
         return delivery;
+    }
+
+    /**
+     * 주소에서 국가를 추출합니다.
+     * 간단한 휴리스틱: 한글이 포함되어 있으면 "KR", 그 외는 "INTERNATIONAL"
+     * 실제로는 더 정교한 로직이 필요할 수 있습니다.
+     */
+    private static String extractCountryFromAddress(String address) {
+        if (address == null || address.trim().isEmpty()) {
+            return "KR"; // 기본값: 국내
+        }
+        // 한글이 포함되어 있으면 국내로 판단
+        if (address.matches(".*[가-힣]+.*")) {
+            return "KR";
+        }
+        // 그 외는 해외로 판단 (실제로는 국가 코드를 정확히 파싱해야 함)
+        return "INTERNATIONAL";
+    }
+
+    /**
+     * 국내 배송 여부 확인
+     */
+    public boolean isDomestic() {
+        return "KR".equals(country);
     }
 
     public void setOrder(Order order) {

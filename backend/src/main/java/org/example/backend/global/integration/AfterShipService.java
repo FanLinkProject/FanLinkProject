@@ -4,33 +4,57 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import org.example.backend.delivery.entity.Delivery;
 import org.springframework.beans.factory.annotation.Value;
-//import org.springframework.context.annotation.Primary; // 목업서비스 사용..
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
-
 import java.io.IOException;
 
 @Slf4j
 @Service
-//@Primary 목업서비스 사용..
-public class AfterShipService implements DeliveryTracker{
+@Order(3) // 3순위: 해외 배송용
+public class AfterShipService implements DeliveryTracker {
 
-    @Value("${external.aftership.api-key}")
+    @Value("${external.aftership.api-key:DUMMY}")
     private String apiKey;
 
     @Value("${external.aftership.base-url}")
     private String baseUrl;
 
+    @Value("${external.aftership.enabled:false}")
+    private boolean enabled;
+
     private final OkHttpClient client = new OkHttpClient();
 
     /**
-     * 배송 상태 조회
-     * @param courierCode 택배사 코드 (예: dhl, fedex, cj-gls)
-     * @param trackingNumber 운송장 번호
+     * 해외 배송 추적 지원 여부 확인
+     * - API 키가 유효하고 활성화되어 있어야 함
+     * - 택배사 코드가 "TEST"가 아니고, 숫자가 아닌 문자열인 경우 (해외 택배사 코드)
      */
     @Override
+    public boolean isSupported(String courierCode) {
+        if (!enabled || apiKey == null || apiKey.equals("DUMMY") || apiKey.equals("YOUR_AFTERSHIP_API_KEY_HERE")) {
+            return false;
+        }
+        // 해외 택배사 코드: "TEST"가 아니고, 숫자가 아닌 문자열 (예: "dhl", "fedex")
+        return courierCode != null
+                && !courierCode.equals("TEST")
+                && !courierCode.matches("\\d+");
+    }
+
+    /**
+     * Delivery 엔티티를 받아서 해외 배송인지 확인하는 오버로드 메서드
+     */
+    public boolean isSupported(Delivery delivery) {
+        if (!enabled || apiKey == null || apiKey.equals("DUMMY") || apiKey.equals("YOUR_AFTERSHIP_API_KEY_HERE")) {
+            return false;
+        }
+        // 해외 배송인 경우 지원
+        return delivery != null && !delivery.isDomestic();
+    }
+
+    @Override
     public String getDeliveryStatus(String courierCode, String trackingNumber) {
-        // API 요청 URL 생성
         String requestUrl = baseUrl + "/trackings/" + courierCode + "/" + trackingNumber;
 
         Request request = new Request.Builder()
@@ -42,24 +66,14 @@ public class AfterShipService implements DeliveryTracker{
 
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                log.error("AfterShip API 호출 실패: 코드={}, 메시지={}", response.code(), response.message());
-                // 404라면 아직 등록되지 않은 운송장일 수 있음 -> "정보 없음" 리턴
                 if (response.code() == 404) return "NOT_FOUND";
                 return "ERROR";
             }
-
             String responseBody = response.body().string();
-            // JSON 파싱: data -> tracking -> tag
             JsonObject jsonObject = JsonParser.parseString(responseBody).getAsJsonObject();
-            String status = jsonObject.getAsJsonObject("data")
-                    .getAsJsonObject("tracking")
-                    .get("tag").getAsString();
-
-            log.info("배송 조회 성공: {} - {}", trackingNumber, status);
-            return status; // 예: InTransit, Delivered
-
+            return jsonObject.getAsJsonObject("data").getAsJsonObject("tracking").get("tag").getAsString();
         } catch (IOException e) {
-            log.error("AfterShip 연동 중 예외 발생", e);
+            log.error("AfterShip Error", e);
             return "ERROR";
         }
     }
