@@ -225,13 +225,25 @@ jwt:
 oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
 
-##배송시스템 aftership api연동 - 추가예정
+#배송시스템 api-실제서비스 연동시 키 입력
+delivery:
+  # 개발/테스트 모드: true일 때 FakeDeliveryTracker 우선 사용 (API 키 없어도 동작)
+  # 프로덕션: false로 설정하고 실제 API 키 입력
+  mock-enabled: ${DELIVERY_MOCK_ENABLED:true}
+
 external:
   aftership:
-    api-key: YOUR_AFTERSHIP_API_KEY_HERE
+    api-key: ${AFTERSHIP_API_KEY:YOUR_AFTERSHIP_API_KEY_HERE}
     # 발급받은 키를 여기에 붙여넣으세요 (sandbox 키 추천)
-    base-url: https://api.aftership.com/v4
-
+    base-url: ${AFTERSHIP_BASE_URL:https://api.aftership.com/v4}
+    # API 키가 유효한지 여부 (자동 설정됨)
+    enabled: ${AFTERSHIP_ENABLED:false}
+  sweettracker:
+    api-key: ${SWEETTRACKER_API_KEY:YOUR_SWEETTRACKER_API_KEY_HERE}
+    # 발급받은 키를 여기에 붙여넣으세요 (sandbox 키 추천)
+    base-url: ${SWEETTRACKER_BASE_URL:http://info.sweettracker.co.kr/api/v1/trackingInfo}
+    # API 키가 유효한지 여부 (자동 설정됨)
+    enabled: ${SWEETTRACKER_ENABLED:false}
 app:
   kafka:
     trusted-packages: org.example.backend.chat.dto
