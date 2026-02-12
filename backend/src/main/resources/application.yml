@@ -181,6 +181,11 @@ aws:
   cloudfront:
     domain: ${AWS_CLOUDFRONT_DOMAIN}
 
+ivs:
+  playback-auth:
+    enabled: ${IVS_PLAYBACK_ENABLED:false}
+    private-key-path: ${IVS_PLAYBACK_PRIVATE_KEY_PATH:}
+
 media:
   presign:
     expire-seconds: ${MEDIA_PRESIGN_EXPIRE_SECONDS}
