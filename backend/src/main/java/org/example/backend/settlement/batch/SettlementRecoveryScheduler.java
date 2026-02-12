@@ -24,11 +24,12 @@ public class SettlementRecoveryScheduler {
 
     /**
      * 실패한 정산 데이터를 복구합니다.
-     * 매일 새벽 2시에 실행됩니다.
+     * 매일 새벽 2시(KST) 실행
+     * (참고: 로그 확인 시 UTC 기준 전날 17:00로 찍힘)
      */
     @Scheduled(cron = "${settlement.recovery.cron:0 0 2 * * *}", zone = "Asia/Seoul")
     public void recoverFailedSettlements() {
-        log.info("정산 데이터 복구 작업 시작");
+        log.info("========== [정산 복구] 배치 시작 (KST 02:00) ==========");
 
         List<SettlementFailureLog> failureLogs = failureLogRepository
                 .findByIsProcessedFalseOrderByCreatedAtAsc();
