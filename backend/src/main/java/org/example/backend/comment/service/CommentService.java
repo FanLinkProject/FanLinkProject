@@ -9,6 +9,9 @@ import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.exception.CommentErrorCode;
 import org.example.backend.comment.exception.CommentException;
 import org.example.backend.comment.repository.CommentRepository;
+import org.example.backend.milestone.entity.FanProfile;
+import org.example.backend.milestone.repository.FanProfileRepository;
+import org.example.backend.milestone.service.FanProfileService;
 import org.example.backend.music_video.entity.ArtistMusicVideo;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.entity.FanPost;
@@ -41,6 +44,9 @@ public class CommentService {
     private final FanPostRepository fanPostRepository;
     private final ArtistPostRepository artistPostRepository;
     private final ArtistMusicVideoRepository artistMusicVideoRepository;
+    private final FanProfileService fanProfileService;
+    private final FanProfileRepository fanProfileRepository;
+
     /**
      * 부모 댓글 목록 조회
      * - 유저 정보(닉네임, 역할, 프로필) Bulk Fetch
@@ -81,7 +87,9 @@ public class CommentService {
 
         return new SliceImpl<>(content, pageable, replies.hasNext());
     }
-
+    /**
+     * 댓글 생성
+     */
     @Transactional
     public Long create(CommentCreateRequest request, Long userId) {
         // targetId 유효성 검증
@@ -105,7 +113,11 @@ public class CommentService {
                 .parent(parent)
                 .build();
 
-        return commentRepository.save(comment).getId();
+        Comment savedComment = commentRepository.save(comment);
+
+        updateFanActivity(userId, request.targetType(), request.targetId(), true);
+
+        return savedComment.getId();
     }
 
     /**
@@ -130,6 +142,7 @@ public class CommentService {
                 .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
         validateAuthority(comment, currentUser);
         comment.delete();
+        updateFanActivity(comment.getUserId(), comment.getTargetType(), comment.getTargetId(), false);
     }
 
     /**
@@ -181,6 +194,36 @@ public class CommentService {
     // ──────────────────────────────────────────────
     // Private Helper Methods
     // ──────────────────────────────────────────────
+
+    /**
+     * 팬 활동 점수 업데이트 (댓글 작성/삭제 시 공통 사용)
+     * * @param fanUserId 활동한 팬의 ID
+     * @param targetType 게시글 타입
+     * @param targetId 게시글 ID
+     * @param isIncrease true면 증가, false면 감소
+     */
+    private void updateFanActivity(Long fanUserId, TargetType targetType, Long targetId, boolean isIncrease) {
+        // 1. 해당 게시물이 속한 아티스트(또는 그룹) ID 찾기
+        Long artistId = getGroupIdFromTarget(targetType, targetId);
+        if (artistId == null) return; // 아티스트 정보를 찾을 수 없으면 패스
+
+        // 2. 해당 팬과 아티스트의 FanProfile 조회
+        // (팬 프로필이 없는 경우 - 예: 아티스트 본인이거나 가입 안 한 유저 - 무시)
+        Optional<FanProfile> fanProfileOpt = fanProfileRepository.findByFan_IdAndArtist_Id(fanUserId, artistId);
+
+        if (fanProfileOpt.isPresent()) {
+            Long profileId = fanProfileOpt.get().getId();
+            if (isIncrease) {
+                fanProfileService.increaseCommentCount(profileId);
+            } else {
+                fanProfileService.decreaseCommentCount(profileId);
+            }
+        }
+    }
+
+
+
+
 
     /**
      * targetId가 실제로 존재하는 게시물인지 검증

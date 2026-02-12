@@ -5,7 +5,7 @@ import lombok.*;
 import org.example.backend.user.entity.User;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 아티스트 채널용 채팅방
@@ -40,5 +40,5 @@ public class ChatRoom {
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+	private Instant createdAt;
 }

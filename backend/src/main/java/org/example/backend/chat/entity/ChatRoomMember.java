@@ -1,6 +1,6 @@
 package org.example.backend.chat.entity;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import org.example.backend.user.entity.User;
 import org.hibernate.annotations.CreationTimestamp;
@@ -66,6 +66,6 @@ public class ChatRoomMember {
 	 */
 	@CreationTimestamp
 	@Column(name = "joined_at", nullable = false, updatable = false)
-	private LocalDateTime joinedAt;
+	private Instant joinedAt;
 
 }

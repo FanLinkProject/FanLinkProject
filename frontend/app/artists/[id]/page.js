@@ -370,7 +370,7 @@ export default function ArtistDetailPage({ params }) {
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-white truncate">{member.name}</p>
                     <Link
-                      href="/dm"
+                      href="/dm/fan"
                       className="text-[10px] font-black text-violet-300 uppercase tracking-widest mt-1 hover:underline flex items-center gap-1"
                     >
                       <span className="material-symbols-outlined text-xs">mail</span>

@@ -9,10 +9,10 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
-    @Query("SELECT n FROM Notification n WHERE n.receiver.id = :userId AND n.isRead = false ORDER BY n.createdAt DESC")
+    @Query("SELECT n FROM Notification n LEFT JOIN FETCH n.sender WHERE n.receiver.id = :userId AND n.isRead = false ORDER BY n.createdAt DESC")
     List<Notification> findByReceiver_IdAndIsReadFalseOrderByCreatedAtDesc(@Param("userId") Long userId);
-    
-    @Query("SELECT n FROM Notification n WHERE n.receiver.id = :userId ORDER BY n.createdAt DESC")
+
+    @Query("SELECT n FROM Notification n LEFT JOIN FETCH n.sender WHERE n.receiver.id = :userId ORDER BY n.createdAt DESC")
     List<Notification> findByReceiver_IdOrderByCreatedAtDesc(@Param("userId") Long userId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
