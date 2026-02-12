@@ -24,6 +24,12 @@ public class LiveKafkaConfig {
 	@Value("${spring.kafka.bootstrap-servers}")
 	private String bootstrapServers;
 
+	@Value("${app.kafka.live-group-id}")
+	private String liveGroupId;
+
+	@Value("${app.kafka.trusted-packages}")
+	private String trustedPackages;
+
 	@Bean
 	public ProducerFactory<String, LiveChatMessageRequest> liveProducerFactory() {
 		Map<String, Object> config = new HashMap<>();
@@ -42,18 +48,29 @@ public class LiveKafkaConfig {
 	public ConsumerFactory<String, LiveChatMessageRequest> liveConsumerFactory() {
 		Map<String, Object> config = new HashMap<>();
 		config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-		config.put(ConsumerConfig.GROUP_ID_CONFIG, "live-chat-server");
+
+		config.put(ConsumerConfig.GROUP_ID_CONFIG, liveGroupId);
+
 		config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
 		config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-
-		config.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-		config.put(JsonDeserializer.VALUE_DEFAULT_TYPE, LiveChatMessageRequest.class.getName());
 
 		return new DefaultKafkaConsumerFactory<>(
 			config,
 			new StringDeserializer(),
-			new JsonDeserializer<>(LiveChatMessageRequest.class, false)
+			buildValueDeserializer()
 		);
+	}
+
+	private JsonDeserializer<LiveChatMessageRequest> buildValueDeserializer() {
+		JsonDeserializer<LiveChatMessageRequest> deserializer =
+			new JsonDeserializer<>(LiveChatMessageRequest.class, false);
+		deserializer.addTrustedPackages(splitTrustedPackages(trustedPackages));
+		deserializer.setUseTypeMapperForKey(false);
+		return deserializer;
+	}
+
+	private String[] splitTrustedPackages(String raw) {
+		return raw == null ? new String[0] : raw.trim().split("\\s*,\\s*");
 	}
 
 	@Bean(name = "liveKafkaListenerContainerFactory")

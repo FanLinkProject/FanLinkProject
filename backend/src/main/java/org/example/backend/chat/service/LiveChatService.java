@@ -6,11 +6,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.dto.request.LiveChatMessageRequest;
 import org.example.backend.chat.exception.ChatException;
 import org.example.backend.chat.exception.LiveChatErrorCode;
+import org.example.backend.live_session.entity.LiveSession;
+import org.example.backend.live_session.enums.LiveSessionStatus;
+import org.example.backend.live_session.exception.LiveSessionErrorCode;
 import org.example.backend.live_session.exception.LiveSessionException;
+import org.example.backend.live_session.repository.LiveSessionRepository;
 import org.example.backend.live_session.service.LiveSessionService;
 import org.example.backend.user.entity.User;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -31,6 +36,7 @@ public class LiveChatService {
 	private static final int MAX_CONTENT_LENGTH = 500;
 
 	private final LiveSessionService liveSessionService;
+	private final LiveSessionRepository liveSessionRepository;
 
 	public void handleLiveMessage(User sender, LiveChatMessageRequest request) {
 		validate(sender, request);
@@ -68,11 +74,23 @@ public class LiveChatService {
 		if (req.getContent().length() > MAX_CONTENT_LENGTH) {
 			throw new ChatException(LiveChatErrorCode.LIVE_CHAT_CONTENT_TOO_LONG);
 		}
-		// sender를 같이 넘겨서 유료 라이브 구독 검증까지 수행
-		try {
-			liveSessionService.validateChatAllowed(sender, req.getRoomId());
-		} catch (LiveSessionException e) {
-			throw new ChatException(LiveChatErrorCode.LIVE_CHAT_SESSION_INVALID);
+	}
+
+	/**
+	 * 유료 라이브라면 "구독자만" 채팅 가능하도록 검증
+	 * - LIVE 상태여야 함
+	 * - isPaid=true 이면 (viewer=user) 가 artist를 구독 중이어야 함
+	 */
+	@Transactional(readOnly = true)
+	public void validateChatAllowed(User loginUser, Long liveSessionId) {
+		LiveSession session = liveSessionRepository.findById(liveSessionId)
+			.orElseThrow(() -> new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_NOT_FOUND));
+
+		if (session.getStatus() != LiveSessionStatus.LIVE) {
+			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_NOT_LIVE);
 		}
+
+		// 유료 라이브면 구독 검증
+		liveSessionService.validatePaidAccess(loginUser, liveSessionId);
 	}
 }

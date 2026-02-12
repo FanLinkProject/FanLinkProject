@@ -77,7 +77,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
-      group-id: ${KAFKA_GROUP_ID}
+      group-id: chat-group
       auto-offset-reset: latest # 수정
       enable-auto-commit: true # 추가
 
