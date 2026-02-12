@@ -9,8 +9,11 @@ import org.example.backend.post.exception.PostException;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.user.enums.UserRole;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,6 +30,10 @@ public class ArtistPostService {
     public ArtistPostResponse createPost(Long userId, ArtistPostRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new PostException(PostErrorCode.USER_NOT_FOUND));
+
+        if (user.getRole() == UserRole.USER) {
+            throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        }
 
         User group = null;
         if (request.getGroupId() != null) {
@@ -58,10 +65,23 @@ public class ArtistPostService {
         return ArtistPostResponse.from(artistPost);
     }
 
-    public List<ArtistPostResponse> getPosts(Long groupId) {
-        return artistPostRepository.findAll().stream()
-                .filter(post -> !post.getStatus())
-                .filter(post -> groupId == null || (post.getGroup() != null && post.getGroup().getId().equals(groupId)))
+    public List<ArtistPostResponse> getPosts(Long groupId, Long lastPostId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return artistPostRepository.findPosts(groupId, lastPostId, pageable).stream()
+                .map(ArtistPostResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<ArtistPostResponse> getNotices(Long lastPostId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return artistPostRepository.findNotices(lastPostId, pageable).stream()
+                .map(ArtistPostResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<ArtistPostResponse> getArtistPosts(Long groupId, Long lastPostId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return artistPostRepository.findArtistPosts(groupId, lastPostId, pageable).stream()
                 .map(ArtistPostResponse::from)
                 .collect(Collectors.toList());
     }
