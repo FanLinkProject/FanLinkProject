@@ -16,4 +16,7 @@ public interface FanProfileRepository extends JpaRepository<FanProfile, Long> {
     Optional<FanProfile> findByFanAndArtist(User fan, User artist);
 
     boolean existsByFanAndArtist(User fan, User artist);
+
+    //댓글 파트에서 사용
+    Optional<FanProfile> findByFan_IdAndArtist_Id(Long fanId, Long artistId);
 }
