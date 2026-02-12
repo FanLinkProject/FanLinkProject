@@ -29,7 +29,6 @@ public class ArtistMusicVideoService {
     private final ArtistMusicVideoRepository artistMusicVideoRepository;
     private final YoutubeUrlParser youtubeUrlParser;
     private final UserRepository userRepository;
-    private final YoutubeVideoVerifier youtubeVideoVerifier;
     private final SecurityContextUtil securityContextUtil;
 
     // MV 등록을 처리한다.
@@ -44,13 +43,12 @@ public class ArtistMusicVideoService {
         if (artistMusicVideoRepository.existsByArtistIdAndVideoId(artistId, videoId)) {
             throw new MusicVideoException(MusicVideoErrorCode.DUPLICATE_MUSIC_VIDEO);
         }
-        youtubeVideoVerifier.validateExists(videoId);
-
         ArtistMusicVideo musicVideo = new ArtistMusicVideo(
                 artistId,
                 VideoProvider.YOUTUBE,
                 videoId,
                 request.title(),
+                request.description(),
                 request.url()
         );
 
@@ -109,6 +107,7 @@ public class ArtistMusicVideoService {
                 entity.getProvider(),
                 entity.getVideoId(),
                 entity.getTitle(),
+                entity.getDescription(),
                 embedUrl,
                 thumbnailUrl,
                 COMMENT_TARGET_TYPE,

@@ -8,7 +8,8 @@
 
 - 아티스트가 팬페이지에 유튜브 MV 링크를 등록/조회/삭제할 수 있다.
 - `videoId`는 서버가 URL에서 추출하고, 응답에서 embed/thumbnail을 계산한다.
-- 실제 유효한 영상인지 **YouTube Data API로 검증**한다.
+- 외부 API 호출 없이 URL 파싱만으로 처리한다.
+- 제목/설명은 아티스트가 직접 입력한다.
 - 댓글 도메인은 targetType/targetId로 연동할 수 있게 응답에 식별자를 제공한다.
 
 ---
@@ -18,7 +19,7 @@
 - MV는 **유튜브 URL을 저장**하는 엔티티다.
 - `videoId`는 서버가 URL에서 추출한다.
 - `embedUrl`/`thumbnailUrl`은 **DB 저장 금지**, 응답에서만 계산한다.
-- 등록 시 **YouTube API로 존재/공개 여부를 확인**한다.
+  -- 등록 시 URL 형식만 검증한다.
 
 ---
 
@@ -39,8 +40,7 @@
 2. artistId 유효성 검사(ARTIST/GROUP)
 3. URL에서 videoId 추출
 4. 중복 등록 여부 검사
-5. YouTube Data API로 실제 존재/공개 여부 검증
-6. DB 저장 후 응답 반환
+5. 제목/설명 포함하여 DB 저장 후 응답 반환
 
 ### 4-2) 목록(List)
 
@@ -80,36 +80,7 @@ videoId 정규식:
 
 ---
 
-## 6) YouTube Data API 검증
-
-- 사용 API: `GET https://www.googleapis.com/youtube/v3/videos`
-- 파라미터: `part=status&id={videoId}&key={API_KEY}`
-- 조건:
-  - items 존재 여부 확인
-  - privacyStatus가 `public` 또는 `unlisted`만 허용
-
-### 설정
-
-```yml
-youtube:
-  api-key: ${YOUTUBE_API_KEY:}
-  validation:
-    enabled: ${YOUTUBE_VALIDATION_ENABLED:true}
-    cache:
-      enabled: ${YOUTUBE_VALIDATION_CACHE_ENABLED:true}
-      ttl-seconds: ${YOUTUBE_VALIDATION_CACHE_TTL_SECONDS:600}
-```
-
-테스트 환경에서는 `YOUTUBE_VALIDATION_ENABLED=false`로 비활성화 가능.
-
-### 캐시 정책
-
-- 동일 videoId 검증을 반복 호출하지 않기 위해 **메모리 캐시**를 사용한다.
-- 성공/실패 결과를 모두 저장하며 TTL 만료 시 재검증한다.
-
----
-
-## 7) API 요약
+## 6) API 요약
 
 ### 등록
 
@@ -129,7 +100,7 @@ youtube:
 
 ---
 
-## 8) 엔티티
+## 7) 엔티티
 
 ### ArtistMusicVideo
 
@@ -137,6 +108,7 @@ youtube:
 - provider(YOUTUBE)
 - videoId
 - title
+- description
 - canonicalUrl
 - createdAt, updatedAt
 
@@ -146,28 +118,26 @@ youtube:
 
 ---
 
-## 9) 응답 필드
+## 8) 응답 필드
 
 - embedUrl = `https://www.youtube.com/embed/{videoId}`
 - thumbnailUrl = `https://img.youtube.com/vi/{videoId}/hqdefault.jpg`
 - commentTargetType = `"MEDIA"`
 - commentTargetId = `id`
+- description = 아티스트가 입력한 설명
 
 ---
 
-## 10) 에러 코드
+## 9) 에러 코드
 
 - INVALID_YOUTUBE_URL (400): URL 파싱 실패
 - DUPLICATE_MUSIC_VIDEO (409): 중복 등록
-- YOUTUBE_VIDEO_NOT_FOUND (404): 존재하지 않는 영상
-- YOUTUBE_API_KEY_MISSING (500): API 키 미설정
-- YOUTUBE_API_FAILED (502): 외부 API 실패
 - ARTIST_NOT_FOUND (404): artistId 유효하지 않음
 - FORBIDDEN_OPERATION (403): 권한 없음
 
 ---
 
-## 11) 패키지 맵
+## 10) 패키지 맵
 
 - `controller`: API 엔드포인트
 - `service`: 등록/삭제/검증 로직
@@ -177,7 +147,7 @@ youtube:
 
 ---
 
-## 12) 테스트
+## 11) 테스트
 
 - `YoutubeUrlParserTest`: 허용/비허용 URL 파싱 검증
 - `ArtistMusicVideoServiceTest`: 권한/artistId/외부검증 흐름 테스트 (권장)

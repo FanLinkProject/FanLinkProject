@@ -11,6 +11,7 @@ public record MusicVideoResponse(
         VideoProvider provider,
         String videoId,
         String title,
+        String description,
         String embedUrl,
         String thumbnailUrl,
         String commentTargetType,
