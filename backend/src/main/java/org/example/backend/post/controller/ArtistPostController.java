@@ -28,8 +28,27 @@ public class ArtistPostController {
 
     @GetMapping
     public ResponseEntity<List<ArtistPostResponse>> getPosts(
-            @RequestParam(required = false) Long groupId) {
-        List<ArtistPostResponse> responses = artistPostService.getPosts(groupId);
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(required = false) Long lastPostId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ArtistPostResponse> responses = artistPostService.getPosts(groupId, lastPostId, limit);
+        return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/notices")
+    public ResponseEntity<List<ArtistPostResponse>> getNotices(
+            @RequestParam(required = false) Long lastPostId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ArtistPostResponse> responses = artistPostService.getNotices(lastPostId, limit);
+        return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/artist-only")
+    public ResponseEntity<List<ArtistPostResponse>> getArtistPosts(
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(required = false) Long lastPostId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<ArtistPostResponse> responses = artistPostService.getArtistPosts(groupId, lastPostId, limit);
         return ResponseEntity.ok(responses);
     }
 
