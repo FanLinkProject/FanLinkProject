@@ -186,6 +186,14 @@ ivs:
     enabled: ${IVS_PLAYBACK_ENABLED:false}
     private-key-path: ${IVS_PLAYBACK_PRIVATE_KEY_PATH:}
 
+youtube:
+  api-key: ${YOUTUBE_API_KEY:}
+  validation:
+    enabled: ${YOUTUBE_VALIDATION_ENABLED:true}
+    cache:
+      enabled: ${YOUTUBE_VALIDATION_CACHE_ENABLED:true}
+      ttl-seconds: ${YOUTUBE_VALIDATION_CACHE_TTL_SECONDS:600}
+
 media:
   presign:
     expire-seconds: ${MEDIA_PRESIGN_EXPIRE_SECONDS}
