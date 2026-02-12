@@ -9,8 +9,11 @@ import org.example.backend.post.exception.PostException;
 import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.user.enums.UserRole;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,6 +30,10 @@ public class FanPostService {
     public FanPostResponse createPost(Long userId, FanPostRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new PostException(PostErrorCode.USER_NOT_FOUND));
+
+        if (user.getRole() != UserRole.USER) {
+            throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        }
 
         User group = null;
         if (request.getGroupId() != null) {
@@ -57,11 +64,9 @@ public class FanPostService {
         return FanPostResponse.from(fanPost);
     }
 
-    public List<FanPostResponse> getPosts(Long groupId) {
-        // TODO: 페이징 처리 필요 시 수정필요
-        return fanPostRepository.findAll().stream()
-                .filter(post -> !post.getStatus())
-                .filter(post -> groupId == null || (post.getGroup() != null && post.getGroup().getId().equals(groupId)))
+    public List<FanPostResponse> getPosts(Long groupId, Long lastPostId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return fanPostRepository.findPosts(groupId, lastPostId, pageable).stream()
                 .map(FanPostResponse::from)
                 .collect(Collectors.toList());
     }
