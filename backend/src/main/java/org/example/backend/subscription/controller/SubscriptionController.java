@@ -24,10 +24,10 @@ public class SubscriptionController {
 
         /**
          * 현금 구독 생성 (캔디 정기 충전)
-         * Toss Payments 빌링키를 발급받고 첫 결제를 수행합니다.
+         * 빌링키 발급 후 첫 결제를 수행합니다.
          *
-         * @param request 구독할 상품 ID와 Toss 인증 키(authKey, customerKey)
-         * @param userId  구독자 ID
+         * @param request   구독할 상품 ID, PG 인증 키(authKey, customerKey), orderNo
+         * @param principal 인증된 사용자 (구독자 ID는 principal.getUser().getId()로 전달)
          * @return 생성된 구독 정보
          */
         @PostMapping("/cash")
@@ -49,8 +49,8 @@ public class SubscriptionController {
          * 유저의 보유 캔디를 차감하여 구독을 시작합니다.
          * 아티스트 상품인 경우 정산 대기 데이터(SettlementPending)가 생성됩니다.
          *
-         * @param request 구독할 상품 ID
-         * @param userId  구독자 ID
+         * @param request   구독할 상품 ID
+         * @param principal 인증된 사용자 (구독자 ID는 principal.getUser().getId()로 전달)
          * @return 생성된 구독 정보
          */
         @PostMapping("/candy")
@@ -66,10 +66,9 @@ public class SubscriptionController {
 
         /**
          * 구독을 해지합니다.
-         * isActive 상태를 false로 변경합니다. (Soft Delete)
          *
          * @param subscriptionId 구독 ID
-         * @param userId         요청자 ID (본인 확인용)
+         * @param principal      인증된 사용자 (본인 확인용)
          */
         @DeleteMapping("/{subscriptionId}")
         public ResponseEntity<Void> cancelSubscription(

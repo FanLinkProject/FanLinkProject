@@ -32,11 +32,10 @@ public class OrderService {
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
-         * 
-         * 로직 흐름:
-         * 1. 사용자 조회 (Email)
-         * 2. 상품 조회 및 총액 계산 (DB 가격 기준), OrderItem 목록 생성
-         * 3. Order 생성 및 저장
+         * 1. 사용자 조회 (email)
+         * 2. 상품 조회, 총액 계산, OrderItem 생성
+         * 3. Order 생성 및 관계 설정
+         * 4. 저장
          */
         @Transactional
         public String createOrder(String email, OrderRequestDto request) {

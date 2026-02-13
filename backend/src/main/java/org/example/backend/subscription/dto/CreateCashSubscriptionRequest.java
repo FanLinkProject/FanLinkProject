@@ -5,7 +5,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * 현금 구독 생성 요청 DTO
- * Toss Payments 빌링키 발급을 위한 authKey, customerKey가 필요합니다.
+ * 빌링키 발급을 위한 authKey, customerKey가 필요합니다.
  */
 @Getter
 @NoArgsConstructor

@@ -37,7 +37,7 @@ public class Payment {
     private Long orderId;
 
     @Column(name = "payment_key", unique = true)
-    private String paymentKey; // 토스 결제 키
+    private String paymentKey; // PG사 결제 키
 
     @Column(nullable = false)
     private BigDecimal amount;
@@ -47,7 +47,7 @@ public class Payment {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private PaymentMethod method; // CARD, TOSS_PAY, ...
+    private PaymentMethod method;
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
