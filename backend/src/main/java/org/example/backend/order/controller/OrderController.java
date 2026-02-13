@@ -22,9 +22,6 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    /**
-     * 주문 생성 API
-     */
     @PostMapping
     public ResponseEntity<Map<String, String>> createOrder(
             @AuthenticationPrincipal PrincipalDetails principal,

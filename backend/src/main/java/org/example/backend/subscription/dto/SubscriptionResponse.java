@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 public class SubscriptionResponse {
     private Long id;
     private String productName;
-    private String subscriptionType; // "CASH" or "CANDY"
+    private String subscriptionType;
     private LocalDateTime startDate;
     private LocalDateTime nextPaymentDate;
     private Boolean isActive;

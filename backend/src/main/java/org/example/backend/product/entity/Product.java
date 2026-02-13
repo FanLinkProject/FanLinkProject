@@ -52,7 +52,7 @@ public class Product {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ProductPaymentMethod paymentMethod; // CASH_ONLY, CANDY_ONLY
+    private ProductPaymentMethod paymentMethod;
 
     @Column(name = "is_subscription", nullable = false)
     private Boolean isSubscription;
