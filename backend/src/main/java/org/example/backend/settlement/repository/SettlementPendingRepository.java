@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public interface SettlementPendingRepository extends JpaRepository<SettlementPending, Long> {
@@ -22,14 +22,15 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
     @Modifying
     @Query(value = "INSERT IGNORE INTO settlement_pendings " +
             "(payment_id, artist_id, amount, order_name, source_type, created_at) " +
-            "VALUES (:paymentId, :artistId, :amount, :orderName, :sourceType, NOW())",
+            "VALUES (:paymentId, :artistId, :amount, :orderName, :sourceType, :createdAt)",
             nativeQuery = true)
     int insertIgnore(
             @Param("paymentId") Long paymentId,
             @Param("artistId") Long artistId,
             @Param("amount") Long amount,
             @Param("orderName") String orderName,
-            @Param("sourceType") String sourceType
+            @Param("sourceType") String sourceType,
+            @Param("createdAt") Instant createdAt
     );
 
     // [Batch] 기간 내 특정 아티스트의 대기열 조회
@@ -39,8 +40,8 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
             "AND sp.createdAt >= :start AND sp.createdAt < :end")
     List<SettlementPending> findAllByArtistIdAndDateRange(
             @Param("artistId") Long artistId,
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end);
+            @Param("start") Instant start,
+            @Param("end") Instant end);
 
     // [Batch] 대량 삭제 최적화
     @Modifying

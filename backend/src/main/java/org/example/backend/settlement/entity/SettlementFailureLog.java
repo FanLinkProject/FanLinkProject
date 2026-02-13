@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 정산 데이터 생성 실패 로그
@@ -55,11 +55,11 @@ public class SettlementFailureLog {
     private Boolean isProcessed = false;
 
     @Column(name = "processed_at")
-    private LocalDateTime processedAt;
+    private Instant processedAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "retry_count", nullable = false)
     private Integer retryCount = 0;
@@ -82,7 +82,7 @@ public class SettlementFailureLog {
      */
     public void markAsProcessed() {
         this.isProcessed = true;
-        this.processedAt = LocalDateTime.now();
+        this.processedAt = Instant.now();
     }
 
     public void incrementRetryCount() {
@@ -95,7 +95,7 @@ public class SettlementFailureLog {
 
     public void markAsAbandoned() {
         this.isProcessed = true; // 더 이상 시도하지 않음 (하지만 성공은 아님)
-        this.processedAt = LocalDateTime.now();
+        this.processedAt = Instant.now();
         this.errorMessage = "[ABANDONED] " + this.errorMessage;
     }
 }

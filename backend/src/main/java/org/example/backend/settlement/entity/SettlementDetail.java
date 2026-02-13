@@ -8,6 +8,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 
 /*
  * 정산 상세 내역 (Audit Log / Snapshot)
@@ -54,7 +55,7 @@ public class SettlementDetail {
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
-    private java.time.LocalDateTime createdAt;
+    private Instant createdAt;
 
 
     @Builder

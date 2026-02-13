@@ -10,8 +10,8 @@ import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.repository.JobExecutionAlreadyRunningException;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 /**
  * 정산 배치 실행 서비스
@@ -47,7 +47,7 @@ public class SettlementBatchService {
                     .addString("startDate", startDate.toString())
                     .addString("endDate", endDate.toString())
                     // 동일 기간 재실행을 허용하기 위한 고유 파라미터
-                    .addString("triggeredAt", LocalDateTime.now().toString())
+                    .addString("triggeredAt", Instant.now().toString())
                     .addString("triggerType", "MANUAL")
                     .toJobParameters();
 

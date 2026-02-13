@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Repository
@@ -32,7 +32,7 @@ public interface SettlementFailureLogRepository extends JpaRepository<Settlement
            "WHERE sfl.isProcessed = false " +
            "AND sfl.createdAt BETWEEN :startDate AND :endDate " +
            "ORDER BY sfl.createdAt ASC")
-    List<SettlementFailureLog> findUnprocessedBetween(LocalDateTime startDate, LocalDateTime endDate);
+    List<SettlementFailureLog> findUnprocessedBetween(Instant startDate, Instant endDate);
 
     /**
      * 특정 Payment의 실패 로그 존재 여부 확인

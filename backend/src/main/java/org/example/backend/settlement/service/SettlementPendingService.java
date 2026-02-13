@@ -14,6 +14,8 @@ import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 /**
  * 정산 대기 데이터 생성 서비스
  * - Listener와 RecoveryService에서 공통으로 사용합니다.
@@ -74,7 +76,8 @@ public class SettlementPendingService {
                     product.getArtistId(),
                     settlementAmount,
                     product.getName(),
-                    sourceType.name()
+                    sourceType.name(),
+                    Instant.now()
             );
 
             if (inserted > 0) {

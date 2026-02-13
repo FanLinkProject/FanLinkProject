@@ -10,8 +10,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 /*
  * 정산서 (Settlement Statement)
@@ -56,15 +56,15 @@ public class Settlement {
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
-    private java.time.LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(nullable = false)
-    private java.time.LocalDateTime updatedAt;
+    private Instant updatedAt;
 
 
     @Column(nullable = false)
-    private LocalDateTime settledAt; //지급 일시 : 정산 배치 이후 바로 지급 가정(테스트 결제이므로 실제 송금 로직 구현 x)
+    private Instant settledAt; //지급 일시 : 정산 배치 이후 바로 지급 가정(테스트 결제이므로 실제 송금 로직 구현 x)
 
     @Builder
     public Settlement(Long artistId, LocalDate startDate, LocalDate endDate,
@@ -78,7 +78,7 @@ public class Settlement {
 
         // 생성되자마자 '지급 완료' 상태로 설정
         this.status = SettlementStatus.COMPLETE;
-        this.settledAt = LocalDateTime.now();
+        this.settledAt = Instant.now();
     }
     // 기본적으로 정산서는 생성후 수정 x
     // 해당 메서드는 재정산 로직 구현부 사용

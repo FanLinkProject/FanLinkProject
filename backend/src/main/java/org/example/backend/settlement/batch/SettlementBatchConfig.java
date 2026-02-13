@@ -25,7 +25,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
 import java.net.SocketTimeoutException;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -110,8 +112,10 @@ public class SettlementBatchConfig {
             }
 
             // 대기열 조회 (반개방 구간: startDate 00:00:00 이상 ~ endDate+1 00:00:00 미만)
+            Instant start = startDate.atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant();
+            Instant end = endDate.plusDays(1).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant();
             List<SettlementPending> pendings = pendingRepository.findAllByArtistIdAndDateRange(
-                    user.getId(), startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay());
+                    user.getId(), start, end);
 
             // [안전장치 2] 정산할 내역이 없으면 스킵
             if (pendings.isEmpty()) return null;

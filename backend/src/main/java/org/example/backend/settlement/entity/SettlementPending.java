@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import java.time.Instant;
 
 /*
  * 정산 대기열 (Temporary Storage)
@@ -54,7 +55,7 @@ public class SettlementPending {
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
-    private java.time.LocalDateTime createdAt;
+    private Instant createdAt;
 
 
     @Builder
