@@ -32,9 +32,9 @@ public class MediaPolicyValidator {
     }
 
     // Presign 요청의 전체 정책(권한/타입/용량/길이/첨부)을 검증한다.
-    public void validatePresign(PresignItemRequest item) {
+    public void validatePresign(PresignItemRequest item, UserRole userRole) {
         String normalizedContentType = normalizeContentType(item.contentType());
-        validateScope(item.scope(), item.userRole(), item.category());
+        validateScope(item.scope(), userRole, item.category());
         validateContentType(item.category(), normalizedContentType);
         validateSize(item.category(), item.sizeBytes());
         validateDuration(item.category(), item.durationSecondsRequested());

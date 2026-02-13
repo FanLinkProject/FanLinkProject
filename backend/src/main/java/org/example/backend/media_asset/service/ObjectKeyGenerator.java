@@ -16,10 +16,10 @@ public class ObjectKeyGenerator {
     private static final int MAX_EXT_LENGTH = 10;
 
     // 요청 정보를 기반으로 규칙에 맞는 objectKey를 생성한다.
-    public String generate(PresignItemRequest item) {
+    public String generate(PresignItemRequest item, Long ownerUserId) {
         String ext = sanitizeExt(item.ext());
         String uuid = UUID.randomUUID().toString();
-        String prefix = resolvePrefix(item.category(), item.scope(), item.ownerUserId(),
+        String prefix = resolvePrefix(item.category(), item.scope(), ownerUserId,
                 item.postIdOrTemp(), item.replayIdOrTemp());
 
         return switch (item.category()) {

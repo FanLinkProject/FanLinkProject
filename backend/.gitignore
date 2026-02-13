@@ -119,3 +119,6 @@ docker-compose.override.yml
 # 로그 폴더
 logs/
 log/
+/src/main/java/org/example/backend/ivs/docs/ivs.md
+/src/main/java/org/example/backend/ivs/README.md
+*.pem

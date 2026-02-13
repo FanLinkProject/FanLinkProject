@@ -1,6 +1,7 @@
 package org.example.backend.media_asset.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.config.MediaProperties;
 import org.example.backend.media_asset.dto.request.CompleteRequest;
@@ -20,6 +21,7 @@ import org.example.backend.media_asset.metadata.VideoMetadataExtractor;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.user.enums.UserRole;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -45,11 +47,13 @@ public class MediaAssetService {
 
     // 업로드용 presigned URL을 배치 발급하고 INITIATED 상태를 저장한다.
     @Transactional
-    public PresignResponse presign(PresignRequest request) {
+    public PresignResponse presign(PresignRequest request, PrincipalDetails principalDetails) {
+        Long userId = principalDetails.getUserId();
+        UserRole userRole = principalDetails.getUser().getRole();
         List<PresignItemResponse> responses = new ArrayList<>();
         for (PresignItemRequest item : request.items()) {
-            mediaPolicyValidator.validatePresign(item);
-            String objectKey = objectKeyGenerator.generate(item);
+            mediaPolicyValidator.validatePresign(item, userRole);
+            String objectKey = objectKeyGenerator.generate(item, userId);
             if (mediaAssetRepository.findByObjectKey(objectKey).isPresent()) {
                 throw new MediaAssetException(MediaAssetErrorCode.DUPLICATE_MEDIA_ASSET);
             }
@@ -64,7 +68,7 @@ public class MediaAssetService {
             );
 
             MediaAsset mediaAsset = new MediaAsset(
-                    item.ownerUserId(),
+                    userId,
                     item.category(),
                     item.scope(),
                     objectKey,
@@ -88,7 +92,8 @@ public class MediaAssetService {
 
     // 업로드 완료 배치를 처리해 S3 HEAD 검증 후 상태를 확정한다.
     @Transactional
-    public CompleteResponse complete(CompleteRequest request) {
+    public CompleteResponse complete(CompleteRequest request, PrincipalDetails principalDetails) {
+        Long userId = principalDetails.getUserId();
         List<CompleteItemResponse> responses = new ArrayList<>();
         for (var item : request.items()) {
             String objectKey = item.objectKey();
@@ -122,6 +127,19 @@ public class MediaAssetService {
             }
 
             MediaAsset mediaAsset = optionalMediaAsset.get();
+            if (!mediaAsset.getOwnerUserId().equals(userId)) {
+                responses.add(new CompleteItemResponse(
+                        mediaAsset.getId(),
+                        mediaAsset.getObjectKey(),
+                        MediaAssetStatus.REJECTED,
+                        null,
+                        null,
+                        null,
+                        null,
+                        MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED.getCode()
+                ));
+                continue;
+            }
             LocalDateTime now = LocalDateTime.now(mediaClock);
             if (mediaAsset.getStatus() == MediaAssetStatus.INITIATED
                     && mediaAsset.getExpiresAt() != null
@@ -188,6 +206,7 @@ public class MediaAssetService {
         return new CompleteResponse(responses);
     }
 
+    // presign 요청의 owner/userRole이 로그인 사용자와 일치하는지 확인한다.
     // HEAD 결과가 정책/요청값과 일치하는지 검사하고 거부 사유를 리턴한다.
     private MediaAssetRejectedReason validateHead(MediaAsset mediaAsset, String actualContentType, long actualSizeBytes) {
         if (!mediaPolicyValidator.isContentTypeAllowed(mediaAsset.getCategory(), actualContentType)) {

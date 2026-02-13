@@ -134,25 +134,11 @@ public class LiveSessionService {
 			.toList();
 	}
 
-	/**
-	 * 유료 라이브라면 "구독자만" 채팅 가능하도록 검증
-	 * - LIVE 상태여야 함
-	 * - isPaid=true 이면 (viewer=user) 가 artist를 구독 중이어야 함
-	 */
 	@Transactional(readOnly = true)
-	public void validateChatAllowed(User loginUser, Long liveSessionId) {
+	public void validatePaidAccess(User loginUser,Long liveSessionId) {
 		LiveSession session = liveSessionRepository.findById(liveSessionId)
 			.orElseThrow(() -> new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_NOT_FOUND));
 
-		if (session.getStatus() != LiveSessionStatus.LIVE) {
-			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_NOT_LIVE);
-		}
-
-		// 유료 라이브면 구독 검증
-		validatePaidAccess(loginUser, session);
-	}
-
-	private void validatePaidAccess(User loginUser, LiveSession session) {
 		// 유료가 아니면 통과
 		if (!session.isPaid()) return;
 
