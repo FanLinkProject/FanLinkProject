@@ -1,20 +1,32 @@
 package org.example.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.media_asset.config.AwsProperties;
+import org.example.backend.media_asset.entity.MediaAsset;
+import org.example.backend.media_asset.entity.MediaAssetCategory;
+import org.example.backend.media_asset.entity.MediaAssetStatus;
+import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.post.dto.request.FanPostRequest;
 import org.example.backend.post.dto.response.FanPostResponse;
+import org.example.backend.post.dto.response.PostMediaAssetResponse;
 import org.example.backend.post.entity.FanPost;
+import org.example.backend.post.entity.PostMediaAsset;
+import org.example.backend.post.entity.PostMediaAssetType;
 import org.example.backend.post.exception.PostErrorCode;
 import org.example.backend.post.exception.PostException;
 import org.example.backend.post.repository.FanPostRepository;
+import org.example.backend.post.repository.PostMediaAssetRepository;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.backend.user.enums.UserRole;
+import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +37,49 @@ public class FanPostService {
 
     private final FanPostRepository fanPostRepository;
     private final UserRepository userRepository;
+    private final PostMediaAssetRepository postMediaAssetRepository;
+    private final MediaAssetRepository mediaAssetRepository;
+    private final AwsProperties awsProperties;
+
+    private String getCdnBaseUrl() {
+        String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
+        if (domain == null || domain.isBlank()) {
+            return null;
+        }
+        return domain.startsWith("http") ? domain : "https://" + domain;
+    }
+
+    private List<MediaAsset> validateAndFetchMediaAssets(Long userId, List<Long> mediaAssetIds) {
+        if (CollectionUtils.isEmpty(mediaAssetIds)) {
+            return Collections.emptyList();
+        }
+        List<MediaAsset> assets = new ArrayList<>();
+        for (Long id : mediaAssetIds) {
+            MediaAsset asset = mediaAssetRepository.findById(id)
+                    .orElseThrow(() -> new PostException(PostErrorCode.MEDIA_ASSET_NOT_FOUND));
+            if (!asset.getOwnerUserId().equals(userId)) {
+                throw new PostException(PostErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+            }
+            if (asset.getStatus() != MediaAssetStatus.READY) {
+                throw new PostException(PostErrorCode.MEDIA_ASSET_NOT_READY);
+            }
+            if (asset.getCategory() != MediaAssetCategory.POST_IMAGE && asset.getCategory() != MediaAssetCategory.POST_VIDEO) {
+                throw new PostException(PostErrorCode.INVALID_MEDIA_ASSET_CATEGORY);
+            }
+            assets.add(asset);
+        }
+        return assets;
+    }
+
+    private List<PostMediaAssetResponse> buildAttachmentResponses(List<PostMediaAsset> postMediaAssets) {
+        if (CollectionUtils.isEmpty(postMediaAssets)) {
+            return Collections.emptyList();
+        }
+        String cdnBaseUrl = getCdnBaseUrl();
+        return postMediaAssets.stream()
+                .map(pma -> PostMediaAssetResponse.from(pma.getMediaAsset(), cdnBaseUrl))
+                .collect(Collectors.toList());
+    }
 
     @Transactional
     public FanPostResponse createPost(Long userId, FanPostRequest request) {
@@ -50,7 +105,14 @@ public class FanPostService {
                 .build();
 
         FanPost savedPost = fanPostRepository.save(fanPost);
-        return FanPostResponse.from(savedPost);
+
+        List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(userId, request.getMediaAssetIds());
+        for (MediaAsset asset : mediaAssets) {
+            postMediaAssetRepository.save(new PostMediaAsset(PostMediaAssetType.FAN, savedPost.getId(), asset));
+        }
+
+        List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, savedPost.getId());
+        return FanPostResponse.from(savedPost, buildAttachmentResponses(attachments));
     }
 
     public FanPostResponse getPost(Long id) {
@@ -61,7 +123,8 @@ public class FanPostService {
             throw new PostException(PostErrorCode.POST_NOT_FOUND);
         }
 
-        return FanPostResponse.from(fanPost);
+        List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, fanPost.getId());
+        return FanPostResponse.from(fanPost, buildAttachmentResponses(attachments));
     }
 
     public List<FanPostResponse> getPosts(Long groupId, Long lastPostId, int limit) {
@@ -82,7 +145,18 @@ public class FanPostService {
 
         fanPost.update(request.getTitle(), request.getContent());
 
-        return FanPostResponse.from(fanPost);
+        if (request.getMediaAssetIds() != null) {
+            postMediaAssetRepository.deleteAllByPostTypeAndPostId(PostMediaAssetType.FAN, postId);
+            if (!request.getMediaAssetIds().isEmpty()) {
+                List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(userId, request.getMediaAssetIds());
+                for (MediaAsset asset : mediaAssets) {
+                    postMediaAssetRepository.save(new PostMediaAsset(PostMediaAssetType.FAN, postId, asset));
+                }
+            }
+        }
+
+        List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, postId);
+        return FanPostResponse.from(fanPost, buildAttachmentResponses(attachments));
     }
 
     @Transactional
