@@ -19,12 +19,14 @@ public record UserMyPageResponse(
         List<FollowedArtist> followedArtists,
         List<MyPost> myPosts,
         List<MyComment> myComments,
+        List<MyLikedPost> myLikedPosts,
         List<MembershipStatus> memberships,
         List<PurchaseHistory> purchaseHistory,
         List<BlockedUser> blockedUsers,
         Long totalFollowingsCount,
         Long totalPostsCount,
         Long totalCommentsCount,
+        Long totalLikedPostsCount,
         Long totalMembershipsCount,
         Long totalOrdersCount,
         Long totalBlockedUsersCount
@@ -72,6 +74,20 @@ public record UserMyPageResponse(
             String title,
             String content,
             String createdAt
+    ) {
+    }
+
+    /**
+     * 내가 좋아요 누른 게시글
+     * - postType: FAN_POST / ARTIST_POST
+     */
+    public record MyLikedPost(
+            Long postId,
+            String postType,
+            String title,
+            String content,
+            String postCreatedAt,
+            String likedAt
     ) {
     }
 
