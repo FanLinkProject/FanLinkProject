@@ -2,6 +2,7 @@ package org.example.backend.music_video.util;
 
 import org.example.backend.music_video.exception.MusicVideoErrorCode;
 import org.example.backend.music_video.exception.MusicVideoException;
+import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URLDecoder;
@@ -10,6 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+@Component
 public class YoutubeUrlParser {
 
     private static final Pattern VIDEO_ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{11}$");

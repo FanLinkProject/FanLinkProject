@@ -39,6 +39,13 @@ public class ArtistMusicVideoController {
         return ResponseEntity.ok(artistMusicVideoService.list(artistId));
     }
 
+    // MV 상세 조회 요청을 처리한다.
+    @GetMapping("/{id}")
+    public ResponseEntity<MusicVideoResponse> getDetail(@PathVariable Long artistId,
+                                                        @PathVariable Long id) {
+        return ResponseEntity.ok(artistMusicVideoService.getDetail(artistId, id));
+    }
+
     // MV 삭제 요청을 처리한다.
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long artistId, @PathVariable Long id) {
