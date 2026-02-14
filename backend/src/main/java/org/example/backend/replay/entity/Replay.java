@@ -106,4 +106,14 @@ public class Replay {
         this.status = ReplayStatus.REJECTED;
         this.rejectReason = reason;
     }
+
+    // Replay 원본 영상 키를 기록한다.
+    public void updateMp4Key(String mp4Key) {
+        this.mp4Key = mp4Key;
+    }
+
+    // Replay 썸네일 키를 기록한다.
+    public void updateThumbnailKey(String thumbnailKey) {
+        this.thumbnailKey = thumbnailKey;
+    }
 }
