@@ -19,15 +19,18 @@ public class ObjectKeyGenerator {
     public String generate(PresignItemRequest item, Long ownerUserId) {
         String ext = sanitizeExt(item.ext());
         String uuid = UUID.randomUUID().toString();
-        String prefix = resolvePrefix(item.category(), item.scope(), ownerUserId,
-                item.postIdOrTemp(), item.replayIdOrTemp());
+        String prefix = resolvePrefix(item.category(), item.scope(), ownerUserId, item.artistId(),
+                item.postIdOrTemp(), item.replayIdOrTemp(), item.productIdOrTemp());
 
         return switch (item.category()) {
             case PROFILE_IMAGE -> prefix + uuid + "." + ext;
+            case ARTIST_COVER_IMAGE -> prefix + uuid + "." + ext;
             case POST_IMAGE -> prefix + uuid + "." + ext;
             case POST_VIDEO -> prefix + uuid + ".mp4";
             case REPLAY_VIDEO -> prefix + "source." + ext;
             case REPLAY_THUMBNAIL -> prefix + "thumbnail." + ext;
+            case PRODUCT_IMAGE -> prefix + uuid + "." + ext;
+            case PRODUCT_DESCRIBE_IMAGE -> prefix + uuid + "." + ext;
         };
     }
 
@@ -43,13 +46,18 @@ public class ObjectKeyGenerator {
     private String resolvePrefix(MediaAssetCategory category,
                                  MediaAssetScope scope,
                                  Long ownerUserId,
+                                 Long artistId,
                                  String postIdOrTemp,
-                                 String replayIdOrTemp) {
+                                 String replayIdOrTemp,
+                                 String productIdOrTemp) {
         String base = switch (category) {
             case PROFILE_IMAGE -> "profiles/" + requireValue(ownerUserId, "ownerUserId") + "/";
+            case ARTIST_COVER_IMAGE -> "covers/" + requireValue(artistId, "artistId") + "/";
             case POST_IMAGE, POST_VIDEO -> "posts/" + (category == MediaAssetCategory.POST_IMAGE ? "images/" : "videos/")
                     + requireText(postIdOrTemp, "postIdOrTemp") + "/";
             case REPLAY_VIDEO, REPLAY_THUMBNAIL -> "live/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
+            case PRODUCT_IMAGE -> "product/images/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
+            case PRODUCT_DESCRIBE_IMAGE -> "product/describe_image/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
         };
 
         if (scope == MediaAssetScope.RESTRICTED) {

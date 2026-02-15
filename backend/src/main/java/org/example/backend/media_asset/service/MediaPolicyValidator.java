@@ -38,14 +38,15 @@ public class MediaPolicyValidator {
         validateContentType(item.category(), normalizedContentType);
         validateSize(item.category(), item.sizeBytes());
         validateDuration(item.category(), item.durationSecondsRequested());
-        validateAttachments(item.category(), item.attachmentCountInPost());
+        validateAttachments(item);
     }
 
     // 카테고리별 허용 Content-Type인지 확인한다.
     public boolean isContentTypeAllowed(MediaAssetCategory category, String contentType) {
         String normalized = normalizeContentType(contentType);
         return switch (category) {
-            case PROFILE_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL -> IMAGE_CONTENT_TYPES.contains(normalized);
+            case PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE
+                    -> IMAGE_CONTENT_TYPES.contains(normalized);
             case POST_VIDEO, REPLAY_VIDEO -> VIDEO_CONTENT_TYPES.contains(normalized);
         };
     }
@@ -61,7 +62,8 @@ public class MediaPolicyValidator {
     // 카테고리별 최대 허용 용량을 반환한다.
     public long resolveMaxBytes(MediaAssetCategory category) {
         return switch (category) {
-            case PROFILE_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL -> mediaProperties.getLimits().getImageBytes();
+            case PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE
+                    -> mediaProperties.getLimits().getImageBytes();
             case POST_VIDEO -> mediaProperties.getLimits().getPostVideoBytes();
             case REPLAY_VIDEO -> mediaProperties.getLimits().getReplayVideoBytes();
         };
@@ -82,6 +84,12 @@ public class MediaPolicyValidator {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_UPLOAD_NOT_ALLOWED);
         }
         if (category == MediaAssetCategory.PROFILE_IMAGE && scope == MediaAssetScope.RESTRICTED) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        }
+        if ((category == MediaAssetCategory.ARTIST_COVER_IMAGE
+                || category == MediaAssetCategory.PRODUCT_IMAGE
+                || category == MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE)
+                && scope == MediaAssetScope.RESTRICTED) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
         if (scope == MediaAssetScope.RESTRICTED && userRole != UserRole.ARTIST) {
@@ -121,14 +129,26 @@ public class MediaPolicyValidator {
     }
 
     // 게시물 첨부 개수 제한을 검증한다.
-    private void validateAttachments(MediaAssetCategory category, Integer attachmentCountInPost) {
+    private void validateAttachments(PresignItemRequest item) {
+        MediaAssetCategory category = item.category();
         if (category == MediaAssetCategory.POST_IMAGE || category == MediaAssetCategory.POST_VIDEO) {
+            Integer attachmentCountInPost = item.attachmentCountInPost();
             if (attachmentCountInPost == null) {
                 throw new MediaAssetException(MediaAssetErrorCode.INVALID_ATTACHMENT_COUNT, "attachmentCountInPost가 필요합니다.");
             }
             int max = mediaProperties.getAttachments().getMaxPerPost();
             if (attachmentCountInPost > max) {
                 throw new MediaAssetException(MediaAssetErrorCode.ATTACHMENT_LIMIT_EXCEEDED, "첨부 개수 제한을 초과했습니다.");
+            }
+        }
+        if (category == MediaAssetCategory.PRODUCT_IMAGE) {
+            Integer attachmentCountInProduct = item.attachmentCountInProduct();
+            if (attachmentCountInProduct == null) {
+                throw new MediaAssetException(MediaAssetErrorCode.INVALID_ATTACHMENT_COUNT, "attachmentCountInProduct가 필요합니다.");
+            }
+            int max = mediaProperties.getAttachments().getMaxPerProductImages();
+            if (attachmentCountInProduct > max) {
+                throw new MediaAssetException(MediaAssetErrorCode.ATTACHMENT_LIMIT_EXCEEDED, "상품 이미지 첨부 개수 제한을 초과했습니다.");
             }
         }
     }

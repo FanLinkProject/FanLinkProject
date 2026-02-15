@@ -219,6 +219,7 @@ media:
     replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
   attachments:
     max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
+    max-per-product-images: ${MEDIA_ATTACHMENTS_MAX_PER_PRODUCT_IMAGES}
 
 # 정산 관련 설정
 settlement:
