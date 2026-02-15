@@ -69,6 +69,7 @@ public class SecurityConfig {
                         "/oauth2/**",             // OAuth2 관련 URL
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )
                     ).permitAll()
+                    .requestMatchers(GET, "/api/artists/*/music-videos").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
                     .requestMatchers("/api/artist-posts/notices").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)

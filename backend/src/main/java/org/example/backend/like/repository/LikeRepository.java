@@ -2,6 +2,8 @@ package org.example.backend.like.repository;
 
 import org.example.backend.like.entity.Like;
 import org.example.backend.like.enums.LikeTarget;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +21,16 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
      * 좋아요 조회 (삭제용)
      */
     Optional<Like> findByUserIdAndTargetTypeAndTargetId(Long userId, LikeTarget targetType, Long targetId);
+
+    /**
+     * 사용자가 좋아요한 대상(복수 타입) 목록 조회 (페이징, 최신 좋아요 순)
+     * - 마이페이지(내가 좋아요 누른 게시글) 용도
+     */
+    Page<Like> findByUserIdAndTargetTypeInOrderByCreatedAtDesc(
+            Long userId,
+            List<LikeTarget> targetTypes,
+            Pageable pageable
+    );
 
     /**
      * 특정 대상의 총 좋아요 수 조회
