@@ -9,6 +9,9 @@ public record CreateMusicVideoRequest(
         String url,
         @NotBlank
         @Size(max = 150)
-        String title
+        String title,
+        @NotBlank
+        @Size(max = 2000)
+        String description
 ) {
 }
