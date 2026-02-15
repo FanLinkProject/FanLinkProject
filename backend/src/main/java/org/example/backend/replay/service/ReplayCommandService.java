@@ -19,7 +19,9 @@ import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.replay.util.CloudFrontCookieSigner;
 import org.example.backend.replay.util.PlaybackUrlCalculator;
 import org.example.backend.user.enums.UserRole;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,10 +39,12 @@ public class ReplayCommandService {
     private final LiveSessionGateway liveSessionGateway;
     @Qualifier("replayDefaultSubscriptionGateway")
     private final SubscriptionGateway subscriptionGateway;
-    private final CloudFrontCookieSigner cookieSigner;
+    private final ObjectProvider<CloudFrontCookieSigner> cookieSignerProvider;
     private final PlaybackUrlCalculator playbackUrlCalculator;
     private final ReplayAccessPolicy replayAccessPolicy;
     private final AwsProperties awsProperties;
+    @Value("${replay.access-gate.enabled:true}")
+    private boolean accessGateEnabled;
 
     // Replay 발행을 처리한다.
     public ReplayPublishResponse publish(ReplayPublishRequest request, Long userId, UserRole role) {
@@ -88,6 +92,9 @@ public class ReplayCommandService {
     // Replay 접근 게이트를 처리한다.
     @Transactional(readOnly = true)
     public ReplayAccessResult issueAccessCookie(Long replayId, Long userId) {
+        if (!accessGateEnabled) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION, "Access gate disabled");
+        }
         Replay replay = replayRepository.findById(replayId)
                 .orElseThrow(() -> new ReplayException(ReplayErrorCode.REPLAY_NOT_FOUND));
         if (userId == null) {
@@ -108,6 +115,10 @@ public class ReplayCommandService {
                 : Duration.ofMinutes(60);
         String playbackUrl = playbackUrlCalculator.buildPlaybackUrl(awsProperties.getCloudfront().getDomain(), replay);
         String pathPattern = playbackUrlCalculator.buildPlaybackPathPattern(awsProperties.getCloudfront().getDomain(), replay);
+        CloudFrontCookieSigner cookieSigner = cookieSignerProvider.getIfAvailable();
+        if (cookieSigner == null) {
+            throw new ReplayException(ReplayErrorCode.COOKIE_ISSUE_FAILED, "CloudFront signer is not configured");
+        }
         List<String> cookies;
         try {
             cookies = cookieSigner.issueSignedCookies(pathPattern, ttl);

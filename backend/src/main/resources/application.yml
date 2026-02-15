@@ -179,12 +179,19 @@ aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
   cloudfront:
+    enabled: ${AWS_CLOUDFRONT_ENABLED:false}
     domain: ${AWS_CLOUDFRONT_DOMAIN}
+    key-pair-id: ${AWS_CLOUDFRONT_KEY_PAIR_ID:}
+    private-key-path: ${AWS_CLOUDFRONT_PRIVATE_KEY_PATH:}
 
 ivs:
   playback-auth:
     enabled: ${IVS_PLAYBACK_ENABLED:false}
     private-key-path: ${IVS_PLAYBACK_PRIVATE_KEY_PATH:}
+
+replay:
+  access-gate:
+    enabled: ${REPLAY_ACCESS_GATE_ENABLED:false}
 
 media:
   presign:
@@ -193,6 +200,10 @@ media:
     expires-minutes: ${MEDIA_ORPHAN_EXPIRES_MINUTES}
   orphan-cleanup:
     fixed-delay-ms: ${MEDIA_ORPHAN_CLEANUP_FIXED_DELAY_MS}
+  metadata:
+    enabled: ${MEDIA_METADATA_ENABLED:false}
+    ffprobe-path: ${MEDIA_FFPROBE_PATH:}
+    ffprobe-timeout-seconds: ${MEDIA_FFPROBE_TIMEOUT_SECONDS:20}
   limits:
     image-bytes: ${MEDIA_LIMITS_IMAGE_BYTES}
     post-video-bytes: ${MEDIA_LIMITS_POST_VIDEO_BYTES}

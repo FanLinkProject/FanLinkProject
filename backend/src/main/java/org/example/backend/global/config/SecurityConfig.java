@@ -70,6 +70,7 @@ public class SecurityConfig {
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )
                     ).permitAll()
                     .requestMatchers(GET, "/api/artists/*/music-videos").permitAll()
+                    .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)
                     .requestMatchers("/api/settlements/**")
