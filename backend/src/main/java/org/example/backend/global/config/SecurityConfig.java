@@ -72,6 +72,7 @@ public class SecurityConfig {
                     .requestMatchers(GET, "/api/artists/*/music-videos").permitAll()
                     .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
+                    .requestMatchers("/api/artist-posts/notices").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)
                     .requestMatchers("/api/settlements/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")

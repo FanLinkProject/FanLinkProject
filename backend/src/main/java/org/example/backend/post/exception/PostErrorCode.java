@@ -11,7 +11,11 @@ public enum PostErrorCode implements ErrorCode {
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "게시글을 찾을 수 없습니다."),
     UNAUTHORIZED_ACCESS(HttpStatus.FORBIDDEN, "UNAUTHORIZED_ACCESS", "게시글에 대한 권한이 없습니다."),
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "그룹을 찾을 수 없습니다."),
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.");
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
+    MEDIA_ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "MEDIA_ASSET_NOT_FOUND", "미디어 파일을 찾을 수 없습니다."),
+    MEDIA_ASSET_ACCESS_DENIED(HttpStatus.FORBIDDEN, "MEDIA_ASSET_ACCESS_DENIED", "미디어 파일에 대한 권한이 없습니다."),
+    MEDIA_ASSET_NOT_READY(HttpStatus.CONFLICT, "MEDIA_ASSET_NOT_READY", "미디어 파일 업로드가 완료되지 않았습니다."),
+    INVALID_MEDIA_ASSET_CATEGORY(HttpStatus.BAD_REQUEST, "INVALID_MEDIA_ASSET_CATEGORY", "게시글 첨부는 POST_IMAGE 또는 POST_VIDEO만 가능합니다.");
 
     private final HttpStatus status;
     private final String code;
