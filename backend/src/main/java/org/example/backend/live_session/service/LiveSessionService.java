@@ -19,8 +19,8 @@ import org.example.backend.user.enums.UserRole;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -150,7 +150,7 @@ public class LiveSessionService {
 		boolean subscribed = subscriptionRepository.existsActiveSubscriptionForArtist(
 			loginUser.getId(),
 			session.getArtistId(),
-			LocalDateTime.now()
+			Instant.now()
 		);
 		if (!subscribed) {
 			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_SUBSCRIPTION_REQUIRED);
@@ -165,7 +165,7 @@ public class LiveSessionService {
 	private void notifyLiveStarted(User artist, LiveSession session) {
 		List<Long> fanIds = subscriptionRepository.findActiveSubscriberUserIdsByArtistId(
 			session.getArtistId(),
-			LocalDateTime.now()
+			Instant.now()
 		);
 
 		String title = session.getTitle();

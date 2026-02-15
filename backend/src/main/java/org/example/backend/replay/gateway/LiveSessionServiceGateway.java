@@ -39,7 +39,7 @@ public class LiveSessionServiceGateway implements LiveSessionGateway {
                 response.getArtistId(),
                 Boolean.TRUE.equals(response.getIsPaid()),
                 mapStatus(response.getStatus()),
-                response.getEndedAt(),
+                response.getEndedAt() == null ? null : response.getEndedAt().toInstant(),
                 response.getRecordingS3Bucket(),
                 response.getRecordingS3Prefix()
         );
@@ -52,7 +52,7 @@ public class LiveSessionServiceGateway implements LiveSessionGateway {
                 response.getArtistId(),
                 Boolean.TRUE.equals(response.getIsPaid()),
                 LiveSessionRecordingStatus.RECORDED,
-                response.getEndedAt(),
+                response.getEndedAt() == null ? null : response.getEndedAt().toInstant(),
                 response.getRecordingS3Bucket(),
                 response.getRecordingS3Prefix()
         );

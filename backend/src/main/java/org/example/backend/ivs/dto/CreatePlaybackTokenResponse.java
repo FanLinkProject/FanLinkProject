@@ -1,11 +1,11 @@
 package org.example.backend.ivs.dto;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 // IVS Playback Token 발급 응답 DTO.
 public record CreatePlaybackTokenResponse(
         String token,
-        OffsetDateTime expiresAt,
+        Instant expiresAt,
         int ttlSeconds,
         int recommendedRefreshInSeconds
 ) {
