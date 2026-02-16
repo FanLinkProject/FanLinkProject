@@ -8,29 +8,28 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import java.time.Instant;
 
 /*
  * 정산 대기열 (Temporary Storage)
- * - 역할: 결제 발생 시 실시간으로 생성되며, 실시간 매출 대시보드 조회에 사용됩니다.
- * - 수명주기: 정산 배치(Batch)가 실행되면 정산 데이터(SettlementDetail)로 변환된 후 삭제(혹은 soft delete) 되어야 합니다.
- * - 주의: 이 데이터는 최종 지급 근거가 아니며, 단순 집계용입니다.
+ * - 역할: 결제가 완료되면 생성되고, 배치 시 정산 상세로 전환 후 삭제됩니다.
  */
-
 @Entity
 @Getter
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "settlement_pendings",
-    indexes = {
-        @Index(name = "idx_pending_artist", columnList = "artist_id") // 조회 성능 최적화
-    },
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_pending_payment_artist_item",
-            columnNames = {"payment_id", "artist_id", "order_name"}
-        )
-    }
+        indexes = {
+                @Index(name = "idx_pending_artist", columnList = "artist_id"),
+                @Index(name = "idx_pending_artist_paid_at", columnList = "artist_id, paid_at")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_pending_payment_artist_item",
+                        columnNames = {"payment_id", "artist_id", "order_name"}
+                )
+        }
 )
 public class SettlementPending {
 
@@ -38,32 +37,36 @@ public class SettlementPending {
     private Long id;
 
     @Column(nullable = false)
-    private Long paymentId; // 원본 결제 ID
+    private Long paymentId;
 
     @Column(nullable = false)
-    private Long artistId;  // 정산대상
+    private Long artistId;
 
     @Column(nullable = false)
-    private Long amount;    // 결제 원금 (수수료 차감 전 금액)
+    private Long amount;
 
     @Column(nullable = false)
-    private String orderName; // 대시보드 표시용 상품명
+    private String orderName;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SettlementSourceType sourceType; // CASH or CANDY
+    private SettlementSourceType sourceType;
+
+    @Column(nullable = false)
+    private Instant paidAt;   // 결제 완료 시각 (정산 기간 기준)
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-
     @Builder
-    public SettlementPending(Long paymentId, Long artistId, Long amount, String orderName, SettlementSourceType sourceType) {
+    public SettlementPending(Long paymentId, Long artistId, Long amount, String orderName,
+                             SettlementSourceType sourceType, Instant paidAt) {
         this.paymentId = paymentId;
         this.artistId = artistId;
         this.amount = amount;
         this.orderName = orderName;
         this.sourceType = sourceType;
+        this.paidAt = paidAt;
     }
 }

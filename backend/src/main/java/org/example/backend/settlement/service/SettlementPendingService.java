@@ -42,6 +42,9 @@ public class SettlementPendingService {
      */
     @Transactional
     public void createSettlementPending(Payment payment, Order order) {
+        // 정산 기간 분류 기준은 pending 생성시각이 아니라 실제 결제 완료 시각.
+        Instant paidAt = payment.getPaidAt() != null ? payment.getPaidAt() : Instant.now();
+
         for (OrderItem item : order.getOrderItems()) {
             Product product = item.getProduct();
 
@@ -77,6 +80,7 @@ public class SettlementPendingService {
                     settlementAmount,
                     product.getName(),
                     sourceType.name(),
+                    paidAt,
                     Instant.now()
             );
 

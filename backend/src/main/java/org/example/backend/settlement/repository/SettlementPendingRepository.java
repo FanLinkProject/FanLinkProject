@@ -21,8 +21,8 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
      */
     @Modifying
     @Query(value = "INSERT IGNORE INTO settlement_pendings " +
-            "(payment_id, artist_id, amount, order_name, source_type, created_at) " +
-            "VALUES (:paymentId, :artistId, :amount, :orderName, :sourceType, :createdAt)",
+            "(payment_id, artist_id, amount, order_name, source_type, paid_at, created_at) " +
+            "VALUES (:paymentId, :artistId, :amount, :orderName, :sourceType, :paidAt, :createdAt)",
             nativeQuery = true)
     int insertIgnore(
             @Param("paymentId") Long paymentId,
@@ -30,6 +30,7 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
             @Param("amount") Long amount,
             @Param("orderName") String orderName,
             @Param("sourceType") String sourceType,
+            @Param("paidAt") Instant paidAt,
             @Param("createdAt") Instant createdAt
     );
 
@@ -37,7 +38,7 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
     // start 이상, end 미만 (반개방 구간: [start, end))
     @Query("SELECT sp FROM SettlementPending sp " +
             "WHERE sp.artistId = :artistId " +
-            "AND sp.createdAt >= :start AND sp.createdAt < :end")
+            "AND sp.paidAt >= :start AND sp.paidAt < :end")
     List<SettlementPending> findAllByArtistIdAndDateRange(
             @Param("artistId") Long artistId,
             @Param("start") Instant start,
