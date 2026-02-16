@@ -51,10 +51,13 @@ public class SettlementBatchConfig {
     private final SettlementRepository settlementRepository;
     private final SettlementDetailRepository detailRepository;
 
+    private final org.example.backend.settlement.listener.SettlementJobExecutionListener settlementJobExecutionListener;
+
     @Bean
     public Job settlementJob() {
         return new JobBuilder("settlementJob", jobRepository)
                 .start(settlementStep())
+                .listener(settlementJobExecutionListener)
                 .build();
     }
 
