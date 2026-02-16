@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Client } from "@stomp/stompjs";
@@ -54,7 +54,8 @@ function formatMessageTime(isoString) {
   });
 }
 
-export default function FanChatRoomPage() {
+// useSearchParams를 사용하는 컴포넌트를 분리
+function FanChatRoomContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomIdFromUrl = searchParams.get("roomId");
@@ -353,5 +354,18 @@ export default function FanChatRoomPage() {
         )}
       </section>
     </div>
+  );
+}
+
+// Suspense로 감싼 메인 컴포넌트
+export default function FanChatRoomPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center">
+        <p className="text-white/55 text-sm">로딩 중...</p>
+      </div>
+    }>
+      <FanChatRoomContent />
+    </Suspense>
   );
 }

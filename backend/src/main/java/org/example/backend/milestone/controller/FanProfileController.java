@@ -4,12 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.milestone.dto.response.FanProfileResponse;
 import org.example.backend.milestone.service.FanProfileService;
-import org.example.backend.milestone.service.FanVisitTrackingService;
 import org.example.backend.milestone.service.JoinDaysScheduler;
-import org.example.backend.user.entity.User;
-import org.example.backend.user.exception.UserErrorCode;
-import org.example.backend.user.exception.UserException;
-import org.example.backend.user.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,8 +20,6 @@ public class FanProfileController {
 
     private final FanProfileService fanProfileService;
     private final JoinDaysScheduler joinDaysScheduler;
-    private final FanVisitTrackingService fanVisitTrackingService;
-    private final UserRepository userRepository;
 
     /**
      * 내 팬 프로필 목록 조회 (아티스트별)
@@ -80,31 +73,14 @@ public class FanProfileController {
     }
 
     /**
-     * 테스트용: 특정 팬 프로필의 방문 수 증가
+     * 본인 팬 프로필만 방문일 체크 (path id + 서비스에서 본인 여부 검사)
      */
     @PostMapping("/{id}/increase-visit")
     public ResponseEntity<Void> increaseVisit(@PathVariable Long id, @AuthenticationPrincipal PrincipalDetails principal) {
-        fanProfileService.increaseVisitCount(id);
+        fanProfileService.increaseVisitCount(id, principal.getUserId());
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * 실제 사용: 팬이 아티스트 페이지를 방문했을 때 호출 (하루 1회만 카운트)
-     * POST /api/fan-profiles/visit/{artistId}
-     */
-    @PostMapping("/visit/{artistId}")
-    public ResponseEntity<Void> trackVisit(
-            @PathVariable Long artistId,
-            @AuthenticationPrincipal PrincipalDetails principal
-    ) {
-        User fan = principal.getUser();
-        User artist = userRepository.findById(artistId)
-                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
-
-        fanVisitTrackingService.trackVisit(fan, artist);
-        
-        return ResponseEntity.ok().build();
-    }
 
     /**
      * 테스트용: 특정 팬 프로필의 가입일수 증가
