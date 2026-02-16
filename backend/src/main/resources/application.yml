@@ -200,6 +200,10 @@ replay:
   access-gate:
     enabled: ${REPLAY_ACCESS_GATE_ENABLED:false}
 
+post:
+  access:
+    cookie-ttl-seconds: ${POST_ACCESS_COOKIE_TTL_SECONDS:600}
+
 media:
   presign:
     expire-seconds: ${MEDIA_PRESIGN_EXPIRE_SECONDS}

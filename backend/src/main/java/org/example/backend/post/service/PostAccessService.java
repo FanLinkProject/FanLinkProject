@@ -18,6 +18,7 @@ import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,14 +32,14 @@ import java.util.ArrayList;
 @Transactional(readOnly = true)
 public class PostAccessService {
 
-    private static final Duration PAID_POST_TTL = Duration.ofMinutes(10);
-
     private final ArtistPostRepository artistPostRepository;
     private final PostMediaAssetRepository postMediaAssetRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final AwsProperties awsProperties;
     private final ObjectProvider<CloudFrontCookieSigner> cookieSignerProvider;
     private final StringRedisTemplate redisTemplate;
+    @Value("${post.access.cookie-ttl-seconds:600}")
+    private long cookieTtlSeconds;
 
     // 유료 게시물 첨부 접근을 위한 Signed Cookie를 발급한다.
     public PostAccessResult issueAccessCookie(Long postId, Long userId, UserRole role) {
@@ -79,12 +80,13 @@ public class PostAccessService {
         if (cookieSigner == null) {
             throw new PostException(PostErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
-        List<String> cookies = cookieSigner.issueSignedCookies(pathPattern, PAID_POST_TTL);
+        Duration ttl = Duration.ofSeconds(cookieTtlSeconds);
+        List<String> cookies = cookieSigner.issueSignedCookies(pathPattern, ttl);
 
         PostAccessResponse response = new PostAccessResponse(
                 postId,
                 pathPattern,
-                Instant.now().plusSeconds(PAID_POST_TTL.getSeconds())
+                Instant.now().plusSeconds(ttl.getSeconds())
         );
         PostAccessResult result = new PostAccessResult(response, cookies);
         cacheResult(cacheKey, result);
@@ -128,7 +130,7 @@ public class PostAccessService {
         for (String cookie : result.setCookieHeaders()) {
             builder.append('\n').append(cookie);
         }
-        redisTemplate.opsForValue().set(cacheKey, builder.toString(), PAID_POST_TTL);
+        redisTemplate.opsForValue().set(cacheKey, builder.toString(), Duration.ofSeconds(cookieTtlSeconds));
     }
 
     private PostAccessResult readCachedResult(String cacheKey, Long postId, String pathPattern) {
