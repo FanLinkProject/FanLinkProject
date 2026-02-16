@@ -296,8 +296,8 @@ export default function AdminSettlementsPage() {
           <div className="p-6 border-b border-white/[0.06]">
             <h3 className="text-lg font-black text-white">정산 대상 요약</h3>
           </div>
-          <div className="overflow-x-auto settlement-scroll">
-            <table className="w-full min-w-[900px] text-left border-collapse">
+          <div>
+            <table className="w-full table-fixed text-left border-collapse">
               <thead>
                 <tr className="bg-white/[0.04] border-b border-white/[0.06]">
                   <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">대상</th>
@@ -358,8 +358,8 @@ export default function AdminSettlementsPage() {
           )}
         </div>
 
-        <div className="overflow-x-auto settlement-scroll">
-          <table className="w-full min-w-[980px] text-left border-collapse">
+        <div>
+          <table className="w-full table-fixed text-left border-collapse">
             <thead>
               <tr className="bg-white/[0.04] border-b border-white/[0.06]">
                 <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">대상</th>
@@ -445,8 +445,8 @@ export default function AdminSettlementsPage() {
           {detailsLoading ? (
             <div className="p-6 text-white/70 text-sm">불러오는 중...</div>
           ) : (
-            <div className="overflow-x-auto settlement-scroll">
-              <table className="w-full min-w-[700px] text-left border-collapse">
+            <div>
+              <table className="w-full table-fixed text-left border-collapse">
                 <thead>
                   <tr className="bg-white/[0.04] border-b border-white/[0.06]">
                     <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">상품명</th>
@@ -503,14 +503,14 @@ export default function AdminSettlementsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto settlement-scroll">
-          <table className="w-full min-w-[940px] text-left border-collapse">
+        <div>
+          <table className="w-full table-fixed text-left border-collapse">
             <thead>
               <tr className="bg-white/[0.04] border-b border-white/[0.06]">
                 <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">ID</th>
                 <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">OrderNo</th>
                 <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">메시지</th>
-                <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">상태</th>
+                <th className="w-[110px] px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest whitespace-nowrap">상태</th>
                 <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">발생시각</th>
               </tr>
             </thead>
@@ -527,9 +527,9 @@ export default function AdminSettlementsPage() {
                   <td className="px-6 py-5 text-white/80">{f.id}</td>
                   <td className="px-6 py-5 text-white">{f.orderNo}</td>
                   <td className="px-6 py-5 text-white/75 line-clamp-1 max-w-[360px]">{f.errorMessage}</td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5 whitespace-nowrap">
                     <span
-                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap leading-none ${
                         f.isProcessed ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
                       }`}
                     >

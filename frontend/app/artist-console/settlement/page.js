@@ -184,8 +184,8 @@ export default function ArtistSettlementPage() {
           <h3 className="text-lg font-black text-white">정산 지급 내역</h3>
         </div>
 
-        <div className="overflow-x-auto settlement-scroll">
-          <table className="w-full text-left border-collapse min-w-[760px]">
+        <div>
+          <table className="w-full table-fixed text-left border-collapse">
             <thead>
               <tr className="bg-white/[0.04] border-b border-white/[0.06]">
                 <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">정산 기간</th>
@@ -252,8 +252,8 @@ export default function ArtistSettlementPage() {
           {detailsError && <div className="p-6 text-red-300 text-sm font-semibold">{detailsError}</div>}
 
           {!detailsLoading && !detailsError && (
-            <div className="overflow-x-auto settlement-scroll">
-              <table className="w-full text-left border-collapse min-w-[700px]">
+            <div>
+              <table className="w-full table-fixed text-left border-collapse">
                 <thead>
                   <tr className="bg-white/[0.04] border-b border-white/[0.06]">
                     <th className="px-6 py-4 text-[10px] font-black text-white/55 uppercase tracking-widest">상품명</th>
