@@ -60,11 +60,14 @@ public class FanProfileService {
     }
 
     /**
-     * 방문 수 1 증가 후 자동승급 조건 즉시 체크
+     * 본인 팬 프로필일 때만 방문 수 +1 후 자동승급 체크
      */
-    public void increaseVisitCount(Long fanProfileId) {
-        FanProfile fan = getFan(fanProfileId);
-        fan.increaseVisitCount();
+    public void increaseVisitCount(Long fanProfileId, Long userId) {
+        FanProfile profile = getFan(fanProfileId);
+        if (!profile.getFan().getId().equals(userId)) {
+            throw new MilestoneException(MilestoneErrorCode.NOT_FANPROFILE_OWNER);
+        }
+        profile.increaseVisitCount();
         fanGradeAutoUpgradeService.checkAndUpgradeForFan(fanProfileId);
     }
 

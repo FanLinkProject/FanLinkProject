@@ -15,6 +15,7 @@ public enum MilestoneErrorCode implements ErrorCode {
     // ====== 권한/소유 관련 ======
     NOT_ARTIST_USER(HttpStatus.FORBIDDEN, "NOT_ARTIST_USER", "아티스트만 마일스톤을 생성할 수 있습니다."),
     NOT_MILESTONE_OWNER(HttpStatus.FORBIDDEN, "NOT_MILESTONE_OWNER", "본인이 소유한 마일스톤이 아닙니다."),
+    NOT_FANPROFILE_OWNER(HttpStatus.FORBIDDEN, "NOT_FANPROFILE_OWNER", "본인의 팬 프로필만 방문일을 갱신할 수 있습니다."),
 
     // ====== 생성/수정 검증 ======
     DUPLICATE_MILESTONE_NAME(HttpStatus.BAD_REQUEST, "DUPLICATE_MILESTONE_NAME", "해당 이름의 등급이 이미 존재합니다."),

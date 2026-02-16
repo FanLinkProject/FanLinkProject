@@ -17,7 +17,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -66,18 +66,18 @@ public class Replay {
     private String mediaConvertJobId;
 
     @Column(name = "published_at")
-    private OffsetDateTime publishedAt;
+    private Instant publishedAt;
 
     @Column(name = "reject_reason", length = 500)
     private String rejectReason;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
+    private Instant updatedAt;
 
     // Replay 엔티티를 생성한다.
     public Replay(Long artistId,
@@ -86,7 +86,7 @@ public class Replay {
                   ReplayStatus status,
                   String recordingS3Bucket,
                   String recordingS3Prefix,
-                  OffsetDateTime publishedAt) {
+                  Instant publishedAt) {
         this.artistId = artistId;
         this.liveSessionId = liveSessionId;
         this.accessType = accessType;

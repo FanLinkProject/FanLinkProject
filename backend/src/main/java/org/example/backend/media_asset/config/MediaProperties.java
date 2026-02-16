@@ -48,6 +48,7 @@ public class MediaProperties {
     @Setter
     public static class Attachments {
         private int maxPerPost = 5;
+        private int maxPerProductImages = 5;
     }
 
     @Getter

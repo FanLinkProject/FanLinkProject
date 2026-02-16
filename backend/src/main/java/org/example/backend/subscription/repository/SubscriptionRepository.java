@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -47,7 +47,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 	boolean existsActiveSubscriptionForArtist(
 		@Param("userId") Long userId,
 		@Param("artistId") Long artistId,
-		@Param("now") LocalDateTime now
+		@Param("now") Instant now
 	);
 
 	// 해당 아티스트를 구독 중인 팬 userId 목록 조회 (라이브 시작 알림 발송용)
@@ -62,6 +62,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 	""")
 	List<Long> findActiveSubscriberUserIdsByArtistId(
 		@Param("artistId") Long artistId,
-		@Param("now") LocalDateTime now
+		@Param("now") Instant now
 	);
 }

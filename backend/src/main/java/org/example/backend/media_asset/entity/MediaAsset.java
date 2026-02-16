@@ -17,7 +17,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "media_assets", uniqueConstraints = {
@@ -64,21 +64,21 @@ public class MediaAsset {
     private MediaAssetStatus status;
 
     @Column(nullable = false)
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 40)
     private MediaAssetRejectedReason rejectedReason;
 
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public MediaAsset(Long ownerUserId,
                       MediaAssetCategory category,
@@ -87,7 +87,7 @@ public class MediaAsset {
                       String contentTypeRequested,
                       Long sizeBytesRequested,
                       Long durationSecondsRequested,
-                      LocalDateTime expiresAt
+                      Instant expiresAt
     ) {
         this.ownerUserId = ownerUserId;
         this.category = category;
@@ -117,13 +117,13 @@ public class MediaAsset {
     }
 
     // 만료된 INITIATED를 ORPHAN으로 전이한다.
-    public void markOrphan(LocalDateTime deletedAt) {
+    public void markOrphan(Instant deletedAt) {
         this.status = MediaAssetStatus.ORPHAN;
         this.deletedAt = deletedAt;
     }
 
     // 명시적 삭제 상태로 전환한다.
-    public void markDeleted(LocalDateTime deletedAt) {
+    public void markDeleted(Instant deletedAt) {
         this.status = MediaAssetStatus.DELETED;
         this.deletedAt = deletedAt;
     }

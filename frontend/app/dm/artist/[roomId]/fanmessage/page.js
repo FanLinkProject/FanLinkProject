@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
 import axios from "axios";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 
@@ -28,11 +28,9 @@ function getEmailFromTokenPayload(payload) {
     return payload.email || payload.username || payload.sub || "";
 }
 
-export default function FanMessagePage() {
+// useSearchParams를 사용하는 컴포넌트를 분리
+function FanMessageContent({ roomId }) {
     const router = useRouter();
-    const params = useParams();
-    const roomId = params.roomId;
-
     const searchParams = useSearchParams();
     const groupIndex = Number(searchParams.get("group"));
 
@@ -110,5 +108,21 @@ export default function FanMessagePage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+// Suspense로 감싼 메인 컴포넌트
+export default function FanMessagePage({ params }) {
+    const resolvedParams = React.use(params);
+    const roomId = resolvedParams?.roomId;
+    
+    return (
+        <Suspense fallback={
+            <div className="p-8 lg:p-12 max-w-5xl mx-auto">
+                <div className="text-white/55">로딩 중...</div>
+            </div>
+        }>
+            <FanMessageContent roomId={roomId} />
+        </Suspense>
     );
 }

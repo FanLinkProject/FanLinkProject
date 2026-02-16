@@ -3,12 +3,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
 
 const CANDY_COST = 500;
+const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
+
+function getAuthHeaders() {
+  const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: token }),
+  };
+}
 
 export default function ArtistDetailPage({ params }) {
   const resolvedParams = React.use(params);
@@ -25,6 +35,8 @@ export default function ArtistDetailPage({ params }) {
   const [candyBalance] = useState(1500);
   const [localFanPosts, setLocalFanPosts] = useState([]);
   const [likedPostIds, setLikedPostIds] = useState(() => new Set());
+  const [fanProfiles, setFanProfiles] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
 
   useEffect(() => {
     const a = MOCK_ARTISTS.find((x) => x.id === id);
@@ -32,7 +44,42 @@ export default function ArtistDetailPage({ params }) {
     setLocalFanPosts(MOCK_POSTS.filter((p) => p.artistId === (a?.id || id) && p.type === "FAN"));
   }, [id]);
 
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) return;
+    axios
+      .get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
+      .then((res) => setFanProfiles(res.data || []))
+      .catch(() => setFanProfiles([]));
+  }, [id]);
+
   if (!artist) return null;
+
+  // URL id가 숫자면 artistId로 매칭, mock 페이지(luna-ray 등)면 artistName으로 매칭
+  const fanProfileForArtist =
+    fanProfiles.find((p) => String(p.artistId) === String(id)) ||
+    (artist.name && fanProfiles.find((p) => p.artistName && p.artistName.trim() === artist.name.trim()));
+
+  const handleAttendance = async () => {
+    if (!fanProfileForArtist || attendanceLoading) return;
+    setAttendanceLoading(true);
+    try {
+      await axios.post(
+        `${FAN_PROFILES_API}/${fanProfileForArtist.id}/increase-visit`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      setFanProfiles((prev) =>
+        prev.map((p) =>
+          p.id === fanProfileForArtist.id ? { ...p, visitCount: (p.visitCount || 0) + 1 } : p
+        )
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
 
   const artistPosts = MOCK_POSTS.filter((p) => p.artistId === artist.id && p.type === "ARTIST");
   const artistNotices = MOCK_POSTS.filter((p) => p.artistId === artist.id && p.type === "NOTICE");
@@ -135,11 +182,23 @@ export default function ArtistDetailPage({ params }) {
               </p>
             </div>
           </div>
-          <div className="pb-1">
+          <div className="pb-1 flex items-center gap-2">
             {artist.isSubscribed ? (
-              <Button variant="ghost" className="px-8 py-3" disabled>
-                구독 중
-              </Button>
+              <>
+                <Button variant="ghost" className="px-8 py-3" disabled>
+                  구독 중
+                </Button>
+                {fanProfileForArtist && (
+                  <Button
+                    variant="primary"
+                    className="px-6 py-3"
+                    onClick={handleAttendance}
+                    disabled={attendanceLoading}
+                  >
+                    {attendanceLoading ? "처리 중…" : "출석"}
+                  </Button>
+                )}
+              </>
             ) : (
               <Button variant="primary" className="px-8 py-3">
                 구독하기

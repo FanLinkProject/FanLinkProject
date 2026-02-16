@@ -9,6 +9,7 @@ import org.example.backend.media_asset.exception.MediaAssetException;
 import org.example.backend.media_asset.gateway.FanMembershipGateway;
 import org.example.backend.media_asset.gateway.FanPageGateway;
 import org.example.backend.media_asset.gateway.PostGateway;
+import org.example.backend.media_asset.gateway.ProductGateway;
 import org.example.backend.media_asset.gateway.ReplayGateway;
 import org.example.backend.user.enums.UserRole;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,7 @@ public class MediaOwnershipValidator {
     private final FanMembershipGateway fanMembershipGateway;
     private final PostGateway postGateway;
     private final ReplayGateway replayGateway;
+    private final ProductGateway productGateway;
 
     // Presign 요청의 소유/권한 규칙을 검증한다.
     public void validatePresignOwnership(PresignItemRequest item, Long userId, UserRole role) {
@@ -34,8 +36,16 @@ public class MediaOwnershipValidator {
             validateProfileOwner(userId);
             return;
         }
+        if (category == MediaAssetCategory.ARTIST_COVER_IMAGE) {
+            validateCoverOwnership(item, userId, role);
+            return;
+        }
         if (category == MediaAssetCategory.POST_IMAGE || category == MediaAssetCategory.POST_VIDEO) {
             validatePostOwnership(item, userId, role);
+            return;
+        }
+        if (category == MediaAssetCategory.PRODUCT_IMAGE || category == MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE) {
+            validateProductOwnership(item, userId, role);
             return;
         }
         validateReplayOwnership(item, userId, role);
@@ -47,6 +57,14 @@ public class MediaOwnershipValidator {
             throw new MediaAssetException(MediaAssetErrorCode.INVALID_OBJECT_KEY, "userId가 필요합니다.");
         }
         if (userId <= 0) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        }
+    }
+
+    // 커버 이미지는 그룹 팬페이지 소유 아티스트만 허용한다.
+    private void validateCoverOwnership(PresignItemRequest item, Long userId, UserRole role) {
+        Long artistId = requireValue(item.artistId(), "artistId");
+        if (!isArtistOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }
@@ -71,6 +89,14 @@ public class MediaOwnershipValidator {
         }
     }
 
+    // 상품 이미지 업로드 권한을 검증한다.
+    private void validateProductOwnership(PresignItemRequest item, Long userId, UserRole role) {
+        Long artistId = resolveArtistIdForProduct(item);
+        if (!isArtistOwner(artistId, userId, role)) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        }
+    }
+
     // postIdOrTemp로 아티스트 ID를 조회한다.
     private Long resolveArtistIdForPost(PresignItemRequest item) {
         String postIdOrTemp = requireText(item.postIdOrTemp(), "postIdOrTemp");
@@ -89,6 +115,16 @@ public class MediaOwnershipValidator {
         }
         Long replayId = parseId(replayIdOrTemp, "replayIdOrTemp");
         return replayGateway.getArtistIdByReplayId(replayId);
+    }
+
+    // productIdOrTemp로 아티스트 ID를 조회한다.
+    private Long resolveArtistIdForProduct(PresignItemRequest item) {
+        String productIdOrTemp = requireText(item.productIdOrTemp(), "productIdOrTemp");
+        if (productIdOrTemp.startsWith(TEMP_PREFIX)) {
+            return requireValue(item.artistId(), "artistId");
+        }
+        Long productId = parseId(productIdOrTemp, "productIdOrTemp");
+        return productGateway.getArtistIdByProductId(productId);
     }
 
     // 아티스트 본인 여부를 판단한다.

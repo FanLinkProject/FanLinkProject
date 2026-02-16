@@ -27,7 +27,7 @@ import org.example.backend.user.enums.UserRole;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -62,9 +62,9 @@ public class MediaAssetService {
             if (mediaAssetRepository.findByObjectKey(objectKey).isPresent()) {
                 throw new MediaAssetException(MediaAssetErrorCode.DUPLICATE_MEDIA_ASSET);
             }
-            LocalDateTime now = LocalDateTime.now(mediaClock);
-            LocalDateTime orphanExpiresAt = now.plusMinutes(mediaProperties.getOrphan().getExpiresMinutes());
-            LocalDateTime presignExpiresAt = now.plusSeconds(mediaProperties.getPresign().getExpireSeconds());
+            Instant now = Instant.now(mediaClock);
+            Instant orphanExpiresAt = now.plus(Duration.ofMinutes(mediaProperties.getOrphan().getExpiresMinutes()));
+            Instant presignExpiresAt = now.plusSeconds(mediaProperties.getPresign().getExpireSeconds());
 
             S3MediaClient.PresignedUpload presignedUpload = s3MediaClient.presignPut(
                     objectKey,
@@ -145,7 +145,7 @@ public class MediaAssetService {
                 ));
                 continue;
             }
-            LocalDateTime now = LocalDateTime.now(mediaClock);
+            Instant now = Instant.now(mediaClock);
             if (mediaAsset.getStatus() == MediaAssetStatus.INITIATED
                     && mediaAsset.getExpiresAt() != null
                     && mediaAsset.getExpiresAt().isBefore(now)) {
