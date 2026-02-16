@@ -34,16 +34,22 @@ public class ArtistPostController {
     public ResponseEntity<List<ArtistPostResponse>> getPosts(
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long lastPostId,
-            @RequestParam(defaultValue = "10") int limit) {
-        List<ArtistPostResponse> responses = artistPostService.getPosts(groupId, lastPostId, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        List<ArtistPostResponse> responses = artistPostService.getPosts(groupId, lastPostId, limit, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/notices")
     public ResponseEntity<List<ArtistPostResponse>> getNotices(
             @RequestParam(required = false) Long lastPostId,
-            @RequestParam(defaultValue = "10") int limit) {
-        List<ArtistPostResponse> responses = artistPostService.getNotices(lastPostId, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        List<ArtistPostResponse> responses = artistPostService.getNotices(lastPostId, limit, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(responses);
     }
 
@@ -51,14 +57,21 @@ public class ArtistPostController {
     public ResponseEntity<List<ArtistPostResponse>> getArtistPosts(
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long lastPostId,
-            @RequestParam(defaultValue = "10") int limit) {
-        List<ArtistPostResponse> responses = artistPostService.getArtistPosts(groupId, lastPostId, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        List<ArtistPostResponse> responses = artistPostService.getArtistPosts(groupId, lastPostId, limit, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ArtistPostResponse> getPost(@PathVariable Long id) {
-        ArtistPostResponse response = artistPostService.getPost(id);
+    public ResponseEntity<ArtistPostResponse> getPost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        ArtistPostResponse response = artistPostService.getPost(id, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(response);
     }
 

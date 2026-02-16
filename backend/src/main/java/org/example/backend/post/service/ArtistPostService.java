@@ -16,6 +16,7 @@ import org.example.backend.post.exception.PostErrorCode;
 import org.example.backend.post.exception.PostException;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.PostMediaAssetRepository;
+import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
@@ -29,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +42,7 @@ public class ArtistPostService {
     private final PostMediaAssetRepository postMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
+    private final SubscriptionRepository subscriptionRepository;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -116,7 +119,7 @@ public class ArtistPostService {
         return ArtistPostResponse.from(savedPost, buildAttachmentResponses(attachments));
     }
 
-    public ArtistPostResponse getPost(Long id) {
+    public ArtistPostResponse getPost(Long id, Long userId, UserRole role) {
         ArtistPost artistPost = artistPostRepository.findById(id)
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
 
@@ -124,28 +127,35 @@ public class ArtistPostService {
             throw new PostException(PostErrorCode.POST_NOT_FOUND);
         }
 
-        List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, artistPost.getId());
-        return ArtistPostResponse.from(artistPost, buildAttachmentResponses(attachments));
+        List<PostMediaAsset> attachments = postMediaAssetRepository
+                .findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, artistPost.getId());
+        return buildPostResponseWithAccess(artistPost, attachments, userId, role);
     }
 
-    public List<ArtistPostResponse> getPosts(Long groupId, Long lastPostId, int limit) {
+    public List<ArtistPostResponse> getPosts(Long groupId, Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
         return artistPostRepository.findPosts(groupId, lastPostId, pageable).stream()
-                .map(ArtistPostResponse::from)
+                .map(post -> buildPostResponseWithAccess(post,
+                        postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
+                        userId, role))
                 .collect(Collectors.toList());
     }
 
-    public List<ArtistPostResponse> getNotices(Long lastPostId, int limit) {
+    public List<ArtistPostResponse> getNotices(Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
         return artistPostRepository.findNotices(lastPostId, pageable).stream()
-                .map(ArtistPostResponse::from)
+                .map(post -> buildPostResponseWithAccess(post,
+                        postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
+                        userId, role))
                 .collect(Collectors.toList());
     }
 
-    public List<ArtistPostResponse> getArtistPosts(Long groupId, Long lastPostId, int limit) {
+    public List<ArtistPostResponse> getArtistPosts(Long groupId, Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
         return artistPostRepository.findArtistPosts(groupId, lastPostId, pageable).stream()
-                .map(ArtistPostResponse::from)
+                .map(post -> buildPostResponseWithAccess(post,
+                        postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
+                        userId, role))
                 .collect(Collectors.toList());
     }
 
@@ -184,5 +194,41 @@ public class ArtistPostService {
         }
 
         artistPost.delete();
+    }
+
+    private ArtistPostResponse buildPostResponseWithAccess(ArtistPost post, List<PostMediaAsset> attachments,
+                                                          Long userId, UserRole role) {
+        if (!Boolean.TRUE.equals(post.getIsMembershipOnly())) {
+            return ArtistPostResponse.from(post, buildAttachmentResponses(attachments));
+        }
+        if (canAccessPaidPost(post, userId, role)) {
+            return ArtistPostResponse.from(post, buildAttachmentResponses(attachments));
+        }
+        return ArtistPostResponse.builder()
+                .id(post.getId())
+                .writerId(post.getUser().getId())
+                .writerNickname(post.getUser().getNickname())
+                .title(post.getTitle())
+                .content(null)
+                .isMembershipOnly(post.getIsMembershipOnly())
+                .createdAt(post.getCreatedAt())
+                .updatedAt(post.getUpdatedAt())
+                .attachments(Collections.emptyList())
+                .build();
+    }
+
+    private boolean canAccessPaidPost(ArtistPost post, Long userId, UserRole role) {
+        if (userId == null || role == null) {
+            return false;
+        }
+        if (role == UserRole.ADMIN) {
+            return true;
+        }
+        if (role == UserRole.ARTIST) {
+            return post.getUser().getId().equals(userId)
+                    || (post.getGroup() != null && post.getGroup().getId().equals(userId));
+        }
+        Long artistId = post.getGroup() != null ? post.getGroup().getId() : post.getUser().getId();
+        return subscriptionRepository.existsActiveSubscriptionForArtist(userId, artistId, Instant.now());
     }
 }
