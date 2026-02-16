@@ -7,6 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.ivs.config.IvsRecordingEventProperties;
 import org.example.backend.live_session.entity.LiveSession;
 import org.example.backend.live_session.repository.LiveSessionRepository;
+import org.example.backend.replay.entity.Replay;
+import org.example.backend.replay.entity.ReplayAccessType;
+import org.example.backend.replay.entity.ReplayStatus;
+import org.example.backend.replay.repository.ReplayRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -16,6 +20,7 @@ import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +36,7 @@ public class IvsRecordingEventListener {
     private final SqsClient sqsClient;
     private final IvsRecordingEventProperties properties;
     private final LiveSessionRepository liveSessionRepository;
+    private final ReplayRepository replayRepository;
     private final ObjectMapper objectMapper;
 
     // IVS 녹화 이벤트 SQS를 폴링한다.
@@ -90,6 +96,7 @@ public class IvsRecordingEventListener {
             LiveSession session = optionalSession.get();
             session.markRecorded(recordingBucket, recordingPrefix);
             liveSessionRepository.save(session);
+            createReplayIfAbsent(session);
             deleteMessage(message);
         } catch (Exception ex) {
             log.error("Failed to handle IVS recording event. messageId={}", message.messageId(), ex);
@@ -129,5 +136,26 @@ public class IvsRecordingEventListener {
                 .queueUrl(properties.getQueueUrl())
                 .receiptHandle(message.receiptHandle())
                 .build());
+    }
+
+    // 자동 녹화본에 대한 Replay를 생성한다(존재하면 스킵).
+    private void createReplayIfAbsent(LiveSession session) {
+        if (session == null || session.getId() == null) {
+            return;
+        }
+        if (replayRepository.existsByLiveSessionId(session.getId())) {
+            return;
+        }
+        ReplayAccessType accessType = session.isPaid() ? ReplayAccessType.PAID : ReplayAccessType.FREE;
+        Replay replay = new Replay(
+                session.getArtistId(),
+                session.getId(),
+                accessType,
+                ReplayStatus.PUBLISHED,
+                session.getRecordingS3Bucket(),
+                session.getRecordingS3Prefix(),
+                Instant.now()
+        );
+        replayRepository.save(replay);
     }
 }

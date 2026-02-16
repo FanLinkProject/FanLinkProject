@@ -141,7 +141,8 @@ public class MediaPolicyValidator {
                 throw new MediaAssetException(MediaAssetErrorCode.ATTACHMENT_LIMIT_EXCEEDED, "첨부 개수 제한을 초과했습니다.");
             }
         }
-        if (category == MediaAssetCategory.PRODUCT_IMAGE) {
+        if (category == MediaAssetCategory.PRODUCT_IMAGE
+                || category == MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE) {
             Integer attachmentCountInProduct = item.attachmentCountInProduct();
             if (attachmentCountInProduct == null) {
                 throw new MediaAssetException(MediaAssetErrorCode.INVALID_ATTACHMENT_COUNT, "attachmentCountInProduct가 필요합니다.");

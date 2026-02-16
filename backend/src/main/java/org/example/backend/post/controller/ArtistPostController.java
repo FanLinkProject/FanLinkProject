@@ -4,8 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.post.dto.request.ArtistPostRequest;
 import org.example.backend.post.dto.response.ArtistPostResponse;
+import org.example.backend.post.dto.response.PostAccessResult;
 import org.example.backend.post.service.ArtistPostService;
+import org.example.backend.post.service.PostAccessService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +20,7 @@ import java.util.List;
 public class ArtistPostController {
 
     private final ArtistPostService artistPostService;
+    private final PostAccessService postAccessService;
 
     @PostMapping
     public ResponseEntity<ArtistPostResponse> createPost(
@@ -56,6 +60,21 @@ public class ArtistPostController {
     public ResponseEntity<ArtistPostResponse> getPost(@PathVariable Long id) {
         ArtistPostResponse response = artistPostService.getPost(id);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/access")
+    public ResponseEntity<?> issueAccessCookie(
+            @PathVariable Long id,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        PostAccessResult result = postAccessService.issueAccessCookie(id, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
+        HttpHeaders headers = new HttpHeaders();
+        for (String cookie : result.setCookieHeaders()) {
+            headers.add(HttpHeaders.SET_COOKIE, cookie);
+        }
+        return ResponseEntity.ok().headers(headers).body(result.response());
     }
 
     @PutMapping("/{id}")
