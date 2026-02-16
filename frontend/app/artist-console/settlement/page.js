@@ -90,6 +90,7 @@ export default function ArtistSettlementPage() {
   const [history, setHistory] = useState([]);
 
   const [selectedSettlementId, setSelectedSettlementId] = useState(null);
+  const [selectedSettlementPeriod, setSelectedSettlementPeriod] = useState("");
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
   const [details, setDetails] = useState([]);
@@ -111,8 +112,9 @@ export default function ArtistSettlementPage() {
     }
   }, []);
 
-  const loadDetails = useCallback(async (settlementId) => {
+  const loadDetails = useCallback(async (settlementId, period) => {
     setSelectedSettlementId(settlementId);
+    setSelectedSettlementPeriod(period || "");
     setDetails([]);
     setDetailsError("");
     setDetailsLoading(true);
@@ -140,6 +142,17 @@ export default function ArtistSettlementPage() {
       count: history.length,
     };
   }, [history]);
+
+  const selectedDetailTitle = useMemo(() => {
+    const match = (selectedSettlementPeriod || "").match(/(\d{4})-(\d{2})-\d{2}/);
+    if (!match) return "정산 상세";
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    if (Number.isNaN(year) || Number.isNaN(month)) return "정산 상세";
+
+    return `${String(year).slice(2)}년 ${month}월 정산 상세`;
+  }, [selectedSettlementPeriod]);
 
   return (
     <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-10">
@@ -194,7 +207,7 @@ export default function ArtistSettlementPage() {
 
               {history.map((row) => (
                 <tr key={row.id} className="border-b border-white/[0.06] hover:bg-white/[0.03] transition-colors">
-                  <td className="px-6 py-5 font-bold text-white">{row.period}</td>
+                  <td className="px-6 py-5 font-bold text-white">{row.period} (KST)</td>
                   <td className="px-6 py-5 font-bold text-white/85 tabular-nums">{formatKRW(row.totalSalesAmount)}</td>
                   <td className="px-6 py-5 font-bold text-white/70 tabular-nums">{formatKRW(row.feeAmount)}</td>
                   <td className="px-6 py-5 font-black text-violet-300 tabular-nums">{formatKRW(row.finalAmount)}</td>
@@ -205,7 +218,7 @@ export default function ArtistSettlementPage() {
                     <button
                       type="button"
                       className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
-                      onClick={() => loadDetails(row.id)}
+                      onClick={() => loadDetails(row.id, row.period)}
                     >
                       보기
                     </button>
@@ -220,12 +233,13 @@ export default function ArtistSettlementPage() {
       {selectedSettlementId && (
         <Surface variant="primary" className="overflow-hidden">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
-            <h3 className="text-lg font-black text-white">정산 상세 #{selectedSettlementId}</h3>
+            <h3 className="text-lg font-black text-white">{selectedDetailTitle}</h3>
             <button
               type="button"
               className="text-[10px] font-black text-white/60 uppercase tracking-widest hover:text-white"
               onClick={() => {
                 setSelectedSettlementId(null);
+                setSelectedSettlementPeriod("");
                 setDetails([]);
                 setDetailsError("");
               }}

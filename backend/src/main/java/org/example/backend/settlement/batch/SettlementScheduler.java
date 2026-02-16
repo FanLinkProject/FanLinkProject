@@ -29,7 +29,8 @@ public class SettlementScheduler {
     private final Job settlementJob;
 
     // 매월 15일 새벽 4시 실행(KST)
-    @Scheduled(cron = "${settlement.batch.cron}", zone = "Asia/Seoul")
+//    @Scheduled(cron = "${settlement.batch.cron}", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0/3 * * * *", zone = "Asia/Seoul")
     public void runSettlementJob() {
         log.info("========== [자동 정산] 배치 시작 (KST): 15일 04:00, (UTC) : 14일 19:00 ==========");
 
@@ -42,6 +43,7 @@ public class SettlementScheduler {
             JobParameters params = new JobParametersBuilder()
                     .addString("startDate", startDate.toString())
                     .addString("endDate", endDate.toString())
+                    .addLong("testTimestamp", System.currentTimeMillis())
                     .toJobParameters();
 
             jobLauncher.run(settlementJob, params);
