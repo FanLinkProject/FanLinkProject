@@ -28,8 +28,10 @@ public class FanPostController {
 
     @GetMapping
     public ResponseEntity<List<FanPostResponse>> getPosts(
-            @RequestParam(required = false) Long groupId) {
-        List<FanPostResponse> responses = fanPostService.getPosts(groupId);
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(required = false) Long lastPostId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<FanPostResponse> responses = fanPostService.getPosts(groupId, lastPostId, limit);
         return ResponseEntity.ok(responses);
     }
 

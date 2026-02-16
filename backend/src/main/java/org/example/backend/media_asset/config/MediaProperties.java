@@ -14,6 +14,7 @@ public class MediaProperties {
     private OrphanCleanup orphanCleanup = new OrphanCleanup();
     private Limits limits = new Limits();
     private Attachments attachments = new Attachments();
+    private Metadata metadata = new Metadata();
 
     @Getter
     @Setter
@@ -47,5 +48,13 @@ public class MediaProperties {
     @Setter
     public static class Attachments {
         private int maxPerPost = 5;
+    }
+
+    @Getter
+    @Setter
+    public static class Metadata {
+        private boolean enabled = false;
+        private String ffprobePath;
+        private long ffprobeTimeoutSeconds = 20;
     }
 }

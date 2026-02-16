@@ -3,6 +3,8 @@ package org.example.backend.post.dto.request;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @NoArgsConstructor
 public class ArtistPostRequest {
@@ -10,4 +12,5 @@ public class ArtistPostRequest {
     private String title;
     private String content;
     private Boolean isMembershipOnly;
+    private List<Long> mediaAssetIds;
 }
