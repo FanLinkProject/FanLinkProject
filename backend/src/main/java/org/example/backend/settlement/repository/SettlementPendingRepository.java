@@ -14,21 +14,22 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
     /**
      * [INSERT IGNORE] 중복 데이터 스킵 저장
      * Unique Constraint(payment_id, artist_id, order_name) 위반 시 해당 행만 무시하고,
-     * 나머지 행은 정상 저장됩니다.
-     * JPA 영속성 컨텍스트를 거치지 않으므로 Hibernate 세션 오염 문제가 없습니다.
+     * 나머지 행은 정상 저장.
+     * JPA 영속성 컨텍스트를 거치지 않으므로 Hibernate 세션 오염 문제 X.
      *
      * @return 실제 INSERT된 행 수 (중복이면 0)
      */
     @Modifying
     @Query(value = "INSERT IGNORE INTO settlement_pendings " +
-            "(payment_id, artist_id, amount, order_name, source_type, paid_at, created_at) " +
-            "VALUES (:paymentId, :artistId, :amount, :orderName, :sourceType, :paidAt, :createdAt)",
+            "(payment_id, artist_id, amount, order_name, order_item_id, source_type, paid_at, created_at) " +
+            "VALUES (:paymentId, :artistId, :amount, :orderName, :orderItemId, :sourceType, :paidAt, :createdAt)",
             nativeQuery = true)
     int insertIgnore(
             @Param("paymentId") Long paymentId,
             @Param("artistId") Long artistId,
             @Param("amount") Long amount,
             @Param("orderName") String orderName,
+            @Param("orderItemId") Long orderItemId,
             @Param("sourceType") String sourceType,
             @Param("paidAt") Instant paidAt,
             @Param("createdAt") Instant createdAt

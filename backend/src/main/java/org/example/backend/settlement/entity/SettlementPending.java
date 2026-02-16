@@ -27,7 +27,7 @@ import java.time.Instant;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_pending_payment_artist_item",
-                        columnNames = {"payment_id", "artist_id", "order_name"}
+                        columnNames = {"payment_id", "artist_id", "order_item_id"}
                 )
         }
 )
@@ -48,6 +48,9 @@ public class SettlementPending {
     @Column(nullable = false)
     private String orderName;
 
+    @Column(nullable = false)
+    private Long orderItemId; // 결제 내 개별 주문 항목 식별자 (멱등 키)
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SettlementSourceType sourceType;
@@ -60,12 +63,13 @@ public class SettlementPending {
     private Instant createdAt;
 
     @Builder
-    public SettlementPending(Long paymentId, Long artistId, Long amount, String orderName,
+    public SettlementPending(Long paymentId, Long artistId, Long amount, String orderName, Long orderItemId,
                              SettlementSourceType sourceType, Instant paidAt) {
         this.paymentId = paymentId;
         this.artistId = artistId;
         this.amount = amount;
         this.orderName = orderName;
+        this.orderItemId = orderItemId;
         this.sourceType = sourceType;
         this.paidAt = paidAt;
     }

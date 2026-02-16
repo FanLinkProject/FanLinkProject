@@ -50,46 +50,48 @@ public class SettlementPendingService {
 
             // [NPE 방지] 상품이 삭제되었거나 존재하지 않는 경우 방어 로직
             if (product == null) {
-                log.warn("상품 정보가 존재하지 않습니다 (삭제됨?): OrderItem ID={}", item.getId());
+                log.warn("[정산 생성 실패] 상품 정보가 존재하지 않습니다. orderItemId={}", item.getId());
                 continue;
             }
 
             // [정산 제외 1] 정산 대상이 아닌 상품 (플랫폼이 전액 수취)
             if (!product.getType().isSettlementTarget()) {
-                log.debug("정산 대상이 아닌 상품: type={}, name={}",
+                log.debug("[정산 제외] 정산 대상 상품이 아님: type={}, name={}",
                         product.getType(), product.getName());
                 continue;
             }
 
-            // [정산 제외 2] artistId가 없는 경우 (플랫폼 상품)
             if (product.getArtistId() == null) {
-                log.warn("아티스트 ID가 없는 상품: {}", product.getName());
+                log.warn("[정산 제외] 아티스트 ID가 없습니다. product={}", product.getName());
                 continue;
             }
 
-            // [정산 원천 결정]
-            SettlementSourceType sourceType = determineSourceType(product.getType());
+            if (item.getId() == null) {
+                log.warn("[정산 생성 실패] 주문 아이템 ID(OrderItem ID)가 null. paymentId={}, product={}",
+                        payment.getId(), product.getName());
+                continue;
+            }
 
-            // [금액 계산]
+            SettlementSourceType sourceType = determineSourceType(product.getType());
             long settlementAmount = calculateSettlementAmount(product, item);
 
-            // [INSERT IGNORE] 중복 시 해당 행만 무시, 나머지는 정상 저장
             int inserted = settlementPendingRepository.insertIgnore(
                     payment.getId(),
                     product.getArtistId(),
                     settlementAmount,
                     product.getName(),
+                    item.getId(),
                     sourceType.name(),
                     paidAt,
                     Instant.now()
             );
 
             if (inserted > 0) {
-                log.info("정산 대기열 생성: artistId={}, amount={}, product={}, sourceType={}",
-                        product.getArtistId(), settlementAmount, product.getName(), sourceType);
+                log.info("[정산 대기 생성 완료] 아티스트: artistId={}, orderItemId={}, amount={}, product={}, sourceType={}",
+                        product.getArtistId(), item.getId(), settlementAmount, product.getName(), sourceType);
             } else {
-                log.info("정산 대기열이 이미 존재합니다 (중복 스킵): paymentId={}, artistId={}, orderName={}",
-                        payment.getId(), product.getArtistId(), product.getName());
+                log.info("[정산 대기 중복 스킵] 이미 존재하는 정산 데이터입니다. paymentId={}, artistId={}, orderItemId={}",
+                        payment.getId(), product.getArtistId(), item.getId());
             }
         }
     }
@@ -98,11 +100,12 @@ public class SettlementPendingService {
         ProductPaymentMethod paymentMethod = product.getType().getPaymentMethod();
 
         if (paymentMethod == ProductPaymentMethod.CANDY_ONLY) {
-            long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
+            // 마스터 상품의 현재 가격이 아닌, 주문 당시 OrderItem에 기록된 캔디 가격(스냅샷)을 사용합니다.
+            long candyPrice = item.getCandyPrice() != null ? item.getCandyPrice() : 0L;
             return candyPrice * PaymentExchangeConfig.CANDY_EXCHANGE_RATE * item.getQuantity();
-        } else {
-            return item.getPrice().longValue() * item.getQuantity();
         }
+        // 현금 결제 시에도 OrderItem에 저장된 당시 단가(price)를 사용합니다.
+        return item.getPrice().longValue() * item.getQuantity();
     }
 
     private SettlementSourceType determineSourceType(ProductType productType) {
