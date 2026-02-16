@@ -23,5 +23,7 @@ public class AwsProperties {
     @Setter
     public static class Cloudfront {
         private String domain;
+        private String keyPairId;
+        private String privateKeyPath;
     }
 }

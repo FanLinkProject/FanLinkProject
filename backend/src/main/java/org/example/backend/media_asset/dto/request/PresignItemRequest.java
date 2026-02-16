@@ -11,6 +11,7 @@ public record PresignItemRequest(
         MediaAssetCategory category,
         @NotNull
         MediaAssetScope scope,
+        Long artistId,
         @NotBlank
         String contentType,
         @NotNull

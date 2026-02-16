@@ -19,6 +19,8 @@ import org.example.backend.media_asset.exception.MediaAssetErrorCode;
 import org.example.backend.media_asset.exception.MediaAssetException;
 import org.example.backend.media_asset.metadata.VideoMetadataExtractor;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.replay.entity.Replay;
+import org.example.backend.replay.repository.ReplayRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.user.enums.UserRole;
@@ -39,11 +41,13 @@ public class MediaAssetService {
     private final MediaAssetRepository mediaAssetRepository;
     private final ObjectKeyGenerator objectKeyGenerator;
     private final MediaPolicyValidator mediaPolicyValidator;
+    private final MediaOwnershipValidator mediaOwnershipValidator;
     private final S3MediaClient s3MediaClient;
     private final MediaProperties mediaProperties;
     private final AwsProperties awsProperties;
     private final Clock mediaClock;
     private final VideoMetadataExtractor videoMetadataExtractor;
+    private final ReplayRepository replayRepository;
 
     // 업로드용 presigned URL을 배치 발급하고 INITIATED 상태를 저장한다.
     @Transactional
@@ -52,6 +56,7 @@ public class MediaAssetService {
         UserRole userRole = principalDetails.getUser().getRole();
         List<PresignItemResponse> responses = new ArrayList<>();
         for (PresignItemRequest item : request.items()) {
+            mediaOwnershipValidator.validatePresignOwnership(item, userId, userRole);
             mediaPolicyValidator.validatePresign(item, userRole);
             String objectKey = objectKeyGenerator.generate(item, userId);
             if (mediaAssetRepository.findByObjectKey(objectKey).isPresent()) {
@@ -201,6 +206,7 @@ public class MediaAssetService {
 
             mediaAsset.markReady(actualContentType, actualSizeBytes);
             mediaAssetRepository.save(mediaAsset);
+            applyReplayMapping(mediaAsset);
             responses.add(toCompleteResponse(mediaAsset));
         }
         return new CompleteResponse(responses);
@@ -243,6 +249,7 @@ public class MediaAssetService {
         return requested == null || actualSeconds <= requested;
     }
 
+
     // 엔티티 상태에 맞는 complete 응답 DTO를 구성한다.
     private CompleteItemResponse toCompleteResponse(MediaAsset mediaAsset) {
         String url = null;
@@ -259,6 +266,63 @@ public class MediaAssetService {
                 mediaAsset.getSizeBytesActual(),
                 null
         );
+    }
+
+    // Replay 업로드 결과를 Replay 엔티티에 반영한다.
+    private void applyReplayMapping(MediaAsset mediaAsset) {
+        if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
+            return;
+        }
+        if (mediaAsset.getCategory() != MediaAssetCategory.REPLAY_VIDEO
+                && mediaAsset.getCategory() != MediaAssetCategory.REPLAY_THUMBNAIL) {
+            return;
+        }
+        String replayIdOrTemp = extractReplayIdOrTemp(mediaAsset.getObjectKey());
+        if (replayIdOrTemp == null || replayIdOrTemp.startsWith("tmp_")) {
+            return;
+        }
+        Long replayId = parseLongSafely(replayIdOrTemp);
+        if (replayId == null) {
+            return;
+        }
+        Replay replay = replayRepository.findById(replayId).orElse(null);
+        if (replay == null) {
+            return;
+        }
+        if (mediaAsset.getCategory() == MediaAssetCategory.REPLAY_VIDEO) {
+            replay.updateMp4Key(mediaAsset.getObjectKey());
+        } else {
+            replay.updateThumbnailKey(mediaAsset.getObjectKey());
+        }
+    }
+
+    // objectKey에서 replayIdOrTemp를 추출한다.
+    private String extractReplayIdOrTemp(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return null;
+        }
+        String normalized = objectKey.startsWith("restricted/")
+                ? objectKey.substring("restricted/".length())
+                : objectKey;
+        String prefix = "live/replays/";
+        if (!normalized.startsWith(prefix)) {
+            return null;
+        }
+        String remainder = normalized.substring(prefix.length());
+        int idx = remainder.indexOf('/');
+        if (idx <= 0) {
+            return null;
+        }
+        return remainder.substring(0, idx);
+    }
+
+    // 문자열을 Long으로 안전하게 변환한다.
+    private Long parseLongSafely(String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     // CloudFront 도메인과 objectKey로 CDN URL을 생성한다.

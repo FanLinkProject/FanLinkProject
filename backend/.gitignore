@@ -121,4 +121,6 @@ logs/
 log/
 /src/main/java/org/example/backend/ivs/docs/ivs.md
 /src/main/java/org/example/backend/ivs/README.md
+/src/main/java/org/example/backend/replay/README.md
+/src/main/java/org/example/backend/music_video/README.md
 *.pem

@@ -46,6 +46,9 @@ public class ArtistMusicVideo {
     @Column(nullable = false, length = 150)
     private String title;
 
+    @Column(nullable = false, length = 2000)
+    private String description;
+
     @Column(length = 500)
     private String canonicalUrl;
 
@@ -58,11 +61,12 @@ public class ArtistMusicVideo {
     private LocalDateTime updatedAt;
 
     // MV 엔티티 생성에 필요한 값을 세팅한다.
-    public ArtistMusicVideo(Long artistId, VideoProvider provider, String videoId, String title, String canonicalUrl) {
+    public ArtistMusicVideo(Long artistId, VideoProvider provider, String videoId, String title, String description, String canonicalUrl) {
         this.artistId = artistId;
         this.provider = provider;
         this.videoId = videoId;
         this.title = title;
+        this.description = description;
         this.canonicalUrl = canonicalUrl;
     }
 }

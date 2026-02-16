@@ -1,7 +1,10 @@
 package org.example.backend.media_asset.config;
 
+import org.example.backend.media_asset.metadata.FfprobeVideoMetadataExtractor;
 import org.example.backend.media_asset.metadata.NoopVideoMetadataExtractor;
 import org.example.backend.media_asset.metadata.VideoMetadataExtractor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +47,16 @@ public class MediaAssetConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "media.metadata", name = {"enabled", "ffprobe-path"})
+    // ffprobe 기반 메타데이터 추출 구현체를 등록한다.
+    public VideoMetadataExtractor ffprobeVideoMetadataExtractor(S3Client s3Client,
+                                                                AwsProperties awsProperties,
+                                                                MediaProperties mediaProperties) {
+        return new FfprobeVideoMetadataExtractor(s3Client, awsProperties, mediaProperties);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(VideoMetadataExtractor.class)
     // Sp-2 확장 전 기본 메타데이터 추출 구현체를 등록한다.
     public VideoMetadataExtractor videoMetadataExtractor() {
         return new NoopVideoMetadataExtractor();
