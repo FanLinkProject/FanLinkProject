@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, Suspense } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -27,7 +27,8 @@ function getEmailFromTokenPayload(payload) {
   return payload.email || payload.username || payload.sub || "";
 }
 
-const ChatDMDetailPage = () => {
+// useSearchParams를 사용하는 컴포넌트를 분리
+const ChatDMDetailContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roomId = searchParams.get("roomId");
@@ -116,6 +117,19 @@ const ChatDMDetailPage = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Suspense로 감싼 메인 컴포넌트
+const ChatDMDetailPage = () => {
+  return (
+    <Suspense fallback={
+      <div className="p-8 lg:p-12 max-w-5xl mx-auto">
+        <div className="text-white">로딩 중...</div>
+      </div>
+    }>
+      <ChatDMDetailContent />
+    </Suspense>
   );
 };
 

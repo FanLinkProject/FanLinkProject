@@ -21,7 +21,6 @@ public class JoinDaysScheduler {
 
     private final FanProfileRepository fanProfileRepository;
     private final FanGradeAutoUpgradeService fanGradeAutoUpgradeService;
-    private final FanVisitTrackingService fanVisitTrackingService;
 
     /**
      * 매일 자정(00:00:00)에 실행
@@ -32,26 +31,22 @@ public class JoinDaysScheduler {
     @Transactional
     public void incrementJoinDays() {
         log.info("[가입일수 스케줄러] 시작");
-        
+
         List<FanProfile> allProfiles = fanProfileRepository.findAll();
         int count = 0;
-        
+
         for (FanProfile profile : allProfiles) {
             profile.increaseJoinDays();
             count++;
-            
-            // 자동승급 체크 (배치 처리)
+
             try {
                 fanGradeAutoUpgradeService.checkAndUpgradeForFan(profile.getId());
             } catch (Exception e) {
                 log.error("[가입일수 스케줄러] 자동승급 실패: fanProfileId={}", profile.getId(), e);
             }
         }
-        
+
         log.info("[가입일수 스케줄러] 완료: {}개 프로필 업데이트", count);
-        
-        // 방문 캐시 초기화
-        fanVisitTrackingService.clearVisitCache();
     }
 
     /**
