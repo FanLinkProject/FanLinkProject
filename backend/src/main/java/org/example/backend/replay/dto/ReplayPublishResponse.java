@@ -3,7 +3,7 @@ package org.example.backend.replay.dto;
 import org.example.backend.replay.entity.ReplayAccessType;
 import org.example.backend.replay.entity.ReplayStatus;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 // Replay 발행 응답 DTO.
 public record ReplayPublishResponse(
@@ -13,6 +13,6 @@ public record ReplayPublishResponse(
         ReplayAccessType accessType,
         ReplayStatus status,
         String playbackUrl,
-        OffsetDateTime publishedAt
+        Instant publishedAt
 ) {
 }

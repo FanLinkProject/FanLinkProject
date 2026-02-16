@@ -21,6 +21,8 @@ public record PresignItemRequest(
         String ext,
         String postIdOrTemp,
         String replayIdOrTemp,
-        Integer attachmentCountInPost
+        String productIdOrTemp,
+        Integer attachmentCountInPost,
+        Integer attachmentCountInProduct
 ) {
 }

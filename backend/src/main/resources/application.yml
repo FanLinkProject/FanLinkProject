@@ -188,10 +188,21 @@ ivs:
   playback-auth:
     enabled: ${IVS_PLAYBACK_ENABLED:false}
     private-key-path: ${IVS_PLAYBACK_PRIVATE_KEY_PATH:}
+  recording-events:
+    enabled: ${IVS_RECORDING_EVENTS_ENABLED:false}
+    queue-url: ${IVS_RECORDING_EVENTS_QUEUE_URL:}
+    max-messages: ${IVS_RECORDING_EVENTS_MAX_MESSAGES:5}
+    wait-seconds: ${IVS_RECORDING_EVENTS_WAIT_SECONDS:10}
+    visibility-timeout-seconds: ${IVS_RECORDING_EVENTS_VISIBILITY_TIMEOUT_SECONDS:30}
+    poll-fixed-delay-ms: ${IVS_RECORDING_EVENTS_POLL_FIXED_DELAY_MS:5000}
 
 replay:
   access-gate:
     enabled: ${REPLAY_ACCESS_GATE_ENABLED:false}
+
+post:
+  access:
+    cookie-ttl-seconds: ${POST_ACCESS_COOKIE_TTL_SECONDS:600}
 
 media:
   presign:
@@ -212,6 +223,7 @@ media:
     replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
   attachments:
     max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
+    max-per-product-images: ${MEDIA_ATTACHMENTS_MAX_PER_PRODUCT_IMAGES}
 
 # 정산 관련 설정
 settlement:
