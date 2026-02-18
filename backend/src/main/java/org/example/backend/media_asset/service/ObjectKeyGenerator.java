@@ -50,20 +50,32 @@ public class ObjectKeyGenerator {
                                  String postIdOrTemp,
                                  String replayIdOrTemp,
                                  String productIdOrTemp) {
-        String base = switch (category) {
-            case PROFILE_IMAGE -> "profiles/" + requireValue(ownerUserId, "ownerUserId") + "/";
-            case ARTIST_COVER_IMAGE -> "covers/" + requireValue(artistId, "artistId") + "/";
-            case POST_IMAGE, POST_VIDEO -> "posts/" + (category == MediaAssetCategory.POST_IMAGE ? "images/" : "videos/")
-                    + requireText(postIdOrTemp, "postIdOrTemp") + "/";
-            case REPLAY_VIDEO, REPLAY_THUMBNAIL -> "live/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
-            case PRODUCT_IMAGE -> "product/images/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
-            case PRODUCT_DESCRIBE_IMAGE -> "product/describe_image/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
+        return switch (category) {
+            case PROFILE_IMAGE ->
+                    "public/profiles/" + requireValue(ownerUserId, "ownerUserId") + "/";
+            case ARTIST_COVER_IMAGE ->
+                    "public/covers/" + requireValue(artistId, "artistId") + "/";
+            case POST_IMAGE ->
+                    buildPostPrefix("images", scope, postIdOrTemp);
+            case POST_VIDEO ->
+                    buildPostPrefix("videos", scope, postIdOrTemp);
+            case REPLAY_VIDEO ->
+                    "raw/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
+            case REPLAY_THUMBNAIL ->
+                    "public/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
+            case PRODUCT_IMAGE ->
+                    "public/products/images/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
+            case PRODUCT_DESCRIBE_IMAGE ->
+                    "public/products/describe/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
         };
+    }
 
+    private String buildPostPrefix(String type, MediaAssetScope scope, String postIdOrTemp) {
+        String suffix = "posts/" + type + "/" + requireText(postIdOrTemp, "postIdOrTemp") + "/";
         if (scope == MediaAssetScope.RESTRICTED) {
-            return "restricted/" + base;
+            return "restricted/" + suffix;
         }
-        return base;
+        return "public/" + suffix;
     }
 
     // 확장자에 대한 기본 sanitize(영숫자/길이 제한)를 수행한다.

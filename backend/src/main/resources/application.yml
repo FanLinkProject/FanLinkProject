@@ -200,6 +200,22 @@ replay:
   access-gate:
     enabled: ${REPLAY_ACCESS_GATE_ENABLED:false}
 
+mediaconvert:
+  enabled: ${MEDIACONVERT_ENABLED:false}
+  endpoint: ${MEDIACONVERT_ENDPOINT:}
+  role-arn: ${MEDIACONVERT_ROLE_ARN:}
+  job-template: ${MEDIACONVERT_JOB_TEMPLATE:}
+  queue-arn: ${MEDIACONVERT_QUEUE_ARN:}
+  output-prefix: ${MEDIACONVERT_OUTPUT_PREFIX:derived/replays}
+  output-subpath: ${MEDIACONVERT_OUTPUT_SUBPATH:cmaf}
+  events:
+    enabled: ${MEDIACONVERT_EVENTS_ENABLED:false}
+    queue-url: ${MEDIACONVERT_EVENTS_QUEUE_URL:}
+    max-messages: ${MEDIACONVERT_EVENTS_MAX_MESSAGES:5}
+    wait-seconds: ${MEDIACONVERT_EVENTS_WAIT_SECONDS:10}
+    visibility-timeout-seconds: ${MEDIACONVERT_EVENTS_VISIBILITY_TIMEOUT_SECONDS:30}
+    poll-fixed-delay-ms: ${MEDIACONVERT_EVENTS_POLL_FIXED_DELAY_MS:5000}
+
 post:
   access:
     cookie-ttl-seconds: ${POST_ACCESS_COOKIE_TTL_SECONDS:600}
