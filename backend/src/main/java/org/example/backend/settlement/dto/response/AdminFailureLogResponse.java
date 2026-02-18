@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.example.backend.settlement.entity.SettlementFailureLog;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 관리자용 정산 실패 로그 응답 DTO
@@ -23,8 +23,8 @@ public class AdminFailureLogResponse {
     private String orderNo;           // 주문번호
     private String errorMessage;      // 에러 메시지
     private Boolean isProcessed;      // 복구 완료 여부
-    private LocalDateTime processedAt;// 복구 완료 시각
-    private LocalDateTime createdAt;  // 실패 발생 시각
+    private Instant processedAt;// 복구 완료 시각
+    private Instant createdAt;  // 실패 발생 시각
 
     public static AdminFailureLogResponse from(SettlementFailureLog entity) {
         return AdminFailureLogResponse.builder()

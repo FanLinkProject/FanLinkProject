@@ -89,6 +89,25 @@ input[type="search"] {
   background: rgba(148, 163, 184, 0.55);
 }
 
+.settlement-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 rgba(255, 255, 255, 0.08);
+}
+.settlement-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.settlement-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+}
+.settlement-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  border-radius: 9999px;
+}
+.settlement-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, #8b5cf6, #c4b5fd);
+}
+
 .material-symbols-outlined.fill-icon {
   font-variation-settings: "FILL" 1;
 }

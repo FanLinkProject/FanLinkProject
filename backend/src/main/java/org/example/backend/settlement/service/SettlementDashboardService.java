@@ -44,7 +44,7 @@ public class SettlementDashboardService {
      */
     public SettlementEstimateResponse getEstimatedAmount(Long artistId) {
         // 1. 소스 타입별 매출 합계 조회 (GROUP BY)
-        // totalSales는 '매출 총액(KRW)'이어야 함
+        // totalSales는 '매출 총액(KRW)'
         List<Object[]> results = pendingRepository.findTotalAmountGroupBySourceType(artistId);
 
         long totalEstimatedAmount = 0;
@@ -54,9 +54,9 @@ public class SettlementDashboardService {
             SettlementSourceType type = (SettlementSourceType) row[0];
             Long totalSales = (Long) row[1];
 
-            // 캔디(CANDY) 처리 주의사항
-            // DB의 amount(totalSales)는 '캔디 개수'가 아닌 '(개수 * 단가)'로 환산된 '금액(KRW)'이어야 함
-            // 예: 캔디 100개(개당 100원) 사용 -> DB amount: 10,000원 -> 정산금: 10,000 * 0.2 = 2,000원
+            // 정산 타입별 비율 적용: CASH(90%), CANDY(20%)
+            // totalSales는 이미 KRW 환산된 금액 (캔디는 EventListener에서 환율 적용됨)
+            // 예: 현금 10,000원 -> 9,000원 / 캔디 10,000원 -> 2,000원
             long settlementAmount = BigDecimal.valueOf(totalSales)
                     .multiply(type.getDefaultShareRatio())
                     .setScale(0, RoundingMode.FLOOR)
@@ -103,45 +103,73 @@ public class SettlementDashboardService {
      * 정산 이력이 있는 모든 정산 대상(GROUP/ARTIST)의 누적 정산 현황 + 이번 달 예상 정산금을 반환합니다.
      */
     public List<AdminSettlementSummaryResponse> getAdminSettlementSummaries() {
-        // 1. 정산 이력이 있는 유저 ID 목록 조회
-        List<Long> targetIds = settlementRepository.findDistinctArtistIds();
+        // 1. Bulk Fetch: 정산 집계 데이터
+        // Row: [artistId, totalSales, totalFee, finalAmount, count]
+        List<Object[]> settlementSummaries = settlementRepository.findAllSettlementSummariesGroupByArtist();
 
-        if (targetIds.isEmpty()) {
+        // 2. Bulk Fetch: 예상 정산금 데이터
+        // Row: [artistId, sourceType, amount]
+        List<Object[]> pendingEstimates = pendingRepository.findAllEstimatedAmountsGroupByArtist();
+
+        // 3. 정산 대상 ID 수집 (정산 이력 OR 대기열이 있는 모든 대상)
+        Set<Long> allArtistIds = new HashSet<>();
+        settlementSummaries.forEach(row -> allArtistIds.add((Long) row[0]));
+        pendingEstimates.forEach(row -> allArtistIds.add((Long) row[0]));
+
+        if (allArtistIds.isEmpty()) {
             return List.of();
         }
 
-        // 2. 유저 정보 일괄 조회 (N+1 방지)
+        // 4. 유저 정보 및 그룹명 일괄 조회
+        List<Long> targetIds = new ArrayList<>(allArtistIds);
         Map<Long, User> userMap = userRepository.findAllById(targetIds)
                 .stream()
                 .collect(Collectors.toMap(User::getId, user -> user));
 
-        // 3. 그룹명 일괄 조회 (N+1 방지)
-        // GROUP 역할 유저 → 자신의 그룹명 조회
-        // ARTIST 역할 유저 → 소속 그룹명 조회
         Map<Long, String> groupNameMap = buildGroupNameMap(targetIds, userMap);
 
-        // 4. 정산 대상별 요약 데이터 생성
+        // 5. 예상 정산금 메모리 집계 (Map<ArtistId, Amount>)
+        Map<Long, Long> pendingMap = new HashMap<>();
+        for (Object[] row : pendingEstimates) {
+            Long artistId = (Long) row[0];
+            SettlementSourceType type = (SettlementSourceType) row[1];
+            Long amount = (Long) row[2]; // KRW Sales Amount
+
+            long calculated = BigDecimal.valueOf(amount)
+                    .multiply(type.getDefaultShareRatio())
+                    .setScale(0, RoundingMode.FLOOR)
+                    .longValue();
+
+            pendingMap.merge(artistId, calculated, Long::sum);
+        }
+
+        // 6. 정산 집계 데이터 메모리 매핑 (Map<ArtistId, Object[]>)
+        Map<Long, Object[]> summaryMap = settlementSummaries.stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> row));
+
+        // 7. 최종 응답 생성
         List<AdminSettlementSummaryResponse> summaries = new ArrayList<>();
 
         for (Long targetId : targetIds) {
-            Object[] summary = settlementRepository.findSettlementSummaryByArtistId(targetId);
-
-            // JPA 쿼리가 이중 배열 [[value1, value2, value3, value4]]을 반환하므로
-            // summary[0]를 먼저 추출하여 실제 데이터 배열을 얻음
-            Object[] data = (Object[]) summary[0];
-
-            // JPA의 SUM() 함수는 Long이 아닌 Number 타입을 반환할 수 있으므로 안전하게 변환
-            Long totalSales = ((Number) data[0]).longValue();
-            Long totalFee = ((Number) data[1]).longValue();
-            Long totalFinal = ((Number) data[2]).longValue();
-            Long count = ((Number) data[3]).longValue();
-
-            // 이번 달 예상 정산금 계산
-            long pendingEstimate = calculatePendingEstimate(targetId);
-
             User user = userMap.get(targetId);
-            String roleName = user != null ? user.getRole().name() : "UNKNOWN";
-            String nickname = user != null ? user.getNickname() : "알 수 없음";
+            if (user == null) continue;
+
+            // 정산 집계 데이터 추출
+            Object[] summary = summaryMap.get(targetId);
+            long totalSales = 0, totalFee = 0, totalFinal = 0, count = 0;
+
+            if (summary != null) {
+                totalSales = ((Number) summary[1]).longValue();
+                totalFee = ((Number) summary[2]).longValue();
+                totalFinal = ((Number) summary[3]).longValue();
+                count = ((Number) summary[4]).longValue();
+            }
+
+            // 예상 정산금 추출
+            long pendingEstimate = pendingMap.getOrDefault(targetId, 0L);
+
+            String roleName = user.getRole().name();
+            String nickname = user.getNickname();
 
             summaries.add(AdminSettlementSummaryResponse.builder()
                     .artistId(targetId)
@@ -261,27 +289,7 @@ public class SettlementDashboardService {
 
     // ===== [내부 공용 메서드] =====
 
-    /**
-     * 이번 달 정산 예상 금액을 계산합니다.
-     */
-    private long calculatePendingEstimate(Long artistId) {
-        List<Object[]> results = pendingRepository.findTotalAmountGroupBySourceType(artistId);
-        long totalEstimatedAmount = 0;
 
-        for (Object[] row : results) {
-            SettlementSourceType type = (SettlementSourceType) row[0];
-            Long totalSales = (Long) row[1];
-
-            long settlementAmount = BigDecimal.valueOf(totalSales)
-                    .multiply(type.getDefaultShareRatio())
-                    .setScale(0, RoundingMode.FLOOR)
-                    .longValue();
-
-            totalEstimatedAmount += settlementAmount;
-        }
-
-        return totalEstimatedAmount;
-    }
 
     /**
      * 여러 유저의 그룹명을 일괄 조회하여 Map으로 반환합니다.
