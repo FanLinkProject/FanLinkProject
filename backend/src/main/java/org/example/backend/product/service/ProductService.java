@@ -1,16 +1,24 @@
 package org.example.backend.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.media_asset.entity.MediaAsset;
+import org.example.backend.media_asset.entity.MediaAssetCategory;
+import org.example.backend.media_asset.entity.MediaAssetStatus;
+import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.product.dto.request.ProductRequestDto;
 import org.example.backend.product.entity.Product;
+import org.example.backend.product.entity.ProductMediaAsset;
 import org.example.backend.product.exception.ProductErrorCode;
 import org.example.backend.product.exception.ProductException;
+import org.example.backend.product.repository.ProductMediaAssetRepository;
 import org.example.backend.product.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-
-import org.example.backend.product.dto.request.ProductRequestDto;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +26,8 @@ import org.example.backend.product.dto.request.ProductRequestDto;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductMediaAssetRepository productMediaAssetRepository;
+    private final MediaAssetRepository mediaAssetRepository;
 
     public List<Product> getAllProducts() {
         return productRepository.findAll();
@@ -44,7 +54,33 @@ public class ProductService {
                 .isMembership(isMembership)
                 .build();
 
-        return productRepository.save(product);
+        Product savedProduct = productRepository.save(product);
+
+        List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(request.mediaAssetIds());
+        for (MediaAsset asset : mediaAssets) {
+            productMediaAssetRepository.save(new ProductMediaAsset(savedProduct, asset));
+        }
+
+        return savedProduct;
+    }
+
+    private List<MediaAsset> validateAndFetchMediaAssets(List<Long> mediaAssetIds) {
+        if (CollectionUtils.isEmpty(mediaAssetIds)) {
+            return Collections.emptyList();
+        }
+        List<MediaAsset> assets = new ArrayList<>();
+        for (Long id : mediaAssetIds) {
+            MediaAsset asset = mediaAssetRepository.findById(id)
+                    .orElseThrow(() -> new ProductException(ProductErrorCode.MEDIA_ASSET_NOT_FOUND));
+            if (asset.getStatus() != MediaAssetStatus.READY) {
+                throw new ProductException(ProductErrorCode.MEDIA_ASSET_NOT_READY);
+            }
+            if (asset.getCategory() != MediaAssetCategory.PRODUCT_IMAGE && asset.getCategory() != MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE) {
+                throw new ProductException(ProductErrorCode.INVALID_MEDIA_ASSET_CATEGORY);
+            }
+            assets.add(asset);
+        }
+        return assets;
     }
 
     public Product getProduct(Long id) {
@@ -73,6 +109,14 @@ public class ProductService {
                 isExclusive,
                 isMembership);
 
+        if (request.mediaAssetIds() != null) {
+            productMediaAssetRepository.deleteAllByProduct_Id(id);
+            List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(request.mediaAssetIds());
+            for (MediaAsset asset : mediaAssets) {
+                productMediaAssetRepository.save(new ProductMediaAsset(product, asset));
+            }
+        }
+
         return product;
     }
 
@@ -91,6 +135,7 @@ public class ProductService {
     @Transactional
     public void deleteProduct(Long id) {
         Product product = getProduct(id);
+        productMediaAssetRepository.deleteAllByProduct_Id(id);
         productRepository.delete(product);
     }
 }
