@@ -5,7 +5,7 @@ import lombok.Getter;
 import org.example.backend.settlement.entity.Settlement;
 import org.example.backend.settlement.enums.SettlementStatus;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 
 // 정산 내역 응답 Dto : SettlementController에서 아티스트에게 과거 내역 보여줄 때 사용
@@ -19,7 +19,7 @@ public class SettlementHistoryResponse {
     private Long feeAmount;         // 수수료
     private Long finalAmount;       // 최종 지급액
     private SettlementStatus status;// 상태 (COMPLETE)
-    private LocalDateTime settledAt;// 지급 완료일
+    private Instant settledAt;// 지급 완료일
 
     public static SettlementHistoryResponse from(Settlement entity) {
         return SettlementHistoryResponse.builder()

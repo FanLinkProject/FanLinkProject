@@ -38,4 +38,14 @@ public interface SettlementRepository extends JpaRepository<Settlement, Long> {
            "FROM Settlement s WHERE s.artistId = :artistId")
     Object[] findSettlementSummaryByArtistId(@Param("artistId") Long artistId);
 
+    // [관리자] 전체 아티스트 정산 집계 (Bulk)
+    @Query("SELECT s.artistId, " +
+           "COALESCE(SUM(s.totalSalesAmount), 0), " +
+           "COALESCE(SUM(s.feeAmount), 0), " +
+           "COALESCE(SUM(s.finalAmount), 0), " +
+           "COUNT(s) " +
+           "FROM Settlement s " +
+           "GROUP BY s.artistId")
+    List<Object[]> findAllSettlementSummariesGroupByArtist();
+
 }

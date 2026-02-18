@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * [정산 스케줄러]
@@ -27,12 +28,12 @@ public class SettlementScheduler {
     private final JobLauncher jobLauncher;
     private final Job settlementJob;
 
-    // 매월 15일 새벽 4시 실행
+    // 매월 15일 새벽 4시 실행(KST)
     @Scheduled(cron = "${settlement.batch.cron}", zone = "Asia/Seoul")
     public void runSettlementJob() {
-        log.info("========== [자동 정산] 배치 시작 (매월 15일) ==========");
+        log.info("========== [자동 정산] 배치 시작 (KST): 15일 04:00, (UTC) : 14일 19:00 ==========");
 
-        LocalDate now = LocalDate.now();
+        LocalDate now = LocalDate.now(ZoneId.of("Asia/Seoul"));
         LocalDate lastMonth = now.minusMonths(1);
         LocalDate startDate = lastMonth.withDayOfMonth(1);
         LocalDate endDate = lastMonth.withDayOfMonth(lastMonth.lengthOfMonth());

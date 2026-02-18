@@ -58,4 +58,5 @@ public class PlaybackUrlCalculator {
         }
         return normalized.substring(0, idx);
     }
+
 }

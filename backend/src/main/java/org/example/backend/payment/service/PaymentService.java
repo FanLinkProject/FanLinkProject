@@ -22,7 +22,8 @@ import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 
 import org.example.backend.payment.exception.PaymentErrorCode;
 import org.example.backend.payment.exception.PaymentException;
@@ -86,8 +87,7 @@ public class PaymentService {
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
                 .status(PaymentStatus.DONE)
                 .method(convertPaymentMethod(response.getMethod()))
-                .paidAt(LocalDateTime.parse(response.getApprovedAt(),
-                        java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .paidAt(OffsetDateTime.parse(response.getApprovedAt()).toInstant())
                 .build();
 
         Payment savedPayment = paymentRepository.save(payment);
@@ -144,8 +144,7 @@ public class PaymentService {
                 .amount(BigDecimal.valueOf(response.getTotalAmount()))
                 .status(PaymentStatus.DONE)
                 .method(PaymentMethod.CARD) // 자동결제는 대부분 CARD
-                .paidAt(LocalDateTime.parse(response.getApprovedAt(),
-                        java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .paidAt(OffsetDateTime.parse(response.getApprovedAt()).toInstant())
                 .build();
 
         Payment savedPayment = paymentRepository.save(payment);
@@ -209,7 +208,7 @@ public class PaymentService {
                 .amount(BigDecimal.valueOf(krwAmount))
                 .status(PaymentStatus.DONE)
                 .method(PaymentMethod.CANDY) // ENUM에 CANDY 확인 필요, 없으면 CARD 등 대체
-                .paidAt(LocalDateTime.now())
+                .paidAt(Instant.now())
                 .build();
 
         Payment savedPayment = paymentRepository.save(payment);

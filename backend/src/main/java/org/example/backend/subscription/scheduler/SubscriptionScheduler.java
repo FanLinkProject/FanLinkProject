@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.payment.config.PaymentExchangeConfig;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -185,7 +186,7 @@ public class SubscriptionScheduler {
                 .amount(BigDecimal.valueOf(krwAmount))
                 .status(PaymentStatus.DONE)
                 .method(PaymentMethod.CARD)
-                .paidAt(LocalDateTime.now())
+                .paidAt(Instant.now())
                 .build();
         Payment savedPayment = paymentRepository.save(payment);
 

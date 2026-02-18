@@ -151,7 +151,7 @@ public class IvsRecordingEventListener {
                 session.getArtistId(),
                 session.getId(),
                 accessType,
-                ReplayStatus.PUBLISHED,
+                ReplayStatus.READY,
                 session.getRecordingS3Bucket(),
                 session.getRecordingS3Prefix(),
                 Instant.now()
