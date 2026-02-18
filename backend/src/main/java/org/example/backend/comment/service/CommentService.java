@@ -18,6 +18,7 @@ import org.example.backend.post.entity.FanPost;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.music_video.repository.ArtistMusicVideoRepository;
+import org.example.backend.replay.entity.ReplayStatus;
 import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
@@ -239,6 +240,7 @@ public class CommentService {
             case MEDIA -> artistMusicVideoRepository.findById(targetId)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case LIVE -> replayRepository.findById(targetId)
+                    .filter(replay -> replay.getStatus() == ReplayStatus.PUBLISHED)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
         }
     }
