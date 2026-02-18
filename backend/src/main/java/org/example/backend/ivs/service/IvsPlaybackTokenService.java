@@ -14,7 +14,7 @@ import org.example.backend.ivs.util.IvsTimeUtil;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 @Service
 @ConditionalOnProperty(prefix = "ivs.playback-auth", name = "enabled", havingValue = "true")
@@ -69,7 +69,7 @@ public class IvsPlaybackTokenService {
     // IVS 호출 결과로 응답 DTO를 구성한다.
     private CreatePlaybackTokenResponse buildResponse(String channelArn, int ttlSeconds, Long userId) {
         IvsPlaybackTokenResult result = awsIvsPlaybackClient.createPlaybackToken(channelArn, ttlSeconds, userId);
-        OffsetDateTime expiresAt = ivsTimeUtil.toUtc(result.expiresAt());
+        Instant expiresAt = result.expiresAt();
         int refreshHint = ivsTimeUtil.recommendedRefreshSeconds(ttlSeconds);
         return new CreatePlaybackTokenResponse(
                 result.token(),

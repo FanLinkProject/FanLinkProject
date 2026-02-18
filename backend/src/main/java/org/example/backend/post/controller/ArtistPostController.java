@@ -4,8 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.post.dto.request.ArtistPostRequest;
 import org.example.backend.post.dto.response.ArtistPostResponse;
+import org.example.backend.post.dto.response.PostAccessResult;
 import org.example.backend.post.service.ArtistPostService;
+import org.example.backend.post.service.PostAccessService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +20,7 @@ import java.util.List;
 public class ArtistPostController {
 
     private final ArtistPostService artistPostService;
+    private final PostAccessService postAccessService;
 
     @PostMapping
     public ResponseEntity<ArtistPostResponse> createPost(
@@ -30,16 +34,22 @@ public class ArtistPostController {
     public ResponseEntity<List<ArtistPostResponse>> getPosts(
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long lastPostId,
-            @RequestParam(defaultValue = "10") int limit) {
-        List<ArtistPostResponse> responses = artistPostService.getPosts(groupId, lastPostId, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        List<ArtistPostResponse> responses = artistPostService.getPosts(groupId, lastPostId, limit, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/notices")
     public ResponseEntity<List<ArtistPostResponse>> getNotices(
             @RequestParam(required = false) Long lastPostId,
-            @RequestParam(defaultValue = "10") int limit) {
-        List<ArtistPostResponse> responses = artistPostService.getNotices(lastPostId, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        List<ArtistPostResponse> responses = artistPostService.getNotices(lastPostId, limit, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(responses);
     }
 
@@ -47,15 +57,37 @@ public class ArtistPostController {
     public ResponseEntity<List<ArtistPostResponse>> getArtistPosts(
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long lastPostId,
-            @RequestParam(defaultValue = "10") int limit) {
-        List<ArtistPostResponse> responses = artistPostService.getArtistPosts(groupId, lastPostId, limit);
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        List<ArtistPostResponse> responses = artistPostService.getArtistPosts(groupId, lastPostId, limit, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ArtistPostResponse> getPost(@PathVariable Long id) {
-        ArtistPostResponse response = artistPostService.getPost(id);
+    public ResponseEntity<ArtistPostResponse> getPost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        ArtistPostResponse response = artistPostService.getPost(id, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/access")
+    public ResponseEntity<?> issueAccessCookie(
+            @PathVariable Long id,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        PostAccessResult result = postAccessService.issueAccessCookie(id, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
+        HttpHeaders headers = new HttpHeaders();
+        for (String cookie : result.setCookieHeaders()) {
+            headers.add(HttpHeaders.SET_COOKIE, cookie);
+        }
+        return ResponseEntity.ok().headers(headers).body(result.response());
     }
 
     @PutMapping("/{id}")

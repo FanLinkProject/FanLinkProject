@@ -24,4 +24,7 @@ public interface LiveSessionRepository extends JpaRepository<LiveSession, Long> 
 		@Param("artistId") Long artistId,
 		@Param("statuses") List<LiveSessionStatus> statuses,
 		@Param("now") OffsetDateTime now);
+
+	// channelArn으로 LiveSession을 조회한다.
+	Optional<LiveSession> findByChannelArn(String channelArn);
 }

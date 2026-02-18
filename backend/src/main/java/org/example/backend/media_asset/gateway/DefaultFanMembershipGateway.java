@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -18,6 +18,6 @@ public class DefaultFanMembershipGateway implements FanMembershipGateway {
         if (artistId == null || userId == null) {
             return false;
         }
-        return subscriptionRepository.existsActiveSubscriptionForArtist(userId, artistId, LocalDateTime.now());
+        return subscriptionRepository.existsActiveSubscriptionForArtist(userId, artistId, Instant.now());
     }
 }

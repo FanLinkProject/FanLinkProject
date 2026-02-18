@@ -17,7 +17,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(
@@ -54,11 +54,11 @@ public class ArtistMusicVideo {
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     // MV 엔티티 생성에 필요한 값을 세팅한다.
     public ArtistMusicVideo(Long artistId, VideoProvider provider, String videoId, String title, String description, String canonicalUrl) {

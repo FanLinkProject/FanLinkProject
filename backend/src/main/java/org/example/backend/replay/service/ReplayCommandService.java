@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -65,7 +65,7 @@ public class ReplayCommandService {
             throw new ReplayException(ReplayErrorCode.DUPLICATE_PUBLISH);
         }
 
-        OffsetDateTime now = OffsetDateTime.now();
+        Instant now = Instant.now();
         Replay replay = new Replay(
                 request.artistId(),
                 request.liveSessionId(),
@@ -128,7 +128,7 @@ public class ReplayCommandService {
         ReplayAccessResponse response = new ReplayAccessResponse(
                 playbackUrl,
                 pathPattern,
-                OffsetDateTime.now().plusSeconds(ttl.getSeconds())
+                Instant.now().plusSeconds(ttl.getSeconds())
         );
         return new ReplayAccessResult(response, cookies);
     }
