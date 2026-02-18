@@ -21,6 +21,8 @@ import org.example.backend.media_asset.metadata.VideoMetadataExtractor;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.replay.entity.Replay;
 import org.example.backend.replay.repository.ReplayRepository;
+import org.example.backend.replay.service.MediaConvertJobService;
+import org.example.backend.replay.entity.ReplayStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.user.enums.UserRole;
@@ -48,6 +50,7 @@ public class MediaAssetService {
     private final Clock mediaClock;
     private final VideoMetadataExtractor videoMetadataExtractor;
     private final ReplayRepository replayRepository;
+    private final MediaConvertJobService mediaConvertJobService;
 
     // 업로드용 presigned URL을 배치 발급하고 INITIATED 상태를 저장한다.
     @Transactional
@@ -291,9 +294,36 @@ public class MediaAssetService {
         }
         if (mediaAsset.getCategory() == MediaAssetCategory.REPLAY_VIDEO) {
             replay.updateMp4Key(mediaAsset.getObjectKey());
+            submitMediaConvertIfNeeded(replay, mediaAsset.getObjectKey());
         } else {
             replay.updateThumbnailKey(mediaAsset.getObjectKey());
         }
+    }
+
+    private void submitMediaConvertIfNeeded(Replay replay, String objectKey) {
+        if (replay.getMediaConvertJobId() != null && !replay.getMediaConvertJobId().isBlank()) {
+            return;
+        }
+        if (!isRawReplayObjectKey(objectKey)) {
+            return;
+        }
+        String jobId = mediaConvertJobService.submitReplayJob(replay, objectKey);
+        if (jobId == null || jobId.isBlank()) {
+            return;
+        }
+        replay.updateMediaConvertJobId(jobId);
+        replay.changeStatus(ReplayStatus.VALIDATING);
+        replayRepository.save(replay);
+    }
+
+    private boolean isRawReplayObjectKey(String objectKey) {
+        if (objectKey == null) {
+            return false;
+        }
+        String normalized = objectKey.startsWith("restricted/")
+                ? objectKey.substring("restricted/".length())
+                : objectKey;
+        return normalized.startsWith("raw/replays/");
     }
 
     // objectKey에서 replayIdOrTemp를 추출한다.
@@ -304,16 +334,23 @@ public class MediaAssetService {
         String normalized = objectKey.startsWith("restricted/")
                 ? objectKey.substring("restricted/".length())
                 : objectKey;
-        String prefix = "live/replays/";
-        if (!normalized.startsWith(prefix)) {
-            return null;
+        String[] prefixes = {
+                "raw/replays/",
+                "public/replays/",
+                "live/replays/"
+        };
+        for (String prefix : prefixes) {
+            if (!normalized.startsWith(prefix)) {
+                continue;
+            }
+            String remainder = normalized.substring(prefix.length());
+            int idx = remainder.indexOf('/');
+            if (idx <= 0) {
+                return null;
+            }
+            return remainder.substring(0, idx);
         }
-        String remainder = normalized.substring(prefix.length());
-        int idx = remainder.indexOf('/');
-        if (idx <= 0) {
-            return null;
-        }
-        return remainder.substring(0, idx);
+        return null;
     }
 
     // 문자열을 Long으로 안전하게 변환한다.

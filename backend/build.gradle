@@ -39,6 +39,7 @@ dependencies {
     implementation 'software.amazon.awssdk:s3'
     implementation 'software.amazon.awssdk:ivs'
     implementation 'software.amazon.awssdk:sqs'
+    implementation 'software.amazon.awssdk:mediaconvert'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
