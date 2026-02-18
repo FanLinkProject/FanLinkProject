@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
+import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
@@ -12,7 +12,6 @@ export default function ArtistConsolePage() {
   const me = MOCK_ARTISTS[0];
   const myPosts = MOCK_POSTS.filter((p) => p.artistId === me.id && p.type === "ARTIST");
   const fanPosts = MOCK_POSTS.filter((p) => p.artistId === me.id && p.type === "FAN");
-  const endedLives = MOCK_LIVES.filter((l) => l.status === "ENDED");
 
   return (
     <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-10">
@@ -48,7 +47,6 @@ export default function ArtistConsolePage() {
         {[
           { id: "POSTS", label: "My Posts" },
           { id: "FAN_POSTS", label: "Fan Posts" },
-          { id: "LIVE", label: "Live History" },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -72,24 +70,6 @@ export default function ArtistConsolePage() {
 
         {activeTab === "FAN_POSTS" && (
           <PostFeed posts={fanPosts} postLinkBase="/posts" postLinkQuery="from=artist-console" showVerifiedByType={true} />
-        )}
-
-        {activeTab === "LIVE" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {endedLives.map((live) => (
-              <Surface key={live.id} variant="card" className="overflow-hidden">
-                <div className="aspect-video relative overflow-hidden bg-white/5">
-                  <img src={live.thumbnail} className="w-full h-full object-cover" alt="" />
-                </div>
-                <div className="p-6">
-                  <h4 className="font-bold text-white truncate mb-4">{live.title}</h4>
-                  <Button variant="primary" className="w-full py-3 text-[10px] uppercase tracking-widest">
-                    다시보기 발행
-                  </Button>
-                </div>
-              </Surface>
-            ))}
-          </div>
         )}
       </div>
     </div>

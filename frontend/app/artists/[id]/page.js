@@ -8,6 +8,8 @@ import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
+import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
+import { apiGet } from "@/lib/api";
 
 const CANDY_COST = 500;
 const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
@@ -37,6 +39,12 @@ export default function ArtistDetailPage({ params }) {
   const [likedPostIds, setLikedPostIds] = useState(() => new Set());
   const [fanProfiles, setFanProfiles] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [liveSessions, setLiveSessions] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState("");
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [subscriptionModalArtistId, setSubscriptionModalArtistId] = useState(null);
+  const [liveCardCheckingId, setLiveCardCheckingId] = useState(null);
 
   useEffect(() => {
     const a = MOCK_ARTISTS.find((x) => x.id === id);
@@ -52,6 +60,51 @@ export default function ArtistDetailPage({ params }) {
       .then((res) => setFanProfiles(res.data || []))
       .catch(() => setFanProfiles([]));
   }, [id]);
+
+  useEffect(() => {
+    // 진행 중 라이브: LiveSessionStatus.LIVE
+    // 1) URL param으로 숫자 ID가 들어온 경우 우선 사용
+    // 2) 그 외에는 mock 아티스트의 backendId 사용
+    // 3) 모두 없으면 artistId=1 하드코딩 (TODO)
+    if (!id && !artist) return;
+
+    let cancelled = false;
+    const fetchLiveSessions = async () => {
+      const numericFromParam = id != null && !Number.isNaN(Number(id)) ? Number(id) : null;
+
+      let artistIdForApi = numericFromParam;
+      if (artistIdForApi == null && artist && artist.backendId != null) {
+        artistIdForApi = artist.backendId;
+      }
+      if (artistIdForApi == null) {
+        // TODO: 실제 로그인/아티스트 정보를 사용해 artistId를 주입하도록 수정 필요
+        artistIdForApi = 1;
+      }
+
+      setLiveLoading(true);
+      setLiveError("");
+
+      try {
+        const data = await apiGet(`/api/live-sessions?artistId=${artistIdForApi}&status=LIVE`);
+        if (cancelled) return;
+        const list = Array.isArray(data) ? data : [];
+        setLiveSessions(list);
+      } catch (e) {
+        if (cancelled) return;
+        const baseMessage = e?.message || "라이브 정보를 불러오지 못했습니다.";
+        setLiveSessions([]);
+        setLiveError(`${baseMessage} (TODO: 백엔드 API 준비되면 연동)`);
+      } finally {
+        if (!cancelled) setLiveLoading(false);
+      }
+    };
+
+    fetchLiveSessions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, artist]);
 
   if (!artist) return null;
 
@@ -83,6 +136,20 @@ export default function ArtistDetailPage({ params }) {
 
   const artistPosts = MOCK_POSTS.filter((p) => p.artistId === artist.id && p.type === "ARTIST");
   const artistNotices = MOCK_POSTS.filter((p) => p.artistId === artist.id && p.type === "NOTICE");
+
+  const handleLiveCardClick = async (session) => {
+    if (liveCardCheckingId != null) return;
+    setLiveCardCheckingId(session.id);
+    try {
+      await apiGet(`/api/live-sessions/${session.id}/access`);
+      router.push(`/live/${session.id}`);
+    } catch (e) {
+      setSubscriptionModalArtistId(session.artistId ?? null);
+      setShowSubscriptionModal(true);
+    } finally {
+      setLiveCardCheckingId(null);
+    }
+  };
 
   const handleTabClick = (tabId) => {
     if (tabId === "MARKET") {
@@ -147,7 +214,6 @@ export default function ArtistDetailPage({ params }) {
   ];
 
   const artistLives = MOCK_LIVES.filter((l) => l.artistId === artist.id);
-  const liveNow = artistLives.filter((l) => l.status === "LIVE");
   const vodList = artistLives.filter((l) => l.status === "ENDED" || l.status === "RECORDED");
 
   return (
@@ -276,29 +342,65 @@ export default function ArtistDetailPage({ params }) {
 
           {activeTab === "LIVE" && (
             <div className="space-y-12">
-              {liveNow.length > 0 && (
-                <section>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">LIVE NOW</h3>
-                  <Link href={`/live/${liveNow[0].id}`} className="block group">
-                    <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#201a33] border border-white/[0.08] hover:border-white/[0.12] hover:shadow-[0_0_24px_rgba(139,92,246,0.08)] transition-all">
-                      <img src={liveNow[0].thumbnail} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" alt="" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                      <div className="absolute top-3 left-3 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-red-500/90 text-white text-[9px] font-black uppercase rounded">LIVE</span>
-                        {liveNow[0].viewerCount && (
-                          <span className="px-2 py-0.5 bg-black/40 text-white/90 text-[9px] font-bold rounded flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[10px]">visibility</span>
-                            {liveNow[0].viewerCount}
-                          </span>
-                        )}
-                      </div>
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <h4 className="font-bold text-white text-lg truncate">{liveNow[0].title}</h4>
-                      </div>
-                    </div>
-                  </Link>
-                </section>
-              )}
+              <section>
+                <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">LIVE NOW</h3>
+                {liveLoading && (
+                  <div className="py-12 text-center rounded-2xl bg-[#201a33] border border-white/[0.06]">
+                    <p className="text-white/55 text-sm">불러오는 중...</p>
+                  </div>
+                )}
+                {!liveLoading && liveError && (
+                  <div className="py-4 px-4 mb-4 rounded-2xl bg-red-500/10 border border-red-500/40">
+                    <p className="text-xs text-red-200">{liveError}</p>
+                  </div>
+                )}
+                {!liveLoading && !liveError && liveSessions.length > 0 && (
+                  <div className="space-y-6">
+                    {liveSessions.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => handleLiveCardClick(session)}
+                        disabled={liveCardCheckingId != null}
+                        className="block w-full text-left group rounded-2xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      >
+                        <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#201a33] border border-white/[0.08] hover:border-white/[0.12] hover:shadow-[0_0_24px_rgba(139,92,246,0.08)] transition-all">
+                          <img
+                            src="https://picsum.photos/seed/live/800/450"
+                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                            alt=""
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                          <div className="absolute top-3 left-3 flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-red-500/90 text-white text-[9px] font-black uppercase rounded">
+                              LIVE
+                            </span>
+                            <span className="px-2 py-0.5 bg-black/40 text-white/90 text-[9px] font-bold rounded flex items-center gap-1">
+                              {session.isPaid ? "멤버십 전용" : "무료"}
+                            </span>
+                          </div>
+                          <div className="absolute bottom-3 left-3 right-3">
+                            {session.artistNickname && (
+                              <p className="text-xs text-white/60 mb-1">{session.artistNickname}</p>
+                            )}
+                            <h4 className="font-bold text-white text-lg truncate">{session.title}</h4>
+                          </div>
+                          {liveCardCheckingId === session.id && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                              <span className="text-white text-sm font-medium">확인 중...</span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!liveLoading && !liveError && liveSessions.length === 0 && (
+                  <div className="py-16 text-center rounded-2xl bg-[#201a33] border border-white/[0.06]">
+                    <p className="text-white/50 text-sm">진행 중인 라이브가 없습니다.</p>
+                  </div>
+                )}
+              </section>
               <section>
                 <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">다시보기</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -510,6 +612,17 @@ export default function ArtistDetailPage({ params }) {
           </Surface>
         </div>
       )}
+
+      <MembershipOnlyModal
+        isOpen={showSubscriptionModal}
+        onClose={() => {
+          setShowSubscriptionModal(false);
+          setSubscriptionModalArtistId(null);
+        }}
+        artistId={artist?.id ?? subscriptionModalArtistId}
+        artistName={artist?.name}
+        contentLabel="라이브"
+      />
     </div>
   );
 }
