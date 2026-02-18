@@ -13,7 +13,9 @@ public enum LikeTarget {
 
     FAN_POST("팬 게시글"),
     ARTIST_POST("아티스트 게시글"),
-    COMMENT("댓글");
+    COMMENT("댓글"),
+    MEDIA("뮤직비디오"),
+    LIVE("라이브 다시보기");
 
     private final String description;
 
