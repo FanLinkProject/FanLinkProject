@@ -20,6 +20,7 @@ public class LiveSessionResponse {
 
 	private Long id;
 	private Long artistId;
+	private String artistNickname;
 	private String channelArn;
 	private Boolean isPaid;
 	private String title;
