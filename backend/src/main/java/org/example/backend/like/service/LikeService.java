@@ -9,8 +9,11 @@ import org.example.backend.like.enums.LikeTarget;
 import org.example.backend.like.exception.LikeErrorCode;
 import org.example.backend.like.exception.LikeException;
 import org.example.backend.like.repository.LikeRepository;
+import org.example.backend.music_video.repository.ArtistMusicVideoRepository;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.FanPostRepository;
+import org.example.backend.replay.entity.ReplayStatus;
+import org.example.backend.replay.repository.ReplayRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +28,8 @@ public class LikeService {
     private final FanPostRepository fanPostRepository;
     private final ArtistPostRepository artistPostRepository;
     private final CommentRepository commentRepository;
+    private final ArtistMusicVideoRepository artistMusicVideoRepository;
+    private final ReplayRepository replayRepository;
 
     /**
      * 좋아요 토글 (좋아요 등록/취소)
@@ -164,6 +169,13 @@ public class LikeService {
 
             case COMMENT -> commentRepository.findById(targetId)
                     .filter(comment -> comment.getStatus() == 1) // status가 1인 것만 (활성 상태)
+                    .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
+
+            case MEDIA -> artistMusicVideoRepository.findById(targetId)
+                    .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
+
+            case LIVE -> replayRepository.findById(targetId)
+                    .filter(replay -> replay.getStatus() == ReplayStatus.PUBLISHED) // PUBLISHED 상태만 허용
                     .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
         }
     }
