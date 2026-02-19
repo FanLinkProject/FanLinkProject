@@ -175,7 +175,7 @@ public class LikeService {
                     .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
 
             case LIVE -> replayRepository.findById(targetId)
-                    .filter(replay -> replay.getStatus() == ReplayStatus.PUBLISHED) // PUBLISHED 상태만 허용
+                    .filter(replay -> replay.getStatus() == ReplayStatus.READY) // READY 상태만 허용
                     .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
         }
     }
