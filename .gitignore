@@ -117,6 +117,7 @@ backend/src/main/resources/data-test.sql
 *.backup
 *.old
 *.swp
+*.pem
 README.md
 backend/src/main/java/org/example/backend/replay/README2.md
 backend/src/main/java/org/example/backend/media_asset/README.md
