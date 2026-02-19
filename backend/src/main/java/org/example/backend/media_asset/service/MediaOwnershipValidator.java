@@ -12,6 +12,7 @@ import org.example.backend.media_asset.gateway.PostGateway;
 import org.example.backend.media_asset.gateway.ProductGateway;
 import org.example.backend.media_asset.gateway.ReplayGateway;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -25,6 +26,7 @@ public class MediaOwnershipValidator {
     private final PostGateway postGateway;
     private final ReplayGateway replayGateway;
     private final ProductGateway productGateway;
+    private final ArtistPermissionService artistPermissionService;
 
     // Presign 요청의 소유/권한 규칙을 검증한다.
     public void validatePresignOwnership(PresignItemRequest item, Long userId, UserRole role) {
@@ -61,10 +63,10 @@ public class MediaOwnershipValidator {
         }
     }
 
-    // 커버 이미지는 그룹 팬페이지 소유 그룹 계정만 허용한다.
+    // 커버 이미지는 팬페이지 관리 계정만 허용한다.
     private void validateCoverOwnership(PresignItemRequest item, Long userId, UserRole role) {
         Long artistId = requireValue(item.artistId(), "artistId");
-        if (!isGroupOwner(artistId, userId, role)) {
+        if (!isManageAccountOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }
@@ -92,7 +94,7 @@ public class MediaOwnershipValidator {
     // 상품 이미지 업로드 권한을 검증한다.
     private void validateProductOwnership(PresignItemRequest item, Long userId, UserRole role) {
         Long artistId = resolveArtistIdForProduct(item);
-        if (!isGroupOwner(artistId, userId, role)) {
+        if (!isManageAccountOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }
@@ -133,10 +135,13 @@ public class MediaOwnershipValidator {
         return (role == UserRole.ARTIST || role == UserRole.GROUP) && ownerUserId.equals(userId);
     }
 
-    // 그룹 계정 본인 여부를 판단한다.
-    private boolean isGroupOwner(Long artistId, Long userId, UserRole role) {
+    // 팬페이지 관리 계정 본인 여부를 판단한다.
+    private boolean isManageAccountOwner(Long artistId, Long userId, UserRole role) {
         Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
-        return role == UserRole.GROUP && ownerUserId.equals(userId);
+        if (!ownerUserId.equals(userId)) {
+            return false;
+        }
+        return artistPermissionService.isManageAccount(userId, role);
     }
 
     // 숫자 필수값 유효성 검사.
