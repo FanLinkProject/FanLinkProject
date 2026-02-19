@@ -240,7 +240,7 @@ public class CommentService {
             case MEDIA -> artistMusicVideoRepository.findById(targetId)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case LIVE -> replayRepository.findById(targetId)
-                    .filter(replay -> replay.getStatus() == ReplayStatus.PUBLISHED)
+                    .filter(replay -> replay.getStatus() == ReplayStatus.READY)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
         }
     }
