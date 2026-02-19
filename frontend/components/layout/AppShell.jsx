@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import AdminNavBar from "@/components/navbar/AdminNavBar";
 import ArtistNavBar from "@/components/navbar/ArtistNavBar";
 import FanNavBar from "@/components/navbar/FanNavBar";
@@ -43,12 +44,19 @@ function getSidebarVariant(pathname) {
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isAuthView =
     AUTH_PATHS.some((p) => pathname === p) ||
     (pathname?.startsWith(AUTH_PREFIX) ?? false);
   const isLiveDetail = pathname?.startsWith("/live/");
   const showNavbar = !isAuthView;
-  const showSidebar = !isAuthView && !isLiveDetail;
+  const showSidebar =
+    mounted && pathname != null && !isAuthView && !isLiveDetail;
   const navVariant = getNavbarVariant(pathname);
   const sidebarVariant = getSidebarVariant(pathname);
 

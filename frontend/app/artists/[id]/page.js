@@ -126,6 +126,32 @@ export default function ArtistDetailPage({ params }) {
         };
     }, [id, artist]);
 
+    // MV 탭용 artistId (훅 순서 일관성을 위해 early return 이전에 선언)
+    const artistIdForApi = Number(id) || artist?.backendId || 1;
+    useEffect(() => {
+        if (activeTab !== "MV") return;
+
+        let cancelled = false;
+        setMusicVideosLoading(true);
+
+        listMusicVideos(artistIdForApi)
+            .then((res) => {
+                if (cancelled) return;
+                setMusicVideos(Array.isArray(res) ? res : []);
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setMusicVideos([]);
+            })
+            .finally(() => {
+                if (!cancelled) setMusicVideosLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeTab, artistIdForApi]);
+
     if (!artist) return null;
 
     // URL id가 숫자면 artistId로 매칭, mock 페이지면 artistName으로 매칭
@@ -244,33 +270,6 @@ export default function ArtistDetailPage({ params }) {
         { id: "MARKET", label: "Market" },
         { id: "MV", label: "뮤직비디오" }, // ✅ dev 추가 탭
     ];
-
-    // ✅ dev: MV 탭에서 사용할 artistId
-    const artistIdForApi = Number(id) || artist?.backendId || 1;
-
-    useEffect(() => {
-        if (activeTab !== "MV") return;
-
-        let cancelled = false;
-        setMusicVideosLoading(true);
-
-        listMusicVideos(artistIdForApi)
-            .then((res) => {
-                if (cancelled) return;
-                setMusicVideos(Array.isArray(res) ? res : []);
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setMusicVideos([]);
-            })
-            .finally(() => {
-                if (!cancelled) setMusicVideosLoading(false);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [activeTab, artistIdForApi]);
 
     // mock 기반 VOD 리스트는 유지
     const artistLives = MOCK_LIVES.filter((l) => l.artistId === artist.id);
