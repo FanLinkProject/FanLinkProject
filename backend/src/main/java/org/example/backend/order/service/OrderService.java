@@ -49,10 +49,11 @@ public class OrderService {
                 List<OrderItem> orderItems = new ArrayList<>();
 
                 for (OrderItemDto itemDto : request.orderItems()) {
-                        Product product = productRepository.findById(itemDto.productId())
+                        // PESSIMISTIC_WRITE 락으로 동시 구매 시 재고 정합성 보장 (race condition 방지)
+                        Product product = productRepository.findByIdForUpdate(itemDto.productId())
                                         .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
 
-                        // 유료 팬 가입 상품 중복 구매 확인 (10개월 내)
+                        // 유료 팬 가입 상품 중복 구매 방지: 10개월 내 동일 아티스트 membership 상품 재구매 차단
                         if (Boolean.TRUE.equals(product.getIsMembership())) {
                                 boolean exists = orderRepository.existsPaidMembershipOrder(
                                                 user.getId(),

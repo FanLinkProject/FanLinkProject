@@ -271,6 +271,14 @@ payment:
 #테스트용 코드
 jwt:
   secret: ${JWT_SECRET}
+
+# 티켓 QR JWT (RS256) - 배포 시 TICKET_PRIVATE_KEY, TICKET_PUBLIC_KEY로 PEM 전달
+ticket:
+  private-key: ${TICKET_PRIVATE_KEY:}
+  public-key: ${TICKET_PUBLIC_KEY:}
+  private-key-path: ${TICKET_PRIVATE_KEY_PATH:ticket-keys/private.pem}
+  public-key-path: ${TICKET_PUBLIC_KEY_PATH:ticket-keys/public.pem}
+  qr-expire-hours: ${TICKET_QR_EXPIRE_HOURS:48}
 oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
 

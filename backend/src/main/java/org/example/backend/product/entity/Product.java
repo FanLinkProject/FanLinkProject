@@ -52,7 +52,7 @@ public class Product {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ProductPaymentMethod paymentMethod;
+    private ProductPaymentMethod paymentMethod; // CASH_ONLY, CANDY_ONLY
 
     @Column(name = "is_subscription", nullable = false)
     private Boolean isSubscription;
@@ -72,6 +72,9 @@ public class Product {
     @Column(name = "representative_media_asset_id")
     private Long representativeMediaAssetId;
 
+    @Column(name = "concert_id")
+    private Long concertId; // 티켓 상품인 경우 Concert ID (nullable)
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -84,7 +87,7 @@ public class Product {
     public Product(Long artistId, String name, Long price, Long candyPrice, ProductType type,
             ProductPaymentMethod paymentMethod, Boolean isSubscription, Long quantity,
             Boolean isMembershipOnly, Boolean isExclusive, Boolean isMembership,
-            Long representativeMediaAssetId) {
+            Long representativeMediaAssetId, Long concertId) {
         this.artistId = artistId;
         this.name = name;
         this.price = price;
@@ -103,6 +106,7 @@ public class Product {
         this.isExclusive = isExclusive != null ? isExclusive : false;
         this.isMembership = isMembership != null ? isMembership : false;
         this.representativeMediaAssetId = representativeMediaAssetId;
+        this.concertId = concertId;
 
         validate();
     }
@@ -136,7 +140,7 @@ public class Product {
 
     public void update(String name, Long price, Long candyPrice, ProductType type, ProductPaymentMethod paymentMethod,
             Boolean isSubscription, Long quantity, Boolean isMembershipOnly, Boolean isExclusive,
-            Boolean isMembership, Long representativeMediaAssetId) {
+            Boolean isMembership, Long representativeMediaAssetId, Long concertId) {
         this.name = name;
         this.price = price;
         this.candyPrice = candyPrice;
@@ -153,6 +157,7 @@ public class Product {
         this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
         this.isExclusive = isExclusive != null ? isExclusive : false;
         this.isMembership = isMembership != null ? isMembership : false;
+        this.concertId = concertId;
         this.representativeMediaAssetId = representativeMediaAssetId;
 
         validate();
