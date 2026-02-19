@@ -6,6 +6,7 @@ import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.jwt.RefreshTokenStore;
 import org.example.backend.user.dto.request.ArtistCreateRequest;
 import org.example.backend.user.dto.request.PenaltyCreateRequest;
+import org.example.backend.user.dto.response.AccountsSummaryResponse;
 import org.example.backend.user.dto.response.AdminHomeResponse;
 import org.example.backend.user.dto.response.AdminPenaltyResponse;
 import org.example.backend.user.dto.response.ReportResponse;
@@ -214,5 +215,24 @@ public class AdminService {
         );
 
         return new AdminHomeResponse(userStats, artistStats, reportStats);
+    }
+
+    /** DB 내 팬 / 개인 아티스트 / 그룹 계정 목록 조회 (관리자용) */
+    @Transactional(readOnly = true)
+    public AccountsSummaryResponse getAccountsSummary() {
+        Pageable limit = PageRequest.of(0, 500);
+        var fans = userRepository.findByRoleAndStatusAndDeletedAtIsNull(UserRole.USER, UserStatus.ACTIVE, limit)
+                .getContent().stream()
+                .map(u -> new AccountsSummaryResponse.AccountRow(u.getId(), u.getNickname(), u.getEmail(), "USER"))
+                .toList();
+        var artists = userRepository.findByRoleAndStatusAndDeletedAtIsNull(UserRole.ARTIST, UserStatus.ACTIVE, limit)
+                .getContent().stream()
+                .map(u -> new AccountsSummaryResponse.AccountRow(u.getId(), u.getNickname(), u.getEmail(), "ARTIST"))
+                .toList();
+        var groups = userRepository.findByRoleAndStatusAndDeletedAtIsNull(UserRole.GROUP, UserStatus.ACTIVE, limit)
+                .getContent().stream()
+                .map(u -> new AccountsSummaryResponse.AccountRow(u.getId(), u.getNickname(), u.getEmail(), "GROUP"))
+                .toList();
+        return new AccountsSummaryResponse(fans, artists, groups);
     }
 }

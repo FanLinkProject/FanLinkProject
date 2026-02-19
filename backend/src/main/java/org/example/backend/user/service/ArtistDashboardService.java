@@ -52,8 +52,7 @@ public class ArtistDashboardService {
                 artist.getNickname(),
                 artist.getProfileImageUrl(),
                 artist.getBannerImageUrl(),
-                artist.getBio(),
-                artist.isGroupAccount()
+                artist.getBio()
         );
 
         // 2) 팔로우 상태
