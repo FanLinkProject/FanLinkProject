@@ -48,6 +48,7 @@ public class ProductService {
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
         boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
         boolean isMembership = request.isMembership() != null && request.isMembership();
+        validateRepresentativeMediaAssetId(request.mediaAssetIds(), request.representativeMediaAssetId());
 
         Product product = Product.builder()
                 .artistId(request.artistId())
@@ -61,6 +62,7 @@ public class ProductService {
                 .isMembershipOnly(isMembershipOnly)
                 .isExclusive(isExclusive)
                 .isMembership(isMembership)
+                .representativeMediaAssetId(request.representativeMediaAssetId())
                 .build();
 
         Product savedProduct = productRepository.save(product);
@@ -110,6 +112,7 @@ public class ProductService {
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
         boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
         boolean isMembership = request.isMembership() != null && request.isMembership();
+        validateRepresentativeMediaAssetId(request.mediaAssetIds(), request.representativeMediaAssetId());
 
         product.update(
                 request.name(),
@@ -121,7 +124,8 @@ public class ProductService {
                 request.quantity(),
                 isMembershipOnly,
                 isExclusive,
-                isMembership);
+                isMembership,
+                request.representativeMediaAssetId());
 
         if (request.mediaAssetIds() != null) {
             productMediaAssetRepository.deleteAllByProduct_Id(id);
@@ -165,11 +169,34 @@ public class ProductService {
     private ProductDetailResponse toSummaryResponse(Product product) {
         List<ProductMediaAsset> links = productMediaAssetRepository.findAllByProduct_IdOrderById(product.getId());
         String cdnBaseUrl = resolveCdnBaseUrl();
-        List<ProductMediaAssetResponse> attachments = links.stream()
-                .limit(1)
-                .map(link -> ProductMediaAssetResponse.from(link.getMediaAsset(), cdnBaseUrl))
-                .toList();
+        List<ProductMediaAssetResponse> attachments = resolveRepresentativeAttachment(links, cdnBaseUrl, product.getRepresentativeMediaAssetId());
         return ProductDetailResponse.from(product, attachments);
+    }
+
+    private void validateRepresentativeMediaAssetId(List<Long> mediaAssetIds, Long representativeMediaAssetId) {
+        if (representativeMediaAssetId == null) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(mediaAssetIds) || !mediaAssetIds.contains(representativeMediaAssetId)) {
+            throw new ProductException(ProductErrorCode.INVALID_MEDIA_ASSET_CATEGORY);
+        }
+    }
+
+    private List<ProductMediaAssetResponse> resolveRepresentativeAttachment(List<ProductMediaAsset> links,
+                                                                           String cdnBaseUrl,
+                                                                           Long representativeMediaAssetId) {
+        if (links == null || links.isEmpty()) {
+            return List.of();
+        }
+        if (representativeMediaAssetId != null) {
+            for (ProductMediaAsset link : links) {
+                MediaAsset mediaAsset = link.getMediaAsset();
+                if (mediaAsset != null && representativeMediaAssetId.equals(mediaAsset.getId())) {
+                    return List.of(ProductMediaAssetResponse.from(mediaAsset, cdnBaseUrl));
+                }
+            }
+        }
+        return List.of(ProductMediaAssetResponse.from(links.get(0).getMediaAsset(), cdnBaseUrl));
     }
 
     private String resolveCdnBaseUrl() {

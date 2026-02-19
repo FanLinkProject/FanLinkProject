@@ -27,5 +27,6 @@ public record ProductRequestDto(
     Boolean isExclusive,
     Boolean isMembership,
 
-    List<Long> mediaAssetIds) {
+    List<Long> mediaAssetIds,
+    Long representativeMediaAssetId) {
 }
