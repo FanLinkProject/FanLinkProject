@@ -137,6 +137,7 @@ function ArtistDetailPageInner({ id }) {
   const [myUserId, setMyUserId] = useState(null);
   const [myNickname, setMyNickname] = useState("");
   const [myProfileImageUrl, setMyProfileImageUrl] = useState("");
+  const [isGroupMember, setIsGroupMember] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [editingPost, setEditingPost] = useState(null); // { id, content }
   const [editContent, setEditContent] = useState("");
@@ -171,6 +172,7 @@ function ArtistDetailPageInner({ id }) {
             postCount: "",
             members: [],
           });
+          setIsGroupMember(data?.isGroupMember ?? false);
         })
         .catch(() => {
           // API 실패 시 mock fallback
@@ -196,19 +198,18 @@ function ArtistDetailPageInner({ id }) {
     }
   }, [id, groupId, isRealGroup]);
 
-  // JWT에서 currentUser 추출 + 닉네임 조회
+  // JWT에서 currentUser 추출 + 닉네임 조회 + 그룹 소속 확인
   useEffect(() => {
     const user = getCurrentUser();
     setCurrentUser(user);
-    if (user) {
-      request("/api/user/profile")
-        .then((data) => {
-          setMyUserId(data.id ?? null);
-          setMyNickname(data.nickname || "");
-          setMyProfileImageUrl(data.profileImageUrl || "");
-        })
-        .catch(() => {});
-    }
+    if (!user) return;
+    request("/api/user/profile")
+      .then((data) => {
+        setMyUserId(data.id ?? null);
+        setMyNickname(data.nickname || "");
+        setMyProfileImageUrl(data.profileImageUrl || "");
+      })
+      .catch(() => {});
   }, []);
 
   // fan profiles
@@ -674,31 +675,33 @@ function ArtistDetailPageInner({ id }) {
             </div>
           </div>
           <div className="pb-1 flex items-center gap-2">
-            {artist.isFollowing ? (
-              <>
-                <Button variant="ghost" className="px-8 py-3" disabled>
-                  구독 중
-                </Button>
-                {fanProfileForArtist && (
-                  <Button
-                    variant="primary"
-                    className="px-6 py-3"
-                    onClick={handleAttendance}
-                    disabled={attendanceLoading}
-                  >
-                    {attendanceLoading ? "처리 중…" : "출석"}
+            {!isGroupMember && (
+              artist.isFollowing ? (
+                <>
+                  <Button variant="ghost" className="px-8 py-3" disabled>
+                    구독 중
                   </Button>
-                )}
-              </>
-            ) : (
-              <Button
-                variant="primary"
-                className="px-8 py-3"
-                onClick={handleSubscribe}
-                disabled={subscribeLoading}
-              >
-                {subscribeLoading ? "처리 중…" : "구독하기"}
-              </Button>
+                  {fanProfileForArtist && (
+                    <Button
+                      variant="primary"
+                      className="px-6 py-3"
+                      onClick={handleAttendance}
+                      disabled={attendanceLoading}
+                    >
+                      {attendanceLoading ? "처리 중…" : "출석"}
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <Button
+                  variant="primary"
+                  className="px-8 py-3"
+                  onClick={handleSubscribe}
+                  disabled={subscribeLoading}
+                >
+                  {subscribeLoading ? "처리 중…" : "구독하기"}
+                </Button>
+              )
             )}
           </div>
         </Surface>
@@ -749,7 +752,7 @@ function ArtistDetailPageInner({ id }) {
                     isLockedMap={Object.fromEntries(
                       artistPosts.map((p) => [
                         p.id,
-                        !!(p.isMembershipOnly && !artist.hasMembership),
+                        !!(p.isMembershipOnly && !artist.hasMembership && !isGroupMember),
                       ])
                     )}
                   />
@@ -766,7 +769,7 @@ function ArtistDetailPageInner({ id }) {
 
           {activeTab === "FAN" && (
             <>
-              {artist.isFollowing ? (
+              {(artist.isFollowing || isGroupMember) ? (
                 <>
                   {canCreateFanPost && (
                     <div className="flex justify-end items-center px-2 mb-4">
