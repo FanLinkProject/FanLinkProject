@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.example.backend.post.entity.FanPost;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
@@ -16,8 +16,8 @@ public class FanPostResponse {
     private String writerNickname;
     private String title;
     private String content;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
     private List<PostMediaAssetResponse> attachments;
 
     public static FanPostResponse from(FanPost post) {

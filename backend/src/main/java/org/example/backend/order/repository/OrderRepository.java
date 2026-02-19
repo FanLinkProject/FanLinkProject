@@ -7,14 +7,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.example.backend.order.enums.OrderStatus;
 import java.util.Optional;
 import org.springframework.data.repository.query.Param;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import org.springframework.data.jpa.repository.Query;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
         Optional<Order> findByOrderNo(String orderNo);
 
         java.util.List<Order> findByStatusAndUpdatedAtBefore(OrderStatus status,
-                        LocalDateTime updatedAt);
+                        Instant updatedAt);
 
         /**
          * 10개월 내 유료 팬 가입 상품 구매 이력 조회.
@@ -28,7 +28,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         boolean existsPaidMembershipOrder(@Param("userId") Long userId,
                         @Param("artistId") Long artistId,
                         @Param("status") OrderStatus status,
-                        @Param("date") LocalDateTime date);
+                        @Param("date") Instant date);
 
         // 유저별 주문 목록 조회 (페이징)
         Page<Order> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);

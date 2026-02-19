@@ -18,7 +18,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Getter
@@ -58,22 +58,22 @@ public class Ticket {
     private TicketStatus status;
 
     @Column(name = "issued_at", nullable = false)
-    private LocalDateTime issuedAt;
+    private Instant issuedAt;
 
     @Column(name = "used_at")
-    private LocalDateTime usedAt;
+    private Instant usedAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @Builder
     public Ticket(String ticketCode, Long orderId, Long orderItemId, Long userId,
-                  Long productId, Long concertId, TicketStatus status, LocalDateTime issuedAt) {
+                  Long productId, Long concertId, TicketStatus status, Instant issuedAt) {
         this.ticketCode = ticketCode;
         this.orderId = orderId;
         this.orderItemId = orderItemId;
@@ -84,7 +84,7 @@ public class Ticket {
         this.issuedAt = issuedAt;
     }
 
-    public void markUsed(LocalDateTime usedAt) {
+    public void markUsed(Instant usedAt) {
         this.status = TicketStatus.USED;
         this.usedAt = usedAt;
     }

@@ -7,7 +7,6 @@ import org.example.backend.ticket.entity.Ticket;
 import org.example.backend.ticket.entity.TicketStatus;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 
 @Getter
 @Builder
@@ -18,9 +17,9 @@ public class TicketResponse {
     private Long concertId;
     private ConcertSummary concert;
     private TicketStatus status;
-    private LocalDateTime issuedAt;
-    private LocalDateTime usedAt;
-    private LocalDateTime createdAt;
+    private Instant issuedAt;
+    private Instant usedAt;
+    private Instant createdAt;
 
     public static TicketResponse from(Ticket ticket) {
         return TicketResponse.builder()
