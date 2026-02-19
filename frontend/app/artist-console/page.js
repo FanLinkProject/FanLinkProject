@@ -37,12 +37,6 @@ export default function ArtistConsolePage() {
             <span className="inline-flex items-center leading-none text-xs font-black text-violet-300">{me.postCount}</span>
           </div>
         </div>
-        <div className="flex flex-wrap justify-center items-center gap-3">
-          <Button variant="primary" href="/artist-console/group-dm" className="text-xs uppercase tracking-widest">
-            <span className="material-symbols-outlined text-sm fill-icon mr-1.5">send</span>
-            DM
-          </Button>
-        </div>
       </Surface>
 
       <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-2xl w-fit border border-white/[0.06]">
