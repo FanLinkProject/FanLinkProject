@@ -54,8 +54,7 @@ public class PaymentController {
 
         try {
             if (paymentKey != null) {
-                // 1. 일반 결제 승인
-                // Toss는 orderId 파라미터로 주문 번호를 전달함
+                // 일반 결제 승인 (orderId 파라미터에 주문 번호 전달됨)
                 Payment payment = paymentService.confirmPayment(paymentKey, orderId, amount);
                 String redirectUrl = String.format(
                                 "%s/payment/success?status=SUCCESS&orderNo=%s&orderId=%s&amount=%d",

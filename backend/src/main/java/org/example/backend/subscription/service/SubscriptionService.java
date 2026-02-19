@@ -38,15 +38,15 @@ public class SubscriptionService {
 
         /**
          * 현금 정기결제 구독을 생성합니다. (캔디 정기 충전)
-         * 1. Toss Payments 빌링키 발급
-         * 2. Order 생성
-         * 3. 첫 결제 실행 (PaymentService 위임)
-         * 4. Subscription 생성
+         * 1. 빌링키 발급 (PaymentAdapter)
+         * 2. 첫 결제 실행 (PaymentService 위임)
+         * 3. Subscription 생성
          *
          * @param userId      유저 ID
          * @param productId   상품 ID (캔디 충전 상품이어야 함)
-         * @param authKey     Toss 인증 키
+         * @param authKey     PG사 인증 키
          * @param customerKey 고객 키
+         * @param orderNo     주문 번호 (프론트엔드에서 생성한 주문)
          * @return 생성된 구독 엔티티
          */
         @Transactional
@@ -193,8 +193,7 @@ public class SubscriptionService {
 
         /**
          * 구독을 해지합니다.
-         * 구독의 상태를 비활성화(isActive = false)로 변경합니다.
-         * (현재 구현은 Hard Delete이나 추후 Soft Delete로 전환 권장)
+         * 현재 구현: DB에서 삭제 (Hard Delete). 추후 Soft Delete(isActive=false) 전환 권장.
          *
          * @param subscriptionId 구독 ID
          * @param userId         요청자 ID (권한 확인용)
@@ -204,7 +203,6 @@ public class SubscriptionService {
                 Subscription subscription = subscriptionRepository.findById(subscriptionId)
                                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 구독입니다."));
 
-                // 본인 소유 확인
                 if (!subscription.getUserId().equals(userId)) {
                         throw new IllegalArgumentException("본인의 구독만 해지할 수 있습니다.");
                 }
@@ -213,10 +211,7 @@ public class SubscriptionService {
                         throw new IllegalArgumentException("이미 해지된 구독입니다.");
                 }
 
-                // isActive를 false로 변경 (soft delete)
-                // Note: Subscription 엔티티에 setter가 없으므로 필드 직접 접근 필요
-                // 실제 운영시에는 Subscription에 cancel() 메서드 추가 권장
-                subscriptionRepository.deleteById(subscriptionId); // 임시로 hard delete
+                subscriptionRepository.deleteById(subscriptionId);
 
                 log.info("구독 해지: subscriptionId={}, userId={}", subscriptionId, userId);
         }
