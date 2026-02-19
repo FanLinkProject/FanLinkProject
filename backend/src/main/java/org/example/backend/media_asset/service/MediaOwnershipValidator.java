@@ -6,12 +6,12 @@ import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetScope;
 import org.example.backend.media_asset.exception.MediaAssetErrorCode;
 import org.example.backend.media_asset.exception.MediaAssetException;
-import org.example.backend.media_asset.gateway.FanMembershipGateway;
 import org.example.backend.media_asset.gateway.FanPageGateway;
 import org.example.backend.media_asset.gateway.PostGateway;
 import org.example.backend.media_asset.gateway.ProductGateway;
 import org.example.backend.media_asset.gateway.ReplayGateway;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -21,10 +21,10 @@ public class MediaOwnershipValidator {
     private static final String TEMP_PREFIX = "tmp_";
 
     private final FanPageGateway fanPageGateway;
-    private final FanMembershipGateway fanMembershipGateway;
     private final PostGateway postGateway;
     private final ReplayGateway replayGateway;
     private final ProductGateway productGateway;
+    private final ArtistPermissionService artistPermissionService;
 
     // Presign 요청의 소유/권한 규칙을 검증한다.
     public void validatePresignOwnership(PresignItemRequest item, Long userId, UserRole role) {
@@ -61,23 +61,22 @@ public class MediaOwnershipValidator {
         }
     }
 
-    // 커버 이미지는 그룹 팬페이지 소유 아티스트만 허용한다.
+    // 커버 이미지는 팬페이지 관리 계정만 허용한다.
     private void validateCoverOwnership(PresignItemRequest item, Long userId, UserRole role) {
         Long artistId = requireValue(item.artistId(), "artistId");
-        if (!isArtistOwner(artistId, userId, role)) {
+        if (!isManageAccountOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }
 
-    // 게시물 업로드 권한을 검증한다.
+    // 게시물(공지 포함) 첨부 업로드는 팬페이지 관리 계정만 허용한다.
     private void validatePostOwnership(PresignItemRequest item, Long userId, UserRole role) {
         Long artistId = resolveArtistIdForPost(item);
-        boolean isOwner = isArtistOwner(artistId, userId, role);
-        if (item.scope() == MediaAssetScope.RESTRICTED && !isOwner) {
+        if (!isManageAccountOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
-        if (!isOwner && !fanMembershipGateway.isFan(artistId, userId)) {
-            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        if (item.scope() == MediaAssetScope.RESTRICTED) {
+            return;
         }
     }
 
@@ -92,7 +91,7 @@ public class MediaOwnershipValidator {
     // 상품 이미지 업로드 권한을 검증한다.
     private void validateProductOwnership(PresignItemRequest item, Long userId, UserRole role) {
         Long artistId = resolveArtistIdForProduct(item);
-        if (!isArtistOwner(artistId, userId, role)) {
+        if (!isManageAccountOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }
@@ -130,7 +129,16 @@ public class MediaOwnershipValidator {
     // 아티스트 본인 여부를 판단한다.
     private boolean isArtistOwner(Long artistId, Long userId, UserRole role) {
         Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
-        return role == UserRole.ARTIST && ownerUserId.equals(userId);
+        return (role == UserRole.ARTIST || role == UserRole.GROUP) && ownerUserId.equals(userId);
+    }
+
+    // 팬페이지 관리 계정 본인 여부를 판단한다.
+    private boolean isManageAccountOwner(Long artistId, Long userId, UserRole role) {
+        Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
+        if (!ownerUserId.equals(userId)) {
+            return false;
+        }
+        return artistPermissionService.isManageAccount(userId, role);
     }
 
     // 숫자 필수값 유효성 검사.

@@ -29,6 +29,7 @@ public class ProductDetailResponse {
     private Boolean isMembershipOnly;
     private Boolean isExclusive;
     private Boolean isMembership;
+    private Long representativeMediaAssetId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ProductMediaAssetResponse> attachments;
@@ -47,6 +48,7 @@ public class ProductDetailResponse {
                 .isMembershipOnly(product.getIsMembershipOnly())
                 .isExclusive(product.getIsExclusive())
                 .isMembership(product.getIsMembership())
+                .representativeMediaAssetId(product.getRepresentativeMediaAssetId())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .attachments(attachments != null ? attachments : Collections.emptyList())
