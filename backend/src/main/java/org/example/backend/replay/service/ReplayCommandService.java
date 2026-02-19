@@ -19,6 +19,7 @@ import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.replay.util.CloudFrontCookieSigner;
 import org.example.backend.replay.util.PlaybackUrlCalculator;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +38,7 @@ public class ReplayCommandService {
     private final ReplayRepository replayRepository;
     @Qualifier("replayLiveSessionServiceGateway")
     private final LiveSessionGateway liveSessionGateway;
+    private final ArtistPermissionService artistPermissionService;
     @Qualifier("replayDefaultSubscriptionGateway")
     private final SubscriptionGateway subscriptionGateway;
     private final ObjectProvider<CloudFrontCookieSigner> cookieSignerProvider;
@@ -46,12 +48,17 @@ public class ReplayCommandService {
     @Value("${replay.access-gate.enabled:true}")
     private boolean accessGateEnabled;
 
-    // Replay 발행을 처리한다.
+    // Replay 발행을 처리한다. 방송 주체(session.artistId)만 발행 가능.
     public ReplayPublishResponse publish(ReplayPublishRequest request, Long userId, UserRole role) {
-        validateArtistOwner(request.artistId(), userId, role);
+        if (!artistPermissionService.canManagePage(request.artistId(), userId, role, true)) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
+        }
 
         LiveSessionRecordingInfo session = liveSessionGateway.getById(request.liveSessionId());
         if (!request.artistId().equals(session.artistId())) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
+        }
+        if (!userId.equals(session.artistId())) {
             throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
         }
         if (!isRecordedOrReady(session.status())) {
@@ -131,16 +138,6 @@ public class ReplayCommandService {
                 Instant.now().plusSeconds(ttl.getSeconds())
         );
         return new ReplayAccessResult(response, cookies);
-    }
-
-    // ARTIST 본인인지 확인한다.
-    private void validateArtistOwner(Long artistId, Long userId, UserRole role) {
-        if (userId == null || role == null) {
-            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
-        }
-        if (role != UserRole.ARTIST || !artistId.equals(userId)) {
-            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
-        }
     }
 
     // RECORDED/READY 상태만 통과시킨다.
