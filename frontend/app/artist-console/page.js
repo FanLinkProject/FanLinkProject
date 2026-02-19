@@ -86,6 +86,7 @@ export default function ArtistConsolePage() {
   const [myId, setMyId] = useState(null);       // 본인 userId
   const [groupId, setGroupId] = useState(null); // GROUP 계정: 본인 ID / ARTIST: 소속 그룹 ID
   const [myProfile, setMyProfile] = useState(null);
+  const [groupProfile, setGroupProfile] = useState(null); // 그룹 계정 프로필 (ARTIST 멤버인 경우 그룹 계정 정보)
 
   // 아티스트 포스트 state
   const [artistPosts, setArtistPosts] = useState([]);
@@ -136,6 +137,28 @@ export default function ArtistConsolePage() {
       })
       .catch(() => {});
   }, []);
+
+  // groupId !== myId(소속 아티스트) 인 경우 그룹 계정의 프로필 조회
+  useEffect(() => {
+    if (!groupId || !myId) return;
+    if (groupId === myId) {
+      // GROUP 계정 본인 → 본인 프로필 그대로 사용
+      setGroupProfile(myProfile);
+      return;
+    }
+    // ARTIST 멤버 → 소속 그룹 계정 프로필 조회
+    request(`/api/user/artists/${groupId}/dashboard`)
+      .then((data) => {
+        setGroupProfile({
+          nickname: data.artistInfo?.nickname || data.nickname || "",
+          profileImageUrl: data.artistInfo?.profileImageUrl || data.profileImageUrl || "",
+        });
+      })
+      .catch(() => {
+        // 조회 실패 시 본인 프로필로 fallback
+        setGroupProfile(null);
+      });
+  }, [groupId, myId, myProfile]);
 
   // 아티스트 포스트 배치 메타 (like/comment count) 로드
   const fetchArtistPostsMeta = useCallback(async (transformed) => {
@@ -407,8 +430,9 @@ export default function ArtistConsolePage() {
     });
   };
 
-  const displayName = myProfile?.nickname || "Studio";
-  const displayAvatar = myProfile?.profileImageUrl || "";
+  // 그룹 계정의 이름/아바타 우선 표시 (ARTIST 멤버는 소속 그룹 계정 정보 표시)
+  const displayName = groupProfile?.nickname || myProfile?.nickname || "Studio";
+  const displayAvatar = groupProfile?.profileImageUrl || myProfile?.profileImageUrl || "";
 
   return (
     <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-10">
@@ -431,6 +455,21 @@ export default function ArtistConsolePage() {
           <p className="text-white/70 font-medium mt-2">
             팬들과 가장 가깝게 만나는 나만의 공간입니다.
           </p>
+          {/* 소속 아티스트 계정으로 접속 중인 경우 표시 */}
+          {groupId !== myId && myProfile && (
+            <div className="mt-3 flex items-center gap-2 justify-center md:justify-start">
+              {myProfile.profileImageUrl && (
+                <img
+                  src={myProfile.profileImageUrl}
+                  className="size-6 rounded-full border border-white/[0.12] shrink-0"
+                  alt=""
+                />
+              )}
+              <span className="text-white/50 text-sm font-medium">
+                {myProfile.nickname}
+              </span>
+            </div>
+          )}
         </div>
       </Surface>
 
