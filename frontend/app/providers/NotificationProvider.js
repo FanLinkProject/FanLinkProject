@@ -1,12 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import axios from "axios";
 
 const NotificationContext = createContext(null);
 const API_BASE = "http://localhost:8080/api/notifications";
 
 export function NotificationProvider({ children }) {
+    const pathname = usePathname();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -123,7 +125,8 @@ export function NotificationProvider({ children }) {
             abortRef.current?.abort();
             clearTimeout(reconnectRef.current);
         };
-    }, [fetchUnreadCount]);
+        // pathname 포함: 알림 페이지 접근 시 effect 재실행 → SSE 재연결 (새로고침 없이 실시간 수신)
+    }, [fetchUnreadCount, pathname]);
 
     /* ===== 읽음 처리 ===== */
     const markAsRead = useCallback(async (id) => {

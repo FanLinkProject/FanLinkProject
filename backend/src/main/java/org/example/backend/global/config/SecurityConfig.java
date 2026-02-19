@@ -113,6 +113,10 @@ public class SecurityConfig {
                 // 유저(팬), 아티스트, 그룹, 관리자
                 .requestMatchers("/api/user/**")
                     .hasAnyRole("USER", "ARTIST", "GROUP", "ADMIN")
+
+                // 공연 CRUD - 아티스트, 관리자
+                .requestMatchers("/api/concerts/**")
+                    .hasAnyRole("ARTIST", "ADMIN")
                 
                 // 그 외 모든 요청은 인증 필요
                 .anyRequest().authenticated()
