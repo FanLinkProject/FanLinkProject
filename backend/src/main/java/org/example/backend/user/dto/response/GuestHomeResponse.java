@@ -25,7 +25,8 @@ public record GuestHomeResponse(
             Long id,
             String nickname,
             String profileImageUrl,
-            Long followerCount         // 팔로워 수
+            Long followerCount,        // 팔로워 수
+            boolean isGroupAccount     // 그룹 계정 여부
     ) {
     }
 }

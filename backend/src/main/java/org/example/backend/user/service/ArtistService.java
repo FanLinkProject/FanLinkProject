@@ -98,16 +98,35 @@ public class ArtistService {
                     memberDtos
             );
         } else {
-            // 개인 아티스트는 소속 그룹이 있으면 소속그룹명만 알려줌
-            String groupName = groupMemberRepository.findByMember(artistOrGroup)
-                    .map(GroupMember::getGroupName)
-                    .orElse(null);
+            // 개인 아티스트: 소속 그룹이 있으면 그 그룹의 멤버 정보까지 조회 (단, 권한 변경은 불가)
+            var groupMembershipOpt = groupMemberRepository.findByMember(artistOrGroup);
+            if (groupMembershipOpt.isPresent()) {
+                GroupMember membership = groupMembershipOpt.get();
+                String groupName = membership.getGroupName();
+                User group = membership.getGroup();
 
-            teamInfo = new ArtistMyPageResponse.TeamInfo(
-                    "ARTIST",
-                    groupName,
-                    List.of()
-            );
+                List<GroupMember> members = groupMemberRepository.findByGroup(group);
+                List<ArtistMyPageResponse.Member> memberDtos = members.stream()
+                        .map(gm -> new ArtistMyPageResponse.Member(
+                                gm.getMember().getId(),
+                                gm.getMember().getNickname(),
+                                gm.getMember().getProfileImageUrl()
+                        ))
+                        .toList();
+
+                teamInfo = new ArtistMyPageResponse.TeamInfo(
+                        "ARTIST",
+                        groupName,
+                        memberDtos
+                );
+            } else {
+                // 소속 그룹이 없는 개인 아티스트
+                teamInfo = new ArtistMyPageResponse.TeamInfo(
+                        "ARTIST",
+                        null,
+                        List.of()
+                );
+            }
         }
 
         // 4) 계정 보안 (기존 비밀번호 변경 API로 연결)
@@ -120,6 +139,7 @@ public class ArtistService {
         );
 
         return new ArtistMyPageResponse(
+                artistOrGroup.isGroupAccount(),
                 profile,
                 fanDailyGraph,
                 teamInfo,
@@ -131,7 +151,36 @@ public class ArtistService {
     // 아티스트 메인 홈 화면 조회
     @Transactional(readOnly = true)
     public ArtistHomeResponse getArtistHome(User artist) {
-        // 최근 게시글 조회 (최대 10개, 삭제되지 않은 글만)
+        // 팔로워 수 (나를 팔로우하는 유저 수) - 그룹/개인 모두 동일 기준
+        long followerCount = followRepository.countByArtist(artist);
+
+        long postCount;
+
+        // 그룹 계정인 경우: 그룹 + 그룹에 속한 모든 멤버 아티스트가 작성한 게시글 수 합산
+        if (artist.getRole() == UserRole.GROUP) {
+            List<GroupMember> members = groupMemberRepository.findByGroup(artist);
+
+            // 그룹 본인 + 멤버 아티스트들을 모두 대상으로 게시글 수 합산
+            List<User> authors = new ArrayList<>();
+            authors.add(artist);
+            authors.addAll(members.stream().map(GroupMember::getMember).toList());
+
+            long totalPosts = 0L;
+            for (User author : authors) {
+                long count = artistPostRepository
+                        .findByUserAndStatusOrderByCreatedAtDesc(author, false, PageRequest.of(0, 1))
+                        .getTotalElements();
+                totalPosts += count;
+            }
+            postCount = totalPosts;
+        } else {
+            // 개인 아티스트: 본인이 작성한 게시글 수
+            postCount = artistPostRepository
+                    .findByUserAndStatusOrderByCreatedAtDesc(artist, false, PageRequest.of(0, 1))
+                    .getTotalElements();
+        }
+
+        // 최근 게시글 조회 (최대 10개, 삭제되지 않은 글만) - 기본적으로 현재 계정이 작성한 글 기준
         List<ArtistPost> recentPosts = artistPostRepository
                 .findByUserAndStatusOrderByCreatedAtDesc(artist, false, PageRequest.of(0, 10))
                 .getContent();
@@ -145,7 +194,7 @@ public class ArtistService {
                 ))
                 .collect(Collectors.toList());
 
-        return new ArtistHomeResponse(postStatistics);
+        return new ArtistHomeResponse(followerCount, postCount, postStatistics);
     }
 }
 

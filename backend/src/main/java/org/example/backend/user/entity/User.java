@@ -72,6 +72,10 @@ public class User {
     @Column(name = "official_links", columnDefinition = "TEXT")
     private String officialLinks;
 
+    // 아티스트 채널 ARN (관리자 계정 생성 시 설정, 라이브 등 연동용)
+    @Column(name = "channel_arn")
+    private String channelArn;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20, columnDefinition = "varchar(20)")
     private UserRole role;
@@ -162,6 +166,11 @@ public class User {
         user.setCreatedAt(LocalDateTime.now());
         user.setCandy(0L);
         return user;
+    }
+
+    /** 그룹 계정 여부 (role == GROUP). 별도 컬럼 없이 역할로 판단 */
+    public boolean isGroupAccount() {
+        return this.role == UserRole.GROUP;
     }
 
     public void updateOAuth2Info(String provider, String providerId) {
