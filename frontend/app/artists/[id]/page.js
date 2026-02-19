@@ -83,6 +83,7 @@ function transformArtistPost(p, groupAvatar = "") {
 function transformFanPost(p) {
   return {
     id: p.id,
+    writerId: p.writerId ?? null,
     authorName: p.writerNickname || "",
     authorMemberName: null,
     authorAvatar: p.writerProfileImageUrl || "",
@@ -133,9 +134,13 @@ function ArtistDetailPageInner({ id }) {
   const [fanIsLikedMap, setFanIsLikedMap] = useState({});
   const [fanCommentCountMap, setFanCommentCountMap] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
+  const [myUserId, setMyUserId] = useState(null);
   const [myNickname, setMyNickname] = useState("");
   const [myProfileImageUrl, setMyProfileImageUrl] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
+  const [editingPost, setEditingPost] = useState(null); // { id, content }
+  const [editContent, setEditContent] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   // 무한스크롤 sentinel refs
   const artistPostsBottomRef = useRef(null);
@@ -198,6 +203,7 @@ function ArtistDetailPageInner({ id }) {
     if (user) {
       request("/api/user/profile")
         .then((data) => {
+          setMyUserId(data.id ?? null);
           setMyNickname(data.nickname || "");
           setMyProfileImageUrl(data.profileImageUrl || "");
         })
@@ -517,6 +523,49 @@ function ArtistDetailPageInner({ id }) {
     });
   };
 
+  const handleDeleteFanPost = async (postId) => {
+    if (!window.confirm("게시글을 삭제하시겠습니까?")) return;
+    try {
+      if (isRealGroup) {
+        await request(`/api/fan-posts/${postId}`, { method: "DELETE" });
+      }
+      setFanPosts((prev) => prev.filter((p) => p.id !== postId));
+    } catch (err) {
+      console.error("팬 포스트 삭제 실패", err);
+    }
+  };
+
+  const handleEditFanPost = (postId) => {
+    const post = fanPosts.find((p) => p.id === postId);
+    if (!post) return;
+    setEditingPost({ id: postId, content: post.content });
+    setEditContent(post.content);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editContent.trim() || editLoading || !editingPost) return;
+    setEditLoading(true);
+    try {
+      if (isRealGroup) {
+        await request(`/api/fan-posts/${editingPost.id}`, {
+          method: "PUT",
+          body: { groupId, title: "", content: editContent.trim(), mediaAssetIds: [] },
+        });
+      }
+      setFanPosts((prev) =>
+        prev.map((p) =>
+          p.id === editingPost.id ? { ...p, content: editContent.trim() } : p
+        )
+      );
+      setEditingPost(null);
+      setEditContent("");
+    } catch (err) {
+      console.error("팬 포스트 수정 실패", err);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const handleCreatePost = async () => {
     if (!newPostContent.trim() || createLoading) return;
 
@@ -751,6 +800,10 @@ function ArtistDetailPageInner({ id }) {
                         onComment={(postId) =>
                           router.push(`/posts/${postId}?type=FAN&groupId=${postGroupId}`)
                         }
+                        onDelete={handleDeleteFanPost}
+                        canDeleteSet={myUserId ? new Set(fanPosts.filter((p) => p.writerId === myUserId).map((p) => p.id)) : undefined}
+                        onEdit={handleEditFanPost}
+                        canEditSet={myUserId ? new Set(fanPosts.filter((p) => p.writerId === myUserId).map((p) => p.id)) : undefined}
                       />
                       {/* 무한스크롤 sentinel */}
                       <div ref={fanPostsBottomRef} className="py-1">
@@ -1036,6 +1089,47 @@ function ArtistDetailPageInner({ id }) {
           </Surface>
         </aside>
       </div>
+
+      {editingPost && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <Surface variant="primary" className="w-full max-w-xl p-10">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-white">팬 포스트 수정</h3>
+              <button
+                type="button"
+                onClick={() => { setEditingPost(null); setEditContent(""); }}
+                className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              autoFocus
+              className="w-full h-40 bg-[#201a33] rounded-2xl p-4 border border-white/[0.06] outline-none focus:ring-2 focus:ring-violet-500/20 text-white placeholder:text-white/40 font-medium"
+              placeholder="내용을 입력하세요..."
+            />
+            <div className="mt-6 flex gap-3">
+              <Button
+                variant="ghost"
+                className="flex-1 py-4 text-sm uppercase tracking-widest"
+                onClick={() => { setEditingPost(null); setEditContent(""); }}
+              >
+                취소
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1 py-4 text-sm uppercase tracking-widest"
+                onClick={handleSaveEdit}
+                disabled={editLoading || !editContent.trim()}
+              >
+                {editLoading ? "저장 중..." : "저장하기"}
+              </Button>
+            </div>
+          </Surface>
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">

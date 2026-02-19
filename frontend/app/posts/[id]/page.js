@@ -52,6 +52,7 @@ function enhanceComment(c) {
     repliesLoadingMore: false,
     likeCount: c.likeCount ?? 0,
     isLiked: c.isLiked ?? false,
+    isEdited: c.isEdited ?? false,
   };
 }
 
@@ -85,7 +86,12 @@ function PostDetailContent({ id }) {
   const [replyingToId, setReplyingToId] = useState(null); // 답글 작성 중인 부모 댓글 id
   const [replyContent, setReplyContent] = useState("");
   const [replySubmitLoading, setReplySubmitLoading] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingReplyParentId, setEditingReplyParentId] = useState(null);
+  const [editCommentContent, setEditCommentContent] = useState("");
+  const [editCommentLoading, setEditCommentLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [myUserId, setMyUserId] = useState(null);
   const [myNickname, setMyNickname] = useState("");
   const [myProfileImageUrl, setMyProfileImageUrl] = useState("");
   const [backArtistId, setBackArtistId] = useState(groupId || null);
@@ -100,6 +106,7 @@ function PostDetailContent({ id }) {
     if (user) {
       request("/api/user/profile")
         .then((data) => {
+          setMyUserId(data.id ?? null);
           setMyNickname(data.nickname || "");
           setMyProfileImageUrl(data.profileImageUrl || "");
         })
@@ -146,6 +153,7 @@ function PostDetailContent({ id }) {
       .then(([postData, countRes, checkRes]) => {
         setPost({
           id: postData.id,
+          writerId: postData.writerId ?? null,
           authorName: postData.writerNickname || "",
           authorAvatar: postData.writerProfileImageUrl || "",
           content: postData.content || "",
@@ -351,6 +359,68 @@ function PostDetailContent({ id }) {
   const openReplyInput = (commentId) => {
     setReplyingToId((prev) => (prev === commentId ? null : commentId));
     setReplyContent("");
+    setEditingCommentId(null);
+    setEditingReplyParentId(null);
+    setEditCommentContent("");
+  };
+
+  const openCommentEdit = (commentId, content, parentId = null) => {
+    setEditingCommentId(commentId);
+    setEditingReplyParentId(parentId);
+    setEditCommentContent(content);
+    setReplyingToId(null);
+    setReplyContent("");
+  };
+
+  const cancelCommentEdit = () => {
+    setEditingCommentId(null);
+    setEditingReplyParentId(null);
+    setEditCommentContent("");
+  };
+
+  const handleSaveCommentEdit = async () => {
+    if (!editCommentContent.trim() || editCommentLoading || !editingCommentId) return;
+    setEditCommentLoading(true);
+    try {
+      if (isRealPost) {
+        await request(`/api/comments/${editingCommentId}`, {
+          method: "PATCH",
+          body: { content: editCommentContent.trim() },
+        });
+      }
+      const newContent = editCommentContent.trim();
+      if (editingReplyParentId) {
+        // 대댓글 수정
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === editingReplyParentId
+              ? {
+                  ...c,
+                  replies: c.replies.map((r) =>
+                    r.id === editingCommentId
+                      ? { ...r, content: newContent, isEdited: true }
+                      : r
+                  ),
+                }
+              : c
+          )
+        );
+      } else {
+        // 부모 댓글 수정
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === editingCommentId
+              ? { ...c, content: newContent, isEdited: true }
+              : c
+          )
+        );
+      }
+      cancelCommentEdit();
+    } catch (err) {
+      console.error("댓글 수정 실패", err);
+    } finally {
+      setEditCommentLoading(false);
+    }
   };
 
   const handleSubmitReply = async (parentCommentId) => {
@@ -423,6 +493,45 @@ function PostDetailContent({ id }) {
     }
   };
 
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
+    try {
+      if (isRealPost) {
+        await request(`/api/comments/${commentId}`, { method: "DELETE" });
+      }
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === commentId ? { ...c, status: 0, content: "삭제된 댓글입니다." } : c
+        )
+      );
+    } catch (err) {
+      console.error("댓글 삭제 실패", err);
+    }
+  };
+
+  const handleDeleteReply = async (parentCommentId, replyId) => {
+    if (!window.confirm("답글을 삭제하시겠습니까?")) return;
+    try {
+      if (isRealPost) {
+        await request(`/api/comments/${replyId}`, { method: "DELETE" });
+      }
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentCommentId
+            ? {
+                ...c,
+                replies: c.replies.map((r) =>
+                  r.id === replyId ? { ...r, status: 0, content: "삭제된 댓글입니다." } : r
+                ),
+              }
+            : c
+        )
+      );
+    } catch (err) {
+      console.error("답글 삭제 실패", err);
+    }
+  };
+
   const handleCommentLike = async (commentId) => {
     if (!currentUser) { router.push("/login"); return; }
     setComments((prev) =>
@@ -478,6 +587,24 @@ function PostDetailContent({ id }) {
             : c
         )
       );
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!window.confirm("게시글을 삭제하시겠습니까?")) return;
+    try {
+      if (isRealPost) {
+        const endpoint = type === "FAN" ? `/api/fan-posts/${numericId}` : `/api/artist-posts/${numericId}`;
+        await request(endpoint, { method: "DELETE" });
+      }
+      const dest = fromArtistConsole
+        ? "/artist-console"
+        : backArtistId
+        ? `/artists/${backArtistId}${type === "FAN" ? "?tab=FAN" : ""}`
+        : "/";
+      router.push(dest);
+    } catch (err) {
+      console.error("게시글 삭제 실패", err);
     }
   };
 
@@ -591,7 +718,7 @@ function PostDetailContent({ id }) {
                 &quot;{post.content}&quot;
               </p>
             </div>
-            <div className="flex items-center gap-2 mt-8 pt-6 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.06]">
               <button
                 type="button"
                 onClick={handleLike}
@@ -607,6 +734,17 @@ function PostDetailContent({ id }) {
                 </span>
                 <span>{likeCount}</span>
               </button>
+              {myUserId && post.writerId === myUserId && (
+                <button
+                  type="button"
+                  onClick={handleDeletePost}
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-white/25 hover:text-red-400 transition-colors focus:outline-none"
+                  aria-label="게시글 삭제"
+                >
+                  <span className="material-symbols-outlined text-lg">delete</span>
+                  <span>삭제</span>
+                </button>
+              )}
             </div>
           </div>
         </article>
@@ -615,7 +753,7 @@ function PostDetailContent({ id }) {
       <aside className="w-full lg:w-96 flex flex-col gap-6 shrink-0">
         <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-[calc(100vh-160px)] sticky top-24">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
-            <h3 className="font-extrabold text-white">댓글 및 토론</h3>
+            <h3 className="font-extrabold text-white">댓글</h3>
             <span className="text-xs font-bold text-white/55 uppercase tracking-widest">
               {comments.length}개
             </span>
@@ -655,12 +793,47 @@ function PostDetailContent({ id }) {
                             <span className="text-[10px] font-bold text-white/55 uppercase">
                               {formatTimestamp(c.createdAt)}
                             </span>
+                            {c.isEdited && !isDeleted && (
+                              <span className="text-[10px] text-white/35">(수정됨)</span>
+                            )}
                           </div>
-                          <p className={`text-sm leading-relaxed ${isDeleted ? "text-white/35 italic" : "text-white/80"}`}>
-                            {c.content}
-                          </p>
+
+                          {editingCommentId === c.id && editingReplyParentId === null ? (
+                            <div className="mt-1">
+                              <textarea
+                                autoFocus
+                                value={editCommentContent}
+                                onChange={(e) => setEditCommentContent(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Escape") cancelCommentEdit(); }}
+                                rows={3}
+                                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 outline-none resize-none"
+                              />
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={handleSaveCommentEdit}
+                                  disabled={editCommentLoading || !editCommentContent.trim()}
+                                  className="text-xs font-bold px-3 py-1 rounded-lg bg-violet-500/90 text-white hover:brightness-110 disabled:opacity-50 transition-all"
+                                >
+                                  {editCommentLoading ? "저장 중..." : "저장"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelCommentEdit}
+                                  className="text-xs font-bold px-3 py-1 rounded-lg bg-white/[0.08] text-white/60 hover:bg-white/[0.12] transition-all"
+                                >
+                                  취소
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className={`text-sm leading-relaxed ${isDeleted ? "text-white/35 italic" : "text-white/80"}`}>
+                              {c.content}
+                            </p>
+                          )}
 
                           {/* 답글 보기/접기 + 답글 달기 + 좋아요 버튼 */}
+                          {!(editingCommentId === c.id && editingReplyParentId === null) && (
                           <div className="flex items-center gap-3 mt-2">
                             {(c.hasReplies || c.replyCount > 0) && !c.repliesExpanded && (
                               <button
@@ -708,7 +881,28 @@ function PostDetailContent({ id }) {
                                 {c.likeCount > 0 && <span>{c.likeCount}</span>}
                               </button>
                             )}
+                            {!isDeleted && myUserId && c.userId === myUserId && (
+                              <button
+                                type="button"
+                                onClick={() => openCommentEdit(c.id, c.content)}
+                                className="text-xs font-bold text-white/25 hover:text-violet-300 transition-colors inline-flex items-center gap-0.5"
+                                aria-label="댓글 수정"
+                              >
+                                <span className="material-symbols-outlined text-sm">edit</span>
+                              </button>
+                            )}
+                            {!isDeleted && myUserId && c.userId === myUserId && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteComment(c.id)}
+                                className="text-xs font-bold text-white/25 hover:text-red-400 transition-colors inline-flex items-center gap-0.5"
+                                aria-label="댓글 삭제"
+                              >
+                                <span className="material-symbols-outlined text-sm">delete</span>
+                              </button>
+                            )}
                           </div>
+                          )}
                         </div>
                       </div>
 
@@ -776,23 +970,80 @@ function PostDetailContent({ id }) {
                                     <span className="text-[10px] font-bold text-white/55 uppercase">
                                       {formatTimestamp(r.createdAt)}
                                     </span>
+                                    {r.isEdited && !rDeleted && (
+                                      <span className="text-[10px] text-white/35">(수정됨)</span>
+                                    )}
                                   </div>
-                                  <p className={`text-xs leading-relaxed ${rDeleted ? "text-white/35 italic" : "text-white/75"}`}>
-                                    {r.content}
-                                  </p>
-                                  {!rDeleted && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleReplyLike(c.id, r.id)}
-                                      className={`mt-1 text-[10px] font-bold transition-colors inline-flex items-center gap-0.5 ${
-                                        r.isLiked ? "text-red-400" : "text-white/35 hover:text-red-400"
-                                      }`}
-                                      aria-pressed={r.isLiked}
-                                      aria-label={r.isLiked ? "좋아요 취소" : "좋아요"}
-                                    >
-                                      <span className={`material-symbols-outlined text-xs ${r.isLiked ? "fill-icon" : ""}`}>favorite</span>
-                                      {r.likeCount > 0 && <span>{r.likeCount}</span>}
-                                    </button>
+
+                                  {editingCommentId === r.id && editingReplyParentId === c.id ? (
+                                    <div className="mt-1">
+                                      <textarea
+                                        autoFocus
+                                        value={editCommentContent}
+                                        onChange={(e) => setEditCommentContent(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Escape") cancelCommentEdit(); }}
+                                        rows={2}
+                                        className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-3 py-2 text-xs text-white focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 outline-none resize-none"
+                                      />
+                                      <div className="flex gap-2 mt-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={handleSaveCommentEdit}
+                                          disabled={editCommentLoading || !editCommentContent.trim()}
+                                          className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-violet-500/90 text-white hover:brightness-110 disabled:opacity-50 transition-all"
+                                        >
+                                          {editCommentLoading ? "저장 중..." : "저장"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={cancelCommentEdit}
+                                          className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-white/[0.08] text-white/60 hover:bg-white/[0.12] transition-all"
+                                        >
+                                          취소
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className={`text-xs leading-relaxed ${rDeleted ? "text-white/35 italic" : "text-white/75"}`}>
+                                      {r.content}
+                                    </p>
+                                  )}
+
+                                  {!rDeleted && !(editingCommentId === r.id && editingReplyParentId === c.id) && (
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleReplyLike(c.id, r.id)}
+                                        className={`text-[10px] font-bold transition-colors inline-flex items-center gap-0.5 ${
+                                          r.isLiked ? "text-red-400" : "text-white/35 hover:text-red-400"
+                                        }`}
+                                        aria-pressed={r.isLiked}
+                                        aria-label={r.isLiked ? "좋아요 취소" : "좋아요"}
+                                      >
+                                        <span className={`material-symbols-outlined text-xs ${r.isLiked ? "fill-icon" : ""}`}>favorite</span>
+                                        {r.likeCount > 0 && <span>{r.likeCount}</span>}
+                                      </button>
+                                      {myUserId && r.userId === myUserId && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openCommentEdit(r.id, r.content, c.id)}
+                                          className="text-[10px] font-bold text-white/25 hover:text-violet-300 transition-colors inline-flex items-center"
+                                          aria-label="답글 수정"
+                                        >
+                                          <span className="material-symbols-outlined text-xs">edit</span>
+                                        </button>
+                                      )}
+                                      {myUserId && r.userId === myUserId && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteReply(c.id, r.id)}
+                                          className="text-[10px] font-bold text-white/25 hover:text-red-400 transition-colors inline-flex items-center"
+                                          aria-label="답글 삭제"
+                                        >
+                                          <span className="material-symbols-outlined text-xs">delete</span>
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>

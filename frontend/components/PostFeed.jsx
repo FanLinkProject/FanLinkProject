@@ -20,6 +20,10 @@ export default function PostFeed({
   likeCountMap = {},
   commentCountMap = {},
   isLockedMap = {},
+  onDelete,
+  canDeleteSet,
+  onEdit,
+  canEditSet,
   className = "",
 }) {
   if (!posts?.length) return null;
@@ -37,6 +41,8 @@ export default function PostFeed({
           commentCount={commentCountMap[post.id] ?? undefined}
           onComment={onComment}
           isLocked={isLockedMap[post.id] ?? false}
+          onDelete={onDelete && canDeleteSet?.has(post.id) ? onDelete : undefined}
+          onEdit={onEdit && canEditSet?.has(post.id) ? onEdit : undefined}
         />
       ))}
     </div>

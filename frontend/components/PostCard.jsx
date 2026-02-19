@@ -13,6 +13,8 @@ export default function PostCard({
   commentCount,
   onComment,
   isLocked = false,
+  onDelete,
+  onEdit,
   className = "",
 }) {
   const displayName = post.authorMemberName ?? post.authorName ?? "";
@@ -34,6 +36,18 @@ export default function PostCard({
     else if (href) window.location.href = `${href}#comments`;
   };
 
+  const handleDelete = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("게시글을 삭제하시겠습니까?")) onDelete?.(post.id);
+  };
+
+  const handleEdit = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onEdit?.(post.id);
+  };
+
   const cardContent = (
     <Surface variant="card" className={"overflow-hidden p-8 " + (className || "")}>
       {/* 작성자 헤더 — 잠금 여부 관계없이 항상 표시 */}
@@ -52,6 +66,26 @@ export default function PostCard({
           <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest shrink-0">
             멤버십 전용
           </span>
+        )}
+        {onEdit && (
+          <button
+            type="button"
+            onClick={handleEdit}
+            className="size-7 flex items-center justify-center rounded-full text-white/25 hover:text-violet-300 hover:bg-violet-300/10 transition-colors shrink-0"
+            aria-label="게시글 수정"
+          >
+            <span className="material-symbols-outlined text-base">edit</span>
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="size-7 flex items-center justify-center rounded-full text-white/25 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
+            aria-label="게시글 삭제"
+          >
+            <span className="material-symbols-outlined text-base">delete</span>
+          </button>
         )}
       </div>
 
