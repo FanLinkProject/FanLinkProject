@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -49,7 +49,7 @@ public class TicketIssuanceListener {
         }
 
         List<Ticket> ticketsToSave = new ArrayList<>();
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
 
         for (OrderItem item : order.getOrderItems()) {
             Product product = item.getProduct();

@@ -15,7 +15,7 @@ import org.example.backend.ticket.util.TicketQrGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -90,7 +90,7 @@ public class TicketService {
         }
 
         Ticket ticket = result.getTicket();
-        ticket.markUsed(LocalDateTime.now());
+        ticket.markUsed(Instant.now());
     }
 
     @Transactional
@@ -100,7 +100,7 @@ public class TicketService {
         }
 
         List<Ticket> tickets = ticketRepository.findByTicketCodeIn(ticketCodes);
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         for (Ticket ticket : tickets) {
             if (ticket.getStatus() == TicketStatus.ISSUED) {
                 ticket.markUsed(now);

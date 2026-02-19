@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.example.backend.post.entity.ArtistPost;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
@@ -18,8 +18,8 @@ public class ArtistPostResponse {
     private String content;
     private Boolean isMembershipOnly;
     private Long representativeMediaAssetId;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
     private List<PostMediaAssetResponse> attachments;
 
     public static ArtistPostResponse from(ArtistPost post) {

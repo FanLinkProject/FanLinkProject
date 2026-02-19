@@ -59,7 +59,7 @@ public class OrderService {
                                                 user.getId(),
                                                 product.getArtistId(),
                                                 OrderStatus.COMPLETED,
-                                                java.time.LocalDateTime.now().minusMonths(10));
+                                                java.time.Instant.now().atZone(java.time.ZoneId.systemDefault()).minusMonths(10).toInstant());
                                 if (exists) {
                                         throw new OrderException(OrderErrorCode.DUPLICATE_MEMBERSHIP_ORDER);
                                 }

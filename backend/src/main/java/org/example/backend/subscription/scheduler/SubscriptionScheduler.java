@@ -25,7 +25,6 @@ import org.example.backend.payment.config.PaymentExchangeConfig;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -61,7 +60,7 @@ public class SubscriptionScheduler {
      */
     @Transactional
     public void processCashSubscriptions() {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         List<Subscription> cashSubscriptions = subscriptionRepository.findCashSubscriptionsDue(now);
 
         log.info("처리할 현금 구독: {}건", cashSubscriptions.size());
@@ -82,7 +81,7 @@ public class SubscriptionScheduler {
      */
     @Transactional
     public void processCandySubscriptions() {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         List<Subscription> candySubscriptions = subscriptionRepository.findCandySubscriptionsDue(now);
 
         log.info("처리할 캔디 구독: {}건", candySubscriptions.size());

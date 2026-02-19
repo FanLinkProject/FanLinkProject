@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -32,7 +32,7 @@ public class PaymentCleanupScheduler {
     @Transactional
     public void cleanupPendingOrders() {
         // 30분 이상 지난 PENDING 주문 정리
-        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(30);
+        Instant cutoffTime = Instant.now().minusSeconds(30 * 60);
         List<Order> pendingOrders = orderRepository.findByStatusAndUpdatedAtBefore(OrderStatus.PENDING, cutoffTime);
 
         if (pendingOrders.isEmpty()) {
