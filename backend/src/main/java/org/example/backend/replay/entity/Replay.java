@@ -116,4 +116,19 @@ public class Replay {
     public void updateThumbnailKey(String thumbnailKey) {
         this.thumbnailKey = thumbnailKey;
     }
+
+    // HLS 마스터 매니페스트 키를 기록한다.
+    public void updateHlsMasterManifestKey(String hlsMasterManifestKey) {
+        this.hlsMasterManifestKey = hlsMasterManifestKey;
+    }
+
+    // MediaConvert 작업 ID를 기록한다.
+    public void updateMediaConvertJobId(String mediaConvertJobId) {
+        this.mediaConvertJobId = mediaConvertJobId;
+    }
+
+    // 거부 사유를 갱신한다.
+    public void updateRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
 }

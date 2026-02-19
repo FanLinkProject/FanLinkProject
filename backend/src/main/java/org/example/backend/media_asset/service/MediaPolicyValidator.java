@@ -92,7 +92,7 @@ public class MediaPolicyValidator {
                 && scope == MediaAssetScope.RESTRICTED) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
-        if (scope == MediaAssetScope.RESTRICTED && userRole != UserRole.ARTIST) {
+        if (scope == MediaAssetScope.RESTRICTED && userRole != UserRole.ARTIST && userRole != UserRole.GROUP) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }

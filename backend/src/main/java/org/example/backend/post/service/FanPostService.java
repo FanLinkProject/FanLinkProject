@@ -16,6 +16,9 @@ import org.example.backend.post.exception.PostErrorCode;
 import org.example.backend.post.exception.PostException;
 import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.post.repository.PostMediaAssetRepository;
+import org.example.backend.milestone.entity.FanProfile;
+import org.example.backend.milestone.repository.FanProfileRepository;
+import org.example.backend.milestone.service.FanProfileService;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
@@ -40,6 +43,8 @@ public class FanPostService {
     private final PostMediaAssetRepository postMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
+    private final FanProfileService fanProfileService;
+    private final FanProfileRepository fanProfileRepository;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -106,6 +111,13 @@ public class FanPostService {
 
         FanPost savedPost = fanPostRepository.save(fanPost);
 
+        // 게시물 생성 시 팬 프로필 게시글 수 증가
+        if (group != null) {
+            fanProfileRepository.findByFan_IdAndArtist_Id(userId, group.getId())
+                    .map(FanProfile::getId)
+                    .ifPresent(fanProfileService::increasePostCount);
+        }
+
         List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(userId, request.getMediaAssetIds());
         for (MediaAsset asset : mediaAssets) {
             postMediaAssetRepository.save(new PostMediaAsset(PostMediaAssetType.FAN, savedPost.getId(), asset));
@@ -166,6 +178,15 @@ public class FanPostService {
 
         if (!fanPost.getUser().getId().equals(userId)) {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        // 게시글 삭제 시 팬 프로필 게시글 수 감소
+        Long fanUserId = fanPost.getUser().getId();
+        if (fanPost.getGroup() != null) {
+            Long artistId = fanPost.getGroup().getId();
+            fanProfileRepository.findByFan_IdAndArtist_Id(fanUserId, artistId)
+                    .map(FanProfile::getId)
+                    .ifPresent(fanProfileService::decreasePostCount);
         }
 
         fanPost.delete();

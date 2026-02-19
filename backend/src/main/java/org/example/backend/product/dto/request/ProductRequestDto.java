@@ -2,6 +2,8 @@ package org.example.backend.product.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+
+import java.util.List;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.product.enums.ProductType;
 
@@ -21,7 +23,10 @@ public record ProductRequestDto(
     Boolean isSubscription,
 
     Long quantity,
-        Boolean isMembershipOnly,
-        Boolean isExclusive,
-        Boolean isMembership) {
+    Boolean isMembershipOnly,
+    Boolean isExclusive,
+    Boolean isMembership,
+    Long concertId,
+    List<Long> mediaAssetIds,
+    Long representativeMediaAssetId) {
 }

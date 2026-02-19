@@ -32,11 +32,10 @@ public class OrderService {
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
-         * 
-         * 로직 흐름:
-         * 1. 사용자 조회 (Email)
-         * 2. 상품 조회 및 총액 계산 (DB 가격 기준), OrderItem 목록 생성
-         * 3. Order 생성 및 저장
+         * 1. 사용자 조회 (email)
+         * 2. 상품 조회, 총액 계산, OrderItem 생성
+         * 3. Order 생성 및 관계 설정
+         * 4. 저장
          */
         @Transactional
         public String createOrder(String email, OrderRequestDto request) {
@@ -50,16 +49,17 @@ public class OrderService {
                 List<OrderItem> orderItems = new ArrayList<>();
 
                 for (OrderItemDto itemDto : request.orderItems()) {
-                        Product product = productRepository.findById(itemDto.productId())
+                        // PESSIMISTIC_WRITE 락으로 동시 구매 시 재고 정합성 보장 (race condition 방지)
+                        Product product = productRepository.findByIdForUpdate(itemDto.productId())
                                         .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
 
-                        // 유료 팬 가입 상품 중복 구매 확인 (10개월 내)
+                        // 유료 팬 가입 상품 중복 구매 방지: 10개월 내 동일 아티스트 membership 상품 재구매 차단
                         if (Boolean.TRUE.equals(product.getIsMembership())) {
                                 boolean exists = orderRepository.existsPaidMembershipOrder(
                                                 user.getId(),
                                                 product.getArtistId(),
                                                 OrderStatus.COMPLETED,
-                                                java.time.LocalDateTime.now().minusMonths(10));
+                                                java.time.Instant.now().atZone(java.time.ZoneId.systemDefault()).minusMonths(10).toInstant());
                                 if (exists) {
                                         throw new OrderException(OrderErrorCode.DUPLICATE_MEMBERSHIP_ORDER);
                                 }

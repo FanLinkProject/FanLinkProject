@@ -13,4 +13,5 @@ public class ArtistPostRequest {
     private String content;
     private Boolean isMembershipOnly;
     private List<Long> mediaAssetIds;
+    private Long representativeMediaAssetId;
 }

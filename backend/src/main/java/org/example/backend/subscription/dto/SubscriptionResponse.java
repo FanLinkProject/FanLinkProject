@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.example.backend.subscription.entity.Subscription;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 구독 정보 응답 DTO
@@ -15,9 +15,9 @@ import java.time.LocalDateTime;
 public class SubscriptionResponse {
     private Long id;
     private String productName;
-    private String subscriptionType; // "CASH" or "CANDY"
-    private LocalDateTime startDate;
-    private LocalDateTime nextPaymentDate;
+    private String subscriptionType;
+    private Instant startDate;
+    private Instant nextPaymentDate;
     private Boolean isActive;
 
     public static SubscriptionResponse fromEntity(Subscription subscription) {

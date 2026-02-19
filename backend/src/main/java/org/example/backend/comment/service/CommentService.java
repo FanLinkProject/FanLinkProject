@@ -18,6 +18,8 @@ import org.example.backend.post.entity.FanPost;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.music_video.repository.ArtistMusicVideoRepository;
+import org.example.backend.replay.entity.ReplayStatus;
+import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.GroupMemberRepository;
@@ -44,6 +46,7 @@ public class CommentService {
     private final FanPostRepository fanPostRepository;
     private final ArtistPostRepository artistPostRepository;
     private final ArtistMusicVideoRepository artistMusicVideoRepository;
+    private final ReplayRepository replayRepository;
     private final FanProfileService fanProfileService;
     private final FanProfileRepository fanProfileRepository;
 
@@ -236,8 +239,9 @@ public class CommentService {
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case MEDIA -> artistMusicVideoRepository.findById(targetId)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
-            //TODO live 다시보기 엔티티 작업 이후 추가
-            case LIVE -> throw new CommentException(CommentErrorCode.INVALID_TARGET_TYPE);
+            case LIVE -> replayRepository.findById(targetId)
+                    .filter(replay -> replay.getStatus() == ReplayStatus.READY)
+                    .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
         }
     }
 
@@ -263,7 +267,14 @@ public class CommentService {
                                 .map(gm -> gm.getGroup().getId()))
                         .orElse(null);
             }
-            case LIVE -> throw new CommentException(CommentErrorCode.INVALID_TARGET_TYPE);
+            case LIVE -> {
+                var replay = replayRepository.findById(targetId).orElse(null);
+                if (replay == null) yield null;
+                yield userRepository.findById(replay.getArtistId())
+                        .flatMap(artist -> groupMemberRepository.findByMember(artist)
+                                .map(gm -> gm.getGroup().getId()))
+                        .orElse(null);
+            }
         };
     }
 

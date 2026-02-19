@@ -22,6 +22,7 @@ import org.example.backend.user.repository.PenaltyRepository;
 import org.example.backend.user.repository.ReportRepository;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -100,6 +101,9 @@ public class AdminService {
                 request.privacyPolicyAgreed(),
                 role
         );
+        if (request.channelArn() != null && !request.channelArn().isBlank()) {
+            user.setChannelArn(request.channelArn());
+        }
 
         User savedUser = userRepository.save(user);
 

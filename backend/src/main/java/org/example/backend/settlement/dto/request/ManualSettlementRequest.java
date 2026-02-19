@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * 관리자 수동 정산 실행 요청 DTO
@@ -13,6 +14,8 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class ManualSettlementRequest {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private LocalDate startDate;
     private LocalDate endDate;
 
@@ -21,7 +24,7 @@ public class ManualSettlementRequest {
      */
     public LocalDate getResolvedStartDate() {
         if (startDate != null) return startDate;
-        LocalDate lastMonth = LocalDate.now().minusMonths(1);
+        LocalDate lastMonth = LocalDate.now(KST).minusMonths(1);
         return lastMonth.withDayOfMonth(1);
     }
 
@@ -30,7 +33,7 @@ public class ManualSettlementRequest {
      */
     public LocalDate getResolvedEndDate() {
         if (endDate != null) return endDate;
-        LocalDate lastMonth = LocalDate.now().minusMonths(1);
+        LocalDate lastMonth = LocalDate.now(KST).minusMonths(1);
         return lastMonth.withDayOfMonth(lastMonth.lengthOfMonth());
     }
 }
