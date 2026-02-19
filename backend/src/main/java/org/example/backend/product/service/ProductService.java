@@ -1,11 +1,14 @@
 package org.example.backend.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.product.dto.request.ProductRequestDto;
+import org.example.backend.product.dto.response.ProductDetailResponse;
+import org.example.backend.product.dto.response.ProductMediaAssetResponse;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.entity.ProductMediaAsset;
 import org.example.backend.product.exception.ProductErrorCode;
@@ -28,13 +31,19 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final ProductMediaAssetRepository productMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
+    private final AwsProperties awsProperties;
 
-    public List<Product> getAllProducts() {
-        return productRepository.findAll();
+    public List<ProductDetailResponse> getAllProducts() {
+        List<Product> products = productRepository.findAll();
+        List<ProductDetailResponse> responses = new ArrayList<>();
+        for (Product product : products) {
+            responses.add(toSummaryResponse(product));
+        }
+        return responses;
     }
 
     @Transactional
-    public Product createProduct(ProductRequestDto request) {
+    public ProductDetailResponse createProduct(ProductRequestDto request) {
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
         boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
@@ -61,7 +70,7 @@ public class ProductService {
             productMediaAssetRepository.save(new ProductMediaAsset(savedProduct, asset));
         }
 
-        return savedProduct;
+        return toDetailResponse(savedProduct);
     }
 
     private List<MediaAsset> validateAndFetchMediaAssets(List<Long> mediaAssetIds) {
@@ -88,8 +97,13 @@ public class ProductService {
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND));
     }
 
+    public ProductDetailResponse getProductDetail(Long id) {
+        Product product = getProduct(id);
+        return toDetailResponse(product);
+    }
+
     @Transactional
-    public Product updateProduct(Long id, ProductRequestDto request) {
+    public ProductDetailResponse updateProduct(Long id, ProductRequestDto request) {
         Product product = getProduct(id);
 
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
@@ -117,7 +131,7 @@ public class ProductService {
             }
         }
 
-        return product;
+        return toDetailResponse(product);
     }
 
     @Transactional
@@ -137,5 +151,36 @@ public class ProductService {
         Product product = getProduct(id);
         productMediaAssetRepository.deleteAllByProduct_Id(id);
         productRepository.delete(product);
+    }
+
+    private ProductDetailResponse toDetailResponse(Product product) {
+        List<ProductMediaAsset> links = productMediaAssetRepository.findAllByProduct_IdOrderById(product.getId());
+        String cdnBaseUrl = resolveCdnBaseUrl();
+        List<ProductMediaAssetResponse> attachments = links.stream()
+                .map(link -> ProductMediaAssetResponse.from(link.getMediaAsset(), cdnBaseUrl))
+                .toList();
+        return ProductDetailResponse.from(product, attachments);
+    }
+
+    private ProductDetailResponse toSummaryResponse(Product product) {
+        List<ProductMediaAsset> links = productMediaAssetRepository.findAllByProduct_IdOrderById(product.getId());
+        String cdnBaseUrl = resolveCdnBaseUrl();
+        List<ProductMediaAssetResponse> attachments = links.stream()
+                .limit(1)
+                .map(link -> ProductMediaAssetResponse.from(link.getMediaAsset(), cdnBaseUrl))
+                .toList();
+        return ProductDetailResponse.from(product, attachments);
+    }
+
+    private String resolveCdnBaseUrl() {
+        String domain = awsProperties.getCloudfront().getDomain();
+        if (domain == null || domain.isBlank()) {
+            return null;
+        }
+        String normalized = domain.trim();
+        if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+            return normalized;
+        }
+        return "https://" + normalized;
     }
 }
