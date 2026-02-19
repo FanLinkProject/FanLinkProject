@@ -21,7 +21,8 @@ import org.example.backend.subscription.exception.SubscriptionErrorCode;
 import org.example.backend.subscription.exception.SubscriptionException;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -95,13 +96,14 @@ public class SubscriptionService {
                                 order.getOrderNo());
 
                 // 7. Subscription 생성
-                LocalDateTime now = LocalDateTime.now();
+                Instant now = Instant.now();
+                Instant oneMonthLater = now.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant();
                 Subscription subscription = Subscription.builder()
                                 .userId(userId)
                                 .product(product)
                                 .startDate(now)
-                                .endDate(now.plusMonths(1))
-                                .nextPaymentDate(now.plusMonths(1))
+                                .endDate(oneMonthLater)
+                                .nextPaymentDate(oneMonthLater)
                                 .billingKey(billingKey)
                                 .isActive(true)
                                 .build();
@@ -150,13 +152,14 @@ public class SubscriptionService {
                 user.useCandy(product.getCandyPrice());
 
                 // 5. Subscription 생성
-                LocalDateTime now = LocalDateTime.now();
+                Instant now = Instant.now();
+                Instant oneMonthLater = now.atZone(ZoneId.systemDefault()).plusMonths(1).toInstant();
                 Subscription subscription = Subscription.builder()
                                 .userId(userId)
                                 .product(product)
                                 .startDate(now)
-                                .endDate(now.plusMonths(1))
-                                .nextPaymentDate(now.plusMonths(1))
+                                .endDate(oneMonthLater)
+                                .nextPaymentDate(oneMonthLater)
                                 .billingKey(null) // 캔디 구독
                                 .isActive(true)
                                 .build();

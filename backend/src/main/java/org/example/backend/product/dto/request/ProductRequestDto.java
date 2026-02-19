@@ -26,7 +26,7 @@ public record ProductRequestDto(
     Boolean isMembershipOnly,
     Boolean isExclusive,
     Boolean isMembership,
-
+    Long concertId,
     List<Long> mediaAssetIds,
     Long representativeMediaAssetId) {
 }
