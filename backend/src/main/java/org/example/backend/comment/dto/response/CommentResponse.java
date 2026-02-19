@@ -4,7 +4,7 @@ import org.example.backend.comment.entity.Comment;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record CommentResponse(
         Long id,
@@ -15,7 +15,7 @@ public record CommentResponse(
         boolean isArtist,       // 아티스트 댓글 강조용
         String content,
         Integer status,
-        LocalDateTime createdAt,
+        Instant createdAt,
         int replyCount,
         boolean hasReplies,
         boolean hasArtistReply  // 부모 댓글에 아티스트 답글 존재 여부
