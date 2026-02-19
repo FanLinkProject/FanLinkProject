@@ -4,7 +4,6 @@ import java.util.List;
 
 // 아티스트 마이페이지 dto
 public record ArtistMyPageResponse(
-        boolean isGroupAccount,        // 그룹 계정 여부
         Profile profile,
         FanDailyGraph fanDailyGraph,
         TeamInfo teamInfo,

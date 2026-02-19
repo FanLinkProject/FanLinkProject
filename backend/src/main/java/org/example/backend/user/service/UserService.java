@@ -454,8 +454,7 @@ public class UserService {
                             artist.getId(),
                             artist.getNickname(),
                             artist.getProfileImageUrl(),
-                            followerCount,
-                            artist.isGroupAccount()
+                            followerCount
                     );
                 })
                 .toList();
@@ -488,8 +487,7 @@ public class UserService {
                             artist.getId(),
                             artist.getNickname(),
                             artist.getProfileImageUrl(),
-                            followerCount,
-                            artist.isGroupAccount()
+                            followerCount
                     );
                 })
                 .toList();

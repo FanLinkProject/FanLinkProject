@@ -168,11 +168,6 @@ public class User {
         return user;
     }
 
-    /** 그룹 계정 여부 (role == GROUP). 별도 컬럼 없이 역할로 판단 */
-    public boolean isGroupAccount() {
-        return this.role == UserRole.GROUP;
-    }
-
     public void updateOAuth2Info(String provider, String providerId) {
     }
 

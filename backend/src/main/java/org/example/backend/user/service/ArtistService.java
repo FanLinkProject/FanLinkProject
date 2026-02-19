@@ -139,7 +139,6 @@ public class ArtistService {
         );
 
         return new ArtistMyPageResponse(
-                artistOrGroup.isGroupAccount(),
                 profile,
                 fanDailyGraph,
                 teamInfo,
