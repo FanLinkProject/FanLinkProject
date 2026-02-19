@@ -32,6 +32,7 @@ import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.BlockRepository;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.order.entity.Order;
 import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.post.entity.ArtistPost;
@@ -58,6 +59,7 @@ import java.util.stream.Collectors;
 public class UserService {
     
     private final UserRepository userRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final BlockRepository blockRepository;
     private final FollowRepository followRepository;
     private final OrderRepository orderRepository;
@@ -155,8 +157,18 @@ public class UserService {
                     pageable
             );
         }
-        
-        return artists.map(ArtistSearchResponse::from);
+
+        // 그룹에 속한 아티스트(멤버)는 추천 리스트에서 제외하고,
+        // 그룹이 없는 개인 아티스트(또는 그룹 계정으로만 쓰이는 아티스트)만 노출
+        var filteredUsers = artists.getContent().stream()
+                .filter(user -> groupMemberRepository.findByMember(user).isEmpty())
+                .toList();
+
+        var responses = filteredUsers.stream()
+                .map(ArtistSearchResponse::from)
+                .toList();
+
+        return new org.springframework.data.domain.PageImpl<>(responses, pageable, artists.getTotalElements());
     }
 
     // 유저 차단
@@ -442,7 +454,8 @@ public class UserService {
                             artist.getId(),
                             artist.getNickname(),
                             artist.getProfileImageUrl(),
-                            followerCount
+                            followerCount,
+                            artist.isGroupAccount()
                     );
                 })
                 .toList();
@@ -475,7 +488,8 @@ public class UserService {
                             artist.getId(),
                             artist.getNickname(),
                             artist.getProfileImageUrl(),
-                            followerCount
+                            followerCount,
+                            artist.isGroupAccount()
                     );
                 })
                 .toList();

@@ -19,7 +19,8 @@ public record ArtistDashboardResponse(
             String nickname,
             String profileImageUrl,
             String bannerImageUrl,
-            String bio
+            String bio,
+            boolean isGroupAccount     // 그룹 계정 여부
     ) {
     }
 
