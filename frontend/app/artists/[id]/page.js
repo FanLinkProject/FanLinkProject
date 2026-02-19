@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
@@ -93,18 +93,15 @@ function transformFanPost(p) {
   };
 }
 
-export default function ArtistDetailPage({ params }) {
-  const resolvedParams = React.use(params);
-  const id = resolvedParams?.id;
-
+function ArtistDetailPageInner({ id }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const VALID_TABS = ["ARTIST", "FAN", "LIVE", "NOTICE", "MV"];
+  const tabParam = searchParams.get("tab");
   const [artist, setArtist] = useState(null);
-  const [activeTab, setActiveTab] = useState(() => {
-    if (typeof window === "undefined") return "ARTIST";
-    const tab = new URLSearchParams(window.location.search).get("tab");
-    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "NOTICE", "MV"];
-    return tab && VALID_TABS.includes(tab) ? tab : "ARTIST";
-  });
+  const [activeTab, setActiveTab] = useState(
+    tabParam && VALID_TABS.includes(tabParam) ? tabParam : "ARTIST"
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostImagePreview, setNewPostImagePreview] = useState(null);
@@ -1029,5 +1026,15 @@ export default function ArtistDetailPage({ params }) {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ArtistDetailPage({ params }) {
+  const resolvedParams = React.use(params);
+  const id = resolvedParams?.id;
+  return (
+    <Suspense fallback={null}>
+      <ArtistDetailPageInner id={id} />
+    </Suspense>
   );
 }
