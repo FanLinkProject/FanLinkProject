@@ -359,7 +359,7 @@ function ArtistDetailPageInner({ id }) {
 
   // 아티스트 포스트 무한스크롤 IntersectionObserver
   useEffect(() => {
-    if (!artistPostsHasNext) return;
+    if (!artistPostsHasNext || artistPostsLoading) return;
     const el = artistPostsBottomRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -368,11 +368,11 @@ function ArtistDetailPageInner({ id }) {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [artistPostsHasNext, artistPostsLastId, loadMoreArtistPosts]);
+  }, [artistPostsHasNext, artistPostsLastId, loadMoreArtistPosts, artistPostsLoading]);
 
   // 팬 포스트 무한스크롤 IntersectionObserver
   useEffect(() => {
-    if (!fanPostsHasNext) return;
+    if (!fanPostsHasNext || fanPostsLoading) return;
     const el = fanPostsBottomRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -381,7 +381,7 @@ function ArtistDetailPageInner({ id }) {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [fanPostsHasNext, fanPostsLastId, loadMoreFanPosts]);
+  }, [fanPostsHasNext, fanPostsLastId, loadMoreFanPosts, fanPostsLoading, isGroupMember, artist?.isFollowing]);
 
   if (!artist) return null;
 
