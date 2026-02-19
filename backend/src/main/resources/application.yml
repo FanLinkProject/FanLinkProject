@@ -26,6 +26,7 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+        default_batch_fetch_size: 100
     show-sql: true
   # redis 디폴트(기본기능)-슬레이브(읽기만가능)모드 전환시 별도 작업필요
   data:
@@ -76,7 +77,7 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
-      group-id: ${KAFKA_GROUP_ID}
+      group-id: chat-group
       auto-offset-reset: latest # 수정
       enable-auto-commit: true # 추가
 
@@ -178,7 +179,46 @@ aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
   cloudfront:
+    enabled: ${AWS_CLOUDFRONT_ENABLED:false}
     domain: ${AWS_CLOUDFRONT_DOMAIN}
+    key-pair-id: ${AWS_CLOUDFRONT_KEY_PAIR_ID:}
+    private-key-path: ${AWS_CLOUDFRONT_PRIVATE_KEY_PATH:}
+
+ivs:
+  playback-auth:
+    enabled: ${IVS_PLAYBACK_ENABLED:false}
+    private-key-path: ${IVS_PLAYBACK_PRIVATE_KEY_PATH:}
+  recording-events:
+    enabled: ${IVS_RECORDING_EVENTS_ENABLED:false}
+    queue-url: ${IVS_RECORDING_EVENTS_QUEUE_URL:}
+    max-messages: ${IVS_RECORDING_EVENTS_MAX_MESSAGES:5}
+    wait-seconds: ${IVS_RECORDING_EVENTS_WAIT_SECONDS:10}
+    visibility-timeout-seconds: ${IVS_RECORDING_EVENTS_VISIBILITY_TIMEOUT_SECONDS:30}
+    poll-fixed-delay-ms: ${IVS_RECORDING_EVENTS_POLL_FIXED_DELAY_MS:5000}
+
+replay:
+  access-gate:
+    enabled: ${REPLAY_ACCESS_GATE_ENABLED:false}
+
+mediaconvert:
+  enabled: ${MEDIACONVERT_ENABLED:false}
+  endpoint: ${MEDIACONVERT_ENDPOINT:}
+  role-arn: ${MEDIACONVERT_ROLE_ARN:}
+  job-template: ${MEDIACONVERT_JOB_TEMPLATE:}
+  queue-arn: ${MEDIACONVERT_QUEUE_ARN:}
+  output-prefix: ${MEDIACONVERT_OUTPUT_PREFIX:derived/replays}
+  output-subpath: ${MEDIACONVERT_OUTPUT_SUBPATH:cmaf}
+  events:
+    enabled: ${MEDIACONVERT_EVENTS_ENABLED:false}
+    queue-url: ${MEDIACONVERT_EVENTS_QUEUE_URL:}
+    max-messages: ${MEDIACONVERT_EVENTS_MAX_MESSAGES:5}
+    wait-seconds: ${MEDIACONVERT_EVENTS_WAIT_SECONDS:10}
+    visibility-timeout-seconds: ${MEDIACONVERT_EVENTS_VISIBILITY_TIMEOUT_SECONDS:30}
+    poll-fixed-delay-ms: ${MEDIACONVERT_EVENTS_POLL_FIXED_DELAY_MS:5000}
+
+post:
+  access:
+    cookie-ttl-seconds: ${POST_ACCESS_COOKIE_TTL_SECONDS:600}
 
 media:
   presign:
@@ -187,6 +227,10 @@ media:
     expires-minutes: ${MEDIA_ORPHAN_EXPIRES_MINUTES}
   orphan-cleanup:
     fixed-delay-ms: ${MEDIA_ORPHAN_CLEANUP_FIXED_DELAY_MS}
+  metadata:
+    enabled: ${MEDIA_METADATA_ENABLED:false}
+    ffprobe-path: ${MEDIA_FFPROBE_PATH:}
+    ffprobe-timeout-seconds: ${MEDIA_FFPROBE_TIMEOUT_SECONDS:20}
   limits:
     image-bytes: ${MEDIA_LIMITS_IMAGE_BYTES}
     post-video-bytes: ${MEDIA_LIMITS_POST_VIDEO_BYTES}
@@ -195,6 +239,7 @@ media:
     replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
   attachments:
     max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
+    max-per-product-images: ${MEDIA_ATTACHMENTS_MAX_PER_PRODUCT_IMAGES}
 
 # 정산 관련 설정
 settlement:
@@ -211,6 +256,10 @@ payment:
     base-url: https://api.tosspayments.com/v1
     client-key: ${PAYMENTS_CLIENT_KEY}
     secret-key: ${PAYMENTS_SECRET_KEY}
+    success-url: ${PAYMENT_SUCCESS_URL}
+    fail-url: ${PAYMENT_FAIL_URL}
+
+  frontend-url: ${FRONTEND_URL}
 
 # 프론트 연동 후 success uri 사용예정
 # OAuth2 로그인 성공 후 프론트엔드로 리다이렉트할 URI
@@ -222,6 +271,14 @@ payment:
 #테스트용 코드
 jwt:
   secret: ${JWT_SECRET}
+
+# 티켓 QR JWT (RS256) - 배포 시 TICKET_PRIVATE_KEY, TICKET_PUBLIC_KEY로 PEM 전달
+ticket:
+  private-key: ${TICKET_PRIVATE_KEY:}
+  public-key: ${TICKET_PUBLIC_KEY:}
+  private-key-path: ${TICKET_PRIVATE_KEY_PATH:ticket-keys/private.pem}
+  public-key-path: ${TICKET_PUBLIC_KEY_PATH:ticket-keys/public.pem}
+  qr-expire-hours: ${TICKET_QR_EXPIRE_HOURS:48}
 oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
 
@@ -247,4 +304,4 @@ external:
 app:
   kafka:
     trusted-packages: org.example.backend.chat.dto
-    live-group-id: ${KAFKA_LIVE_GROUP_ID}
+    live-group-id: live-chat-group

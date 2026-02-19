@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/** 팬(일반 사용자) 영역 NavBar. front-design 팬 NavBar DOM/스타일 유지. */
+/** 팬(일반 사용자) 영역 NavBar. */
 export default function FanNavBar() {
   const pathname = usePathname();
 

@@ -1,9 +1,14 @@
 package org.example.backend.chat.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import org.example.backend.chat.entity.ChatMessage;
 import org.example.backend.chat.enums.MessageType;
+
+/**
+ * 채팅 메시지 응답 DTO.
+ * 시간 필드(createdAt)는 Instant(ISO-8601 UTC)로 노출되며, 프론트엔드에서 브라우저 timezone으로 현지화.
+ */
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,7 +29,8 @@ public class ChatMessageResponse {
     private String senderNickName;
 	private MessageType type;
 	private String content;
-	private LocalDateTime createdAt;
+	/** ISO-8601 UTC. 프론트엔드에서 브라우저 timezone으로 현지화. */
+	private Instant createdAt;
 
 	public static ChatMessageResponse from(ChatMessage message) {
 		return ChatMessageResponse.builder()

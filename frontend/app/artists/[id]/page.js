@@ -3,12 +3,24 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
+import { list as listMusicVideos } from "@/lib/musicVideoApi";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
 
 const CANDY_COST = 500;
+const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
+
+function getAuthHeaders() {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: token }),
+  };
+}
 
 export default function ArtistDetailPage({ params }) {
   const resolvedParams = React.use(params);
@@ -25,17 +37,70 @@ export default function ArtistDetailPage({ params }) {
   const [candyBalance] = useState(1500);
   const [localFanPosts, setLocalFanPosts] = useState([]);
   const [likedPostIds, setLikedPostIds] = useState(() => new Set());
+  const [fanProfiles, setFanProfiles] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
 
   useEffect(() => {
     const a = MOCK_ARTISTS.find((x) => x.id === id);
     setArtist(a || MOCK_ARTISTS[0]);
-    setLocalFanPosts(MOCK_POSTS.filter((p) => p.artistId === (a?.id || id) && p.type === "FAN"));
+    setLocalFanPosts(
+      MOCK_POSTS.filter(
+        (p) => p.artistId === (a?.id || id) && p.type === "FAN",
+      ),
+    );
+  }, [id]);
+
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("accessToken")
+        : null;
+    if (!token) return;
+    axios
+      .get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
+      .then((res) => setFanProfiles(res.data || []))
+      .catch(() => setFanProfiles([]));
   }, [id]);
 
   if (!artist) return null;
 
-  const artistPosts = MOCK_POSTS.filter((p) => p.artistId === artist.id && p.type === "ARTIST");
-  const artistNotices = MOCK_POSTS.filter((p) => p.artistId === artist.id && p.type === "NOTICE");
+  // URL id가 숫자면 artistId로 매칭, mock 페이지(luna-ray 등)면 artistName으로 매칭
+  const fanProfileForArtist =
+    fanProfiles.find((p) => String(p.artistId) === String(id)) ||
+    (artist.name &&
+      fanProfiles.find(
+        (p) => p.artistName && p.artistName.trim() === artist.name.trim(),
+      ));
+
+  const handleAttendance = async () => {
+    if (!fanProfileForArtist || attendanceLoading) return;
+    setAttendanceLoading(true);
+    try {
+      await axios.post(
+        `${FAN_PROFILES_API}/${fanProfileForArtist.id}/increase-visit`,
+        {},
+        { headers: getAuthHeaders() },
+      );
+      setFanProfiles((prev) =>
+        prev.map((p) =>
+          p.id === fanProfileForArtist.id
+            ? { ...p, visitCount: (p.visitCount || 0) + 1 }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  const artistPosts = MOCK_POSTS.filter(
+    (p) => p.artistId === artist.id && p.type === "ARTIST",
+  );
+  const artistNotices = MOCK_POSTS.filter(
+    (p) => p.artistId === artist.id && p.type === "NOTICE",
+  );
 
   const handleTabClick = (tabId) => {
     if (tabId === "MARKET") {
@@ -53,7 +118,8 @@ export default function ArtistDetailPage({ params }) {
   };
 
   const removeFanPostImage = () => {
-    if (newPostImagePreview && newPostImageFile) URL.revokeObjectURL(newPostImagePreview);
+    if (newPostImagePreview && newPostImageFile)
+      URL.revokeObjectURL(newPostImagePreview);
     setNewPostImageFile(null);
     setNewPostImagePreview(null);
     if (fanPostFileInputRef.current) fanPostFileInputRef.current.value = "";
@@ -84,7 +150,8 @@ export default function ArtistDetailPage({ params }) {
     };
     setLocalFanPosts([newPost, ...localFanPosts]);
     setNewPostContent("");
-    if (newPostImagePreview && newPostImageFile) URL.revokeObjectURL(newPostImagePreview);
+    if (newPostImagePreview && newPostImageFile)
+      URL.revokeObjectURL(newPostImagePreview);
     setNewPostImagePreview(null);
     setNewPostImageFile(null);
     if (fanPostFileInputRef.current) fanPostFileInputRef.current.value = "";
@@ -97,11 +164,25 @@ export default function ArtistDetailPage({ params }) {
     { id: "LIVE", label: "Live" },
     { id: "NOTICE", label: "Notice" },
     { id: "MARKET", label: "Market" },
+    { id: "MV", label: "뮤직비디오" },
   ];
+
+  const artistIdForApi = Number(id) || 1;
+
+  useEffect(() => {
+    if (activeTab !== "MV") return;
+    setMusicVideosLoading(true);
+    listMusicVideos(artistIdForApi)
+      .then(setMusicVideos)
+      .catch(() => setMusicVideos([]))
+      .finally(() => setMusicVideosLoading(false));
+  }, [activeTab, artistIdForApi]);
 
   const artistLives = MOCK_LIVES.filter((l) => l.artistId === artist.id);
   const liveNow = artistLives.filter((l) => l.status === "LIVE");
-  const vodList = artistLives.filter((l) => l.status === "ENDED" || l.status === "RECORDED");
+  const vodList = artistLives.filter(
+    (l) => l.status === "ENDED" || l.status === "RECORDED",
+  );
 
   return (
     <div className="flex flex-col min-h-full relative">
@@ -112,7 +193,10 @@ export default function ArtistDetailPage({ params }) {
       </div>
 
       <div className="max-w-6xl w-full mx-auto px-8 relative -mt-16 z-10 shrink-0">
-        <Surface variant="primary" className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]">
+        <Surface
+          variant="primary"
+          className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]"
+        >
           <div className="flex items-end gap-6">
             <div className="rounded-2xl border-2 border-white/[0.08] shadow-[0_8px_24px_rgba(0,0,0,0.4)] -mt-20 overflow-hidden bg-[#201a33]">
               <img
@@ -135,11 +219,23 @@ export default function ArtistDetailPage({ params }) {
               </p>
             </div>
           </div>
-          <div className="pb-1">
+          <div className="pb-1 flex items-center gap-2">
             {artist.isSubscribed ? (
-              <Button variant="ghost" className="px-8 py-3" disabled>
-                구독 중
-              </Button>
+              <>
+                <Button variant="ghost" className="px-8 py-3" disabled>
+                  구독 중
+                </Button>
+                {fanProfileForArtist && (
+                  <Button
+                    variant="primary"
+                    className="px-6 py-3"
+                    onClick={handleAttendance}
+                    disabled={attendanceLoading}
+                  >
+                    {attendanceLoading ? "처리 중…" : "출석"}
+                  </Button>
+                )}
+              </>
             ) : (
               <Button variant="primary" className="px-8 py-3">
                 구독하기
@@ -176,7 +272,9 @@ export default function ArtistDetailPage({ params }) {
               posts={artistPosts}
               postLinkBase="/posts"
               showVerifiedByType={true}
-              isLikedMap={Object.fromEntries([...likedPostIds].map((id) => [id, true]))}
+              isLikedMap={Object.fromEntries(
+                [...likedPostIds].map((id) => [id, true]),
+              )}
               onLike={handleLike}
               onComment={(postId) => router.push(`/posts/${postId}#comments`)}
             />
@@ -192,7 +290,9 @@ export default function ArtistDetailPage({ params }) {
                       className="text-xs uppercase tracking-widest"
                       onClick={() => setShowCreateModal(true)}
                     >
-                      <span className="material-symbols-outlined text-lg mr-1.5 align-middle">edit_note</span>
+                      <span className="material-symbols-outlined text-lg mr-1.5 align-middle">
+                        edit_note
+                      </span>
                       팬 포스트 작성
                     </Button>
                   </div>
@@ -200,9 +300,13 @@ export default function ArtistDetailPage({ params }) {
                     posts={localFanPosts}
                     postLinkBase="/posts"
                     showVerifiedByType={true}
-                    isLikedMap={Object.fromEntries([...likedPostIds].map((id) => [id, true]))}
+                    isLikedMap={Object.fromEntries(
+                      [...likedPostIds].map((id) => [id, true]),
+                    )}
                     onLike={handleLike}
-                    onComment={(postId) => router.push(`/posts/${postId}#comments`)}
+                    onComment={(postId) =>
+                      router.push(`/posts/${postId}#comments`)
+                    }
                   />
                 </>
               ) : (
@@ -219,44 +323,74 @@ export default function ArtistDetailPage({ params }) {
             <div className="space-y-12">
               {liveNow.length > 0 && (
                 <section>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">LIVE NOW</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">
+                    LIVE NOW
+                  </h3>
                   <Link href={`/live/${liveNow[0].id}`} className="block group">
                     <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#201a33] border border-white/[0.08] hover:border-white/[0.12] hover:shadow-[0_0_24px_rgba(139,92,246,0.08)] transition-all">
-                      <img src={liveNow[0].thumbnail} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" alt="" />
+                      <img
+                        src={liveNow[0].thumbnail}
+                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                        alt=""
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                       <div className="absolute top-3 left-3 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-red-500/90 text-white text-[9px] font-black uppercase rounded">LIVE</span>
+                        <span className="px-2 py-0.5 bg-red-500/90 text-white text-[9px] font-black uppercase rounded">
+                          LIVE
+                        </span>
                         {liveNow[0].viewerCount && (
                           <span className="px-2 py-0.5 bg-black/40 text-white/90 text-[9px] font-bold rounded flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[10px]">visibility</span>
+                            <span className="material-symbols-outlined text-[10px]">
+                              visibility
+                            </span>
                             {liveNow[0].viewerCount}
                           </span>
                         )}
                       </div>
                       <div className="absolute bottom-3 left-3 right-3">
-                        <h4 className="font-bold text-white text-lg truncate">{liveNow[0].title}</h4>
+                        <h4 className="font-bold text-white text-lg truncate">
+                          {liveNow[0].title}
+                        </h4>
                       </div>
                     </div>
                   </Link>
                 </section>
               )}
               <section>
-                <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">다시보기</h3>
+                <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">
+                  다시보기
+                </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {vodList.map((vod) => (
-                    <Link key={vod.id} href={`/live/${vod.id}`} className="block group">
+                    <Link
+                      key={vod.id}
+                      href={`/live/${vod.id}`}
+                      className="block group"
+                    >
                       <div className="rounded-2xl overflow-hidden bg-[#201a33] border border-white/[0.08] hover:border-white/[0.1] hover:shadow-[0_0_20px_rgba(139,92,246,0.06)] transition-all">
                         <div className="aspect-video relative overflow-hidden">
-                          <img src={vod.thumbnail} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" alt="" />
+                          <img
+                            src={vod.thumbnail}
+                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                            alt=""
+                          />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
+                            <span className="material-symbols-outlined text-white text-5xl">
+                              play_circle
+                            </span>
                           </div>
                         </div>
                         <div className="p-4">
-                          <h4 className="font-bold text-white truncate mb-1">{vod.title}</h4>
-                          <p className="text-[10px] text-white/55 font-medium">{vod.startTime}</p>
+                          <h4 className="font-bold text-white truncate mb-1">
+                            {vod.title}
+                          </h4>
+                          <p className="text-[10px] text-white/55 font-medium">
+                            {vod.startTime}
+                          </p>
                           {vod.timeLabel && vod.timeLabel !== "종료" && (
-                            <p className="text-[10px] text-white/45 mt-0.5">{vod.timeLabel}</p>
+                            <p className="text-[10px] text-white/45 mt-0.5">
+                              {vod.timeLabel}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -265,7 +399,9 @@ export default function ArtistDetailPage({ params }) {
                 </div>
                 {vodList.length === 0 && (
                   <div className="py-16 text-center rounded-2xl bg-[#201a33] border border-white/[0.06]">
-                    <p className="text-white/50 text-sm">다시보기 영상이 없습니다.</p>
+                    <p className="text-white/50 text-sm">
+                      다시보기 영상이 없습니다.
+                    </p>
                   </div>
                 )}
               </section>
@@ -280,7 +416,9 @@ export default function ArtistDetailPage({ params }) {
                     <span className="px-2 py-0.5 rounded bg-white/10 text-white/90 text-[8px] font-black uppercase">
                       Notice
                     </span>
-                    <span className="text-[10px] font-bold text-white/55">{post.timestamp}</span>
+                    <span className="text-[10px] font-bold text-white/55">
+                      {post.timestamp}
+                    </span>
                   </div>
                   <h4 className="font-bold text-white mb-2">
                     {post.content.slice(0, 50)}...
@@ -300,18 +438,73 @@ export default function ArtistDetailPage({ params }) {
               )}
             </div>
           )}
+
+          {activeTab === "MV" && (
+            <div className="space-y-4">
+              {musicVideosLoading ? (
+                <Surface variant="primary" className="py-12 text-center">
+                  <p className="text-white/55">로딩 중...</p>
+                </Surface>
+              ) : musicVideos.length === 0 ? (
+                <Surface variant="primary" className="py-20 text-center">
+                  <p className="text-white/55 italic">
+                    등록된 뮤직비디오가 없습니다.
+                  </p>
+                </Surface>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {musicVideos.map((mv) => (
+                    <Surface
+                      key={mv.id}
+                      variant="primary"
+                      className="p-4 overflow-hidden"
+                    >
+                      <a
+                        href={mv.embedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block group"
+                      >
+                        {mv.thumbnailUrl && (
+                          <div className="aspect-video rounded-xl overflow-hidden bg-white/5 mb-3">
+                            <img
+                              src={mv.thumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform"
+                            />
+                          </div>
+                        )}
+                        <h4 className="font-bold text-white truncate">
+                          {mv.title}
+                        </h4>
+                        <p className="text-xs text-white/55 mt-1 line-clamp-2">
+                          {mv.description}
+                        </p>
+                      </a>
+                    </Surface>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <aside className="hidden lg:col-span-4 lg:flex flex-col gap-6">
           {/* 멤버십 — Primary 퍼플 1개 강조 */}
-          <Surface variant="primary" className="p-8 border border-violet-500/20">
+          <Surface
+            variant="primary"
+            className="p-8 border border-violet-500/20"
+          >
             <div className="mb-6">
               <span className="bg-violet-500/20 text-violet-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
                 Exclusive Access
               </span>
-              <h3 className="font-black text-2xl text-white mt-4 leading-tight">공식 멤버십 가입</h3>
+              <h3 className="font-black text-2xl text-white mt-4 leading-tight">
+                공식 멤버십 가입
+              </h3>
               <p className="text-sm text-white/70 mt-4 leading-relaxed font-medium">
-                {artist.name}를 직접 응원하고 전용 스트리밍과 굿즈 혜택을 받으세요.
+                {artist.name}를 직접 응원하고 전용 스트리밍과 굿즈 혜택을
+                받으세요.
               </p>
             </div>
             <div className="bg-white/[0.06] rounded-2xl p-4 mb-8 border border-white/[0.06]">
@@ -320,14 +513,18 @@ export default function ArtistDetailPage({ params }) {
                   멤버십 1단계
                 </span>
                 <span className="font-black text-xl text-white flex items-center gap-1 tabular-nums">
-                  <span className="material-symbols-outlined text-violet-300 fill-icon">token</span>
+                  <span className="material-symbols-outlined text-violet-300 fill-icon">
+                    token
+                  </span>
                   {CANDY_COST} 캔디 / 월
                 </span>
               </div>
             </div>
             <div className="mb-6 px-1 flex justify-between items-center text-[11px] font-bold text-white/55 uppercase tracking-widest">
               <span>내 보유 캔디</span>
-              <span className="text-white tabular-nums">{candyBalance.toLocaleString()} 캔디</span>
+              <span className="text-white tabular-nums">
+                {candyBalance.toLocaleString()} 캔디
+              </span>
             </div>
             {candyBalance >= CANDY_COST ? (
               <Button
@@ -368,12 +565,16 @@ export default function ArtistDetailPage({ params }) {
                     alt=""
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-white truncate">{member.name}</p>
+                    <p className="font-bold text-white truncate">
+                      {member.name}
+                    </p>
                     <Link
-                      href="/dm"
+                      href="/dm/fan"
                       className="text-[10px] font-black text-violet-300 uppercase tracking-widest mt-1 hover:underline flex items-center gap-1"
                     >
-                      <span className="material-symbols-outlined text-xs">mail</span>
+                      <span className="material-symbols-outlined text-xs">
+                        mail
+                      </span>
                       DM 보내기
                     </Link>
                   </div>
@@ -388,11 +589,14 @@ export default function ArtistDetailPage({ params }) {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
           <Surface variant="primary" className="w-full max-w-xl p-10">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-white">팬 포스트 작성</h3>
+              <h3 className="text-xl font-semibold text-white">
+                팬 포스트 작성
+              </h3>
               <button
                 type="button"
                 onClick={() => {
-                  if (newPostImagePreview && newPostImageFile) URL.revokeObjectURL(newPostImagePreview);
+                  if (newPostImagePreview && newPostImageFile)
+                    URL.revokeObjectURL(newPostImagePreview);
                   setNewPostImagePreview(null);
                   setNewPostImageFile(null);
                   setShowCreateModal(false);
@@ -409,7 +613,9 @@ export default function ArtistDetailPage({ params }) {
               placeholder="아티스트를 향한 따뜻한 한마디..."
             />
             <div className="mt-4">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">사진 첨부</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+                사진 첨부
+              </span>
               <input
                 ref={fanPostFileInputRef}
                 type="file"
@@ -423,18 +629,26 @@ export default function ArtistDetailPage({ params }) {
                   onClick={() => fanPostFileInputRef.current?.click()}
                   className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
                 >
-                  <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                  <span className="material-symbols-outlined text-3xl">
+                    add_photo_alternate
+                  </span>
                   <span className="text-xs font-bold">클릭하여 사진 추가</span>
                 </button>
               ) : (
                 <div className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                  <img src={newPostImagePreview} alt="미리보기" className="w-full max-h-48 object-contain bg-black/20" />
+                  <img
+                    src={newPostImagePreview}
+                    alt="미리보기"
+                    className="w-full max-h-48 object-contain bg-black/20"
+                  />
                   <button
                     type="button"
                     onClick={removeFanPostImage}
                     className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
                   >
-                    <span className="material-symbols-outlined text-lg">close</span>
+                    <span className="material-symbols-outlined text-lg">
+                      close
+                    </span>
                   </button>
                 </div>
               )}

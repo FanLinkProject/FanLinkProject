@@ -117,7 +117,12 @@ backend/src/main/resources/data-test.sql
 *.backup
 *.old
 *.swp
+*.pem
+README.md
+backend/src/main/java/org/example/backend/replay/README2.md
 backend/src/main/java/org/example/backend/media_asset/README.md
+backend/src/main/java/org/example/backend/music_video/README.md
+backend/src/main/java/org/example/backend/ivs/README.md
 
 # 로그 폴더
 logs/

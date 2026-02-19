@@ -25,6 +25,8 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     // 특정 멤버가 속한 그룹 조회
     Optional<GroupMember> findByMember(User member);
 
+    boolean existsByMemberId(Long memberId);
+
     boolean existsByGroupAndMember(User group, User member);
 
     // 그룹명 조회

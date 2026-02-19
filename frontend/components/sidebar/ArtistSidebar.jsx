@@ -22,6 +22,18 @@ const personalMenuItems = [
     icon: "sensors",
     href: "/artist-console/live",
   },
+  {
+    id: "ARTIST_MILESTONES",
+    label: "등급 관리",
+    icon: "military_tech",
+    href: "/milestone",
+  },
+  {
+    id: "ARTIST_DM",
+    label: "DM",
+    icon: "mail",
+    href: "/dm/artist",
+  },
 ];
 
 const businessMenuItems = [

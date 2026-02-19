@@ -12,6 +12,11 @@ import org.example.backend.chat.enums.MessageType;
 import org.example.backend.chat.repository.ChatMessageRepository;
 import org.example.backend.chat.repository.ChatRoomRepository;
 import org.example.backend.notification.repository.NotificationRepository;
+import org.example.backend.comment.entity.Comment;
+import org.example.backend.comment.repository.CommentRepository;
+import org.example.backend.like.entity.Like;
+import org.example.backend.like.enums.LikeTarget;
+import org.example.backend.like.repository.LikeRepository;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.GuestHomeResponse;
@@ -27,9 +32,12 @@ import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.BlockRepository;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.order.entity.Order;
 import org.example.backend.order.repository.OrderRepository;
+import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.entity.FanPost;
+import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
@@ -41,6 +49,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,16 +59,20 @@ import java.util.stream.Collectors;
 public class UserService {
     
     private final UserRepository userRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final BlockRepository blockRepository;
     private final FollowRepository followRepository;
     private final OrderRepository orderRepository;
     private final FanPostRepository fanPostRepository;
+    private final ArtistPostRepository artistPostRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final VerificationCodeService verificationCodeService;
     private final PasswordEncoder passwordEncoder;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final NotificationRepository notificationRepository;
+    private final CommentRepository commentRepository;
+    private final LikeRepository likeRepository;
 
     // 전화번호 수정
     public void updatePhoneNumber(User user, PhoneNumberUpdateRequest request) {
@@ -143,8 +157,18 @@ public class UserService {
                     pageable
             );
         }
-        
-        return artists.map(ArtistSearchResponse::from);
+
+        // 그룹에 속한 아티스트(멤버)는 추천 리스트에서 제외하고,
+        // 그룹이 없는 개인 아티스트(또는 그룹 계정으로만 쓰이는 아티스트)만 노출
+        var filteredUsers = artists.getContent().stream()
+                .filter(user -> groupMemberRepository.findByMember(user).isEmpty())
+                .toList();
+
+        var responses = filteredUsers.stream()
+                .map(ArtistSearchResponse::from)
+                .toList();
+
+        return new org.springframework.data.domain.PageImpl<>(responses, pageable, artists.getTotalElements());
     }
 
     // 유저 차단
@@ -273,7 +297,88 @@ public class UserService {
                 post.getCreatedAt().toString()
         )).getContent();
 
-        // 4) 멤버십 상태 (활성 구독만)
+        // 4) 내가 쓴 댓글 (페이징)
+        Page<Comment> commentsPage = commentRepository.findMyComments(user.getId(), pageable);
+        var myComments = commentsPage.map(comment -> new UserMyPageResponse.MyComment(
+                comment.getId(),
+                comment.getContent() != null && comment.getContent().length() > 100
+                        ? comment.getContent().substring(0, 100) + "..."
+                        : comment.getContent(),
+                comment.getTargetType().name(),
+                comment.getTargetId(),
+                comment.getCreatedAt().toString()
+        )).getContent();
+
+        // 4-1) 내가 좋아요 누른 게시글 (페이징)
+        Page<Like> likesPage = likeRepository.findByUserIdAndTargetTypeInOrderByCreatedAtDesc(
+                user.getId(),
+                List.of(LikeTarget.FAN_POST, LikeTarget.ARTIST_POST),
+                pageable
+        );
+
+        List<Like> likes = likesPage.getContent();
+        List<Long> likedFanPostIds = likes.stream()
+                .filter(l -> l.getTargetType() == LikeTarget.FAN_POST)
+                .map(Like::getTargetId)
+                .distinct()
+                .toList();
+        List<Long> likedArtistPostIds = likes.stream()
+                .filter(l -> l.getTargetType() == LikeTarget.ARTIST_POST)
+                .map(Like::getTargetId)
+                .distinct()
+                .toList();
+
+        Map<Long, FanPost> fanPostMap = fanPostRepository.findAllById(likedFanPostIds).stream()
+                .collect(Collectors.toMap(FanPost::getId, Function.identity(), (a, b) -> a));
+        Map<Long, ArtistPost> artistPostMap = artistPostRepository.findAllById(likedArtistPostIds).stream()
+                .collect(Collectors.toMap(ArtistPost::getId, Function.identity(), (a, b) -> a));
+
+        var myLikedPosts = likes.stream()
+                .map(like -> {
+                    if (like.getTargetType() == LikeTarget.FAN_POST) {
+                        FanPost post = fanPostMap.get(like.getTargetId());
+                        if (post == null || Boolean.TRUE.equals(post.getStatus())) {
+                            return null;
+                        }
+                        String content = post.getContent();
+                        if (content != null && content.length() > 100) {
+                            content = content.substring(0, 100) + "...";
+                        }
+                        return new UserMyPageResponse.MyLikedPost(
+                                post.getId(),
+                                LikeTarget.FAN_POST.name(),
+                                post.getTitle(),
+                                content,
+                                post.getCreatedAt().toString(),
+                                like.getCreatedAt().toString()
+                        );
+                    }
+
+                    if (like.getTargetType() == LikeTarget.ARTIST_POST) {
+                        ArtistPost post = artistPostMap.get(like.getTargetId());
+                        if (post == null || Boolean.TRUE.equals(post.getStatus())) {
+                            return null;
+                        }
+                        String content = post.getContent();
+                        if (content != null && content.length() > 100) {
+                            content = content.substring(0, 100) + "...";
+                        }
+                        return new UserMyPageResponse.MyLikedPost(
+                                post.getId(),
+                                LikeTarget.ARTIST_POST.name(),
+                                post.getTitle(),
+                                content,
+                                post.getCreatedAt().toString(),
+                                like.getCreatedAt().toString()
+                        );
+                    }
+
+                    return null;
+                })
+                .filter(v -> v != null)
+                .toList();
+
+        // 5) 멤버십 상태 (활성 구독만)
         List<Subscription> activeSubscriptions = subscriptionRepository
                 .findByUserIdAndIsActive(user.getId(), true);
         var memberships = activeSubscriptions.stream()
@@ -285,7 +390,7 @@ public class UserService {
                 ))
                 .toList();
 
-        // 5) 구매 내역 (페이징)
+        // 6) 구매 내역 (페이징)
         Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
         var purchaseHistory = ordersPage.map(order -> new UserMyPageResponse.PurchaseHistory(
                 order.getId(),
@@ -297,7 +402,7 @@ public class UserService {
                 order.getCreatedAt().toString()
         )).getContent();
 
-        // 6) 차단 목록 (페이징)
+        // 7) 차단 목록 (페이징)
         Page<Block> blocks = blockRepository.findByBlocker(user, pageable);
         var blockedUsers = blocks.map(b -> new UserMyPageResponse.BlockedUser(
                 b.getBlocked().getId(),
@@ -309,11 +414,15 @@ public class UserService {
                 profile,
                 followedArtists,
                 myPosts,
+                myComments,
+                myLikedPosts,
                 memberships,
                 purchaseHistory,
                 blockedUsers,
                 follows.getTotalElements(),
                 postsPage.getTotalElements(),
+                commentsPage.getTotalElements(),
+                likesPage.getTotalElements(),
                 (long) activeSubscriptions.size(),
                 ordersPage.getTotalElements(),
                 blocks.getTotalElements()

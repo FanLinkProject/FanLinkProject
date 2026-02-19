@@ -134,4 +134,18 @@ public class LiveSession {
 		this.status = LiveSessionStatus.ENDED;
 		this.endedAt = OffsetDateTime.now();
 	}
+
+	// 녹화 완료 시점을 기록하고 RECORDED로 전이한다.
+	public void markRecorded(String recordingS3Bucket, String recordingS3Prefix) {
+		this.status = LiveSessionStatus.RECORDED;
+		if (this.endedAt == null) {
+			this.endedAt = OffsetDateTime.now();
+		}
+		if (recordingS3Bucket != null && !recordingS3Bucket.isBlank()) {
+			this.recordingS3Bucket = recordingS3Bucket;
+		}
+		if (recordingS3Prefix != null && !recordingS3Prefix.isBlank()) {
+			this.recordingS3Prefix = recordingS3Prefix;
+		}
+	}
 }

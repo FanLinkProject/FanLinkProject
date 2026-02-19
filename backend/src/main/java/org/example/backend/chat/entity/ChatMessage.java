@@ -7,7 +7,7 @@ import org.example.backend.chat.enums.MessageType;
 import org.example.backend.user.entity.User;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 채널 메시지
@@ -56,7 +56,7 @@ public class ChatMessage {
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
-	private LocalDateTime createdAt;
+	private Instant createdAt;
 
 	public static ChatMessage of(
 		ChatRoom chatRoom,

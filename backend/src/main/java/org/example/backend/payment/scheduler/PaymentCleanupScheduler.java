@@ -5,13 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.backend.order.entity.Order;
 import org.example.backend.order.enums.OrderStatus;
 import org.example.backend.order.repository.OrderRepository;
+import org.example.backend.order.service.OrderService;
 import org.example.backend.payment.adapter.TossPaymentAdapter;
 import org.example.backend.payment.dto.TossPaymentDto;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -21,7 +22,7 @@ public class PaymentCleanupScheduler {
 
     private final OrderRepository orderRepository;
     private final TossPaymentAdapter tossPaymentAdapter;
-    private final org.example.backend.order.service.OrderService orderService;
+    private final OrderService orderService;
 
     /**
      * 매 5분마다 실행되어 30분 이상 PENDING 상태인 주문을 정리합니다.
@@ -31,7 +32,7 @@ public class PaymentCleanupScheduler {
     @Transactional
     public void cleanupPendingOrders() {
         // 30분 이상 지난 PENDING 주문 정리
-        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(30);
+        Instant cutoffTime = Instant.now().minusSeconds(30 * 60);
         List<Order> pendingOrders = orderRepository.findByStatusAndUpdatedAtBefore(OrderStatus.PENDING, cutoffTime);
 
         if (pendingOrders.isEmpty()) {

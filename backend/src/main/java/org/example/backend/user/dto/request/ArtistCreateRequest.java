@@ -41,6 +41,9 @@ public record ArtistCreateRequest(
         Boolean isGroup,
 
         // 그룹 ID (개인 아티스트 계정 생성 시 그룹에 소속시키려는 경우 지정, null 가능)
-        Long groupId
+        Long groupId,
+
+        // 아티스트 채널 ARN (선택, 관리자 계정 생성 시 설정)
+        String channelArn
 ) {
 }

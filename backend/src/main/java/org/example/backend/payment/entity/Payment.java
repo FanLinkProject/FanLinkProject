@@ -20,7 +20,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Getter
@@ -37,7 +37,7 @@ public class Payment {
     private Long orderId;
 
     @Column(name = "payment_key", unique = true)
-    private String paymentKey; // 토스 결제 키
+    private String paymentKey; // PG사 결제 키
 
     @Column(nullable = false)
     private BigDecimal amount;
@@ -47,18 +47,18 @@ public class Payment {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private PaymentMethod method; // CARD, TOSS_PAY, ...
+    private PaymentMethod method;
 
     @Column(name = "paid_at")
-    private LocalDateTime paidAt;
+    private Instant paidAt;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
@@ -70,7 +70,7 @@ public class Payment {
     public Payment(Long userId, Long orderId, String orderNo, String paymentKey, BigDecimal amount,
             PaymentStatus status,
             PaymentMethod method,
-            LocalDateTime paidAt) {
+            Instant paidAt) {
         this.userId = userId;
         this.orderId = orderId;
         this.orderNo = orderNo;

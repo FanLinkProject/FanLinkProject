@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { createPlaybackToken } from "@/lib/ivsApi";
 
 const MOCK_ARTIST = {
   id: "luna-ray",
@@ -42,18 +44,36 @@ const MOCK_LIVES = {
 
 const INITIAL_CHAT = [
   { user: "김팬", text: "기다렸어요!! 💜", tier: "골드" },
-  { user: "별하늘", text: "지난번 스트리밍도 너무 좋았는데 오늘도 기대돼요 ✨", tier: "멤버십" },
+  {
+    user: "별하늘",
+    text: "지난번 스트리밍도 너무 좋았는데 오늘도 기대돼요 ✨",
+    tier: "멤버십",
+  },
   { user: "MusicLover", text: "서울에서 응원합니다! 🗽", tier: "일반" },
 ];
 
 const INITIAL_COMMENTS = [
-  { id: "c1", user: "팬A", avatar: "https://picsum.photos/seed/c1/100/100", text: "다시보기로라도 봤어요. 감사해요!", timestamp: "1일 전" },
-  { id: "c2", user: "팬B", avatar: "https://picsum.photos/seed/c2/100/100", text: "이 곡 너무 좋아요 ㅠㅠ", timestamp: "2일 전" },
+  {
+    id: "c1",
+    user: "팬A",
+    avatar: "https://picsum.photos/seed/c1/100/100",
+    text: "다시보기로라도 봤어요. 감사해요!",
+    timestamp: "1일 전",
+  },
+  {
+    id: "c2",
+    user: "팬B",
+    avatar: "https://picsum.photos/seed/c2/100/100",
+    text: "이 곡 너무 좋아요 ㅠㅠ",
+    timestamp: "2일 전",
+  },
 ];
 
 export default function LiveSessionPage({ params }) {
   const resolvedParams = React.use(params);
   const id = resolvedParams?.id;
+  const searchParams = useSearchParams();
+  const liveSessionIdParam = searchParams?.get("liveSessionId");
 
   const [live, setLive] = useState(null);
   const [chat, setChat] = useState(INITIAL_CHAT);
@@ -61,6 +81,8 @@ export default function LiveSessionPage({ params }) {
   const [comments, setComments] = useState(INITIAL_COMMENTS);
   const [commentText, setCommentText] = useState("");
   const [isPlaying, setIsPlaying] = useState(true);
+  const [ivsToken, setIvsToken] = useState(null);
+  const [ivsError, setIvsError] = useState(null);
   const chatEndRef = useRef(null);
   const commentEndRef = useRef(null);
 
@@ -68,6 +90,18 @@ export default function LiveSessionPage({ params }) {
     const idStr = typeof id === "string" ? id : "live-now";
     setLive(MOCK_LIVES[idStr] || MOCK_LIVES["live-now"]);
   }, [id]);
+
+  // IVS Playback Token: URL에 liveSessionId가 있고 LIVE일 때 토큰 발급 (실제 연동 시 플레이어에 token 전달)
+  useEffect(() => {
+    const numId = liveSessionIdParam ? Number(liveSessionIdParam) : null;
+    if (!numId || !live || live.status !== "LIVE") return;
+    setIvsError(null);
+    createPlaybackToken(numId, 300)
+      .then((res) => setIvsToken(res))
+      .catch((e) =>
+        setIvsError(e?.data?.message || e.message || "IVS 토큰 발급 실패"),
+      );
+  }, [liveSessionIdParam, live?.status]);
 
   useEffect(() => {
     if (chatEndRef.current) {
@@ -91,7 +125,13 @@ export default function LiveSessionPage({ params }) {
     if (!commentText.trim()) return;
     setComments((prev) => [
       ...prev,
-      { id: `c-${Date.now()}`, user: "나", avatar: "https://picsum.photos/seed/me/100/100", text: commentText.trim(), timestamp: "방금 전" },
+      {
+        id: `c-${Date.now()}`,
+        user: "나",
+        avatar: "https://picsum.photos/seed/me/100/100",
+        text: commentText.trim(),
+        timestamp: "방금 전",
+      },
     ]);
     setCommentText("");
   };
@@ -110,6 +150,22 @@ export default function LiveSessionPage({ params }) {
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
+      {liveSessionIdParam && isLive && (
+        <div className="absolute top-2 left-2 right-2 z-10 flex justify-center">
+          <div className="bg-black/80 rounded-lg px-3 py-2 text-xs text-white/90">
+            {ivsToken ? (
+              <span>
+                IVS 토큰 발급됨 (만료: {ivsToken.expiresAt?.slice(0, 19)}) —
+                플레이어에 token 전달 시 재생 가능
+              </span>
+            ) : ivsError ? (
+              <span className="text-red-400">{ivsError}</span>
+            ) : (
+              <span>IVS 토큰 요청 중...</span>
+            )}
+          </div>
+        </div>
+      )}
       {/* 좌측: 영상 + 아티스트 바 */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* 1. 영상 영역 — 풀폭, 상단, 16:9, 장식 없음 */}
@@ -117,8 +173,12 @@ export default function LiveSessionPage({ params }) {
           {isEndedNoVod ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
-                <span className="material-symbols-outlined text-6xl text-white/20 block mb-3">video_off</span>
-                <p className="text-white/50 text-sm">다시보기가 준비되지 않았습니다.</p>
+                <span className="material-symbols-outlined text-6xl text-white/20 block mb-3">
+                  video_off
+                </span>
+                <p className="text-white/50 text-sm">
+                  다시보기가 준비되지 않았습니다.
+                </p>
               </div>
             </div>
           ) : (
@@ -146,7 +206,9 @@ export default function LiveSessionPage({ params }) {
                   className="size-8 rounded-full bg-black/40 flex items-center justify-center text-white hover:bg-black/60 transition-colors"
                   aria-label="뒤로"
                 >
-                  <span className="material-symbols-outlined text-lg">arrow_back</span>
+                  <span className="material-symbols-outlined text-lg">
+                    arrow_back
+                  </span>
                 </Link>
                 {isLive && (
                   <>
@@ -155,7 +217,9 @@ export default function LiveSessionPage({ params }) {
                     </span>
                     {live.viewerCount && (
                       <span className="px-2 py-0.5 bg-black/40 text-white/90 text-[10px] font-medium rounded flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">visibility</span>
+                        <span className="material-symbols-outlined text-xs">
+                          visibility
+                        </span>
                         {live.viewerCount}
                       </span>
                     )}
@@ -181,14 +245,18 @@ export default function LiveSessionPage({ params }) {
                     className="size-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
                     aria-label="볼륨"
                   >
-                    <span className="material-symbols-outlined text-xl">volume_up</span>
+                    <span className="material-symbols-outlined text-xl">
+                      volume_up
+                    </span>
                   </button>
                   <button
                     type="button"
                     className="size-9 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
                     aria-label="전체화면"
                   >
-                    <span className="material-symbols-outlined text-xl">fullscreen</span>
+                    <span className="material-symbols-outlined text-xl">
+                      fullscreen
+                    </span>
                   </button>
                 </div>
               </div>
@@ -205,10 +273,19 @@ export default function LiveSessionPage({ params }) {
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-white truncate">{MOCK_ARTIST.name}</span>
-              <span className="material-symbols-outlined text-white/70 text-sm fill-icon shrink-0" aria-hidden>verified</span>
+              <span className="text-sm font-semibold text-white truncate">
+                {MOCK_ARTIST.name}
+              </span>
+              <span
+                className="material-symbols-outlined text-white/70 text-sm fill-icon shrink-0"
+                aria-hidden
+              >
+                verified
+              </span>
             </div>
-            <p className="text-[10px] text-white/50 font-medium">{isLive ? "LIVE NOW" : live.startTime}</p>
+            <p className="text-[10px] text-white/50 font-medium">
+              {isLive ? "LIVE NOW" : live.startTime}
+            </p>
           </div>
           <button
             type="button"
@@ -224,20 +301,31 @@ export default function LiveSessionPage({ params }) {
         {isLive ? (
           <>
             <div className="h-11 px-4 border-b border-white/5 flex items-center shrink-0">
-              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider">라이브 채팅</span>
+              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider">
+                라이브 채팅
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar">
               {chat.map((msg, i) => (
-                <div key={i} className="flex gap-2 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors">
+                <div
+                  key={i}
+                  className="flex gap-2 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors"
+                >
                   <div className="size-6 rounded-full bg-white/10 flex items-center justify-center text-[9px] font-semibold text-white/50 shrink-0">
                     {msg.user[0]}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] font-semibold text-white/90">{msg.user}</span>
-                      <span className="text-[8px] text-white/40">{msg.tier}</span>
+                      <span className="text-[11px] font-semibold text-white/90">
+                        {msg.user}
+                      </span>
+                      <span className="text-[8px] text-white/40">
+                        {msg.tier}
+                      </span>
                     </div>
-                    <p className="text-[11px] text-white/70 leading-snug break-words">{msg.text}</p>
+                    <p className="text-[11px] text-white/70 leading-snug break-words">
+                      {msg.text}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -259,7 +347,9 @@ export default function LiveSessionPage({ params }) {
                   className="size-8 bg-white/10 text-white rounded-lg flex items-center justify-center hover:bg-white/15 transition-colors"
                   aria-label="보내기"
                 >
-                  <span className="material-symbols-outlined text-base">send</span>
+                  <span className="material-symbols-outlined text-base">
+                    send
+                  </span>
                 </button>
               </div>
             </div>
@@ -267,19 +357,33 @@ export default function LiveSessionPage({ params }) {
         ) : (
           <>
             <div className="h-11 px-4 border-b border-white/5 flex items-center shrink-0">
-              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider">댓글</span>
-              <span className="text-[10px] text-white/45 ml-2">{comments.length}개</span>
+              <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider">
+                댓글
+              </span>
+              <span className="text-[10px] text-white/45 ml-2">
+                {comments.length}개
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-4 min-h-0 custom-scrollbar">
               {comments.map((c) => (
                 <div key={c.id} className="flex gap-3">
-                  <img src={c.avatar} alt="" className="size-8 rounded-full object-cover shrink-0 border border-white/10" />
+                  <img
+                    src={c.avatar}
+                    alt=""
+                    className="size-8 rounded-full object-cover shrink-0 border border-white/10"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-semibold text-white/90">{c.user}</span>
-                      <span className="text-[9px] text-white/45">{c.timestamp}</span>
+                      <span className="text-[11px] font-semibold text-white/90">
+                        {c.user}
+                      </span>
+                      <span className="text-[9px] text-white/45">
+                        {c.timestamp}
+                      </span>
                     </div>
-                    <p className="text-[11px] text-white/80 leading-snug break-words mt-0.5">{c.text}</p>
+                    <p className="text-[11px] text-white/80 leading-snug break-words mt-0.5">
+                      {c.text}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -301,7 +405,9 @@ export default function LiveSessionPage({ params }) {
                   className="size-8 bg-violet-500/80 text-white rounded-lg flex items-center justify-center hover:brightness-110 transition-colors"
                   aria-label="댓글 작성"
                 >
-                  <span className="material-symbols-outlined text-base">send</span>
+                  <span className="material-symbols-outlined text-base">
+                    send
+                  </span>
                 </button>
               </div>
             </div>

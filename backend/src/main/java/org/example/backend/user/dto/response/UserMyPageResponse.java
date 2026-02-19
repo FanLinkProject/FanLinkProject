@@ -9,6 +9,7 @@ import java.util.List;
  * - 내 프로필 (닉네임, 프로필 사진)
  * - 팔로우 중인 아티스트
  * - 내가 쓴 글
+ * - 내가 쓴 댓글
  * - 멤버십 상태
  * - 구매 내역
  * - 차단 목록
@@ -17,11 +18,15 @@ public record UserMyPageResponse(
         UserProfileResponse profile,
         List<FollowedArtist> followedArtists,
         List<MyPost> myPosts,
+        List<MyComment> myComments,
+        List<MyLikedPost> myLikedPosts,
         List<MembershipStatus> memberships,
         List<PurchaseHistory> purchaseHistory,
         List<BlockedUser> blockedUsers,
         Long totalFollowingsCount,
         Long totalPostsCount,
+        Long totalCommentsCount,
+        Long totalLikedPostsCount,
         Long totalMembershipsCount,
         Long totalOrdersCount,
         Long totalBlockedUsersCount
@@ -73,6 +78,20 @@ public record UserMyPageResponse(
     }
 
     /**
+     * 내가 좋아요 누른 게시글
+     * - postType: FAN_POST / ARTIST_POST
+     */
+    public record MyLikedPost(
+            Long postId,
+            String postType,
+            String title,
+            String content,
+            String postCreatedAt,
+            String likedAt
+    ) {
+    }
+
+    /**
      * 멤버십 상태
      */
     public record MembershipStatus(
@@ -80,6 +99,18 @@ public record UserMyPageResponse(
             String productName,
             Boolean isActive,
             String endDate
+    ) {
+    }
+
+    /**
+     * 내가 쓴 댓글
+     */
+    public record MyComment(
+            Long commentId,
+            String content,
+            String targetType,  // POST, ARTIST_POST 등
+            Long targetId,      // 게시글 ID
+            String createdAt
     ) {
     }
 }

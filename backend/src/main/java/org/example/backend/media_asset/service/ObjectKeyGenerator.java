@@ -16,18 +16,21 @@ public class ObjectKeyGenerator {
     private static final int MAX_EXT_LENGTH = 10;
 
     // 요청 정보를 기반으로 규칙에 맞는 objectKey를 생성한다.
-    public String generate(PresignItemRequest item) {
+    public String generate(PresignItemRequest item, Long ownerUserId) {
         String ext = sanitizeExt(item.ext());
         String uuid = UUID.randomUUID().toString();
-        String prefix = resolvePrefix(item.category(), item.scope(), item.ownerUserId(),
-                item.postIdOrTemp(), item.replayIdOrTemp());
+        String prefix = resolvePrefix(item.category(), item.scope(), ownerUserId, item.artistId(),
+                item.postIdOrTemp(), item.replayIdOrTemp(), item.productIdOrTemp());
 
         return switch (item.category()) {
             case PROFILE_IMAGE -> prefix + uuid + "." + ext;
+            case ARTIST_COVER_IMAGE -> prefix + uuid + "." + ext;
             case POST_IMAGE -> prefix + uuid + "." + ext;
             case POST_VIDEO -> prefix + uuid + ".mp4";
             case REPLAY_VIDEO -> prefix + "source." + ext;
             case REPLAY_THUMBNAIL -> prefix + "thumbnail." + ext;
+            case PRODUCT_IMAGE -> prefix + uuid + "." + ext;
+            case PRODUCT_DESCRIBE_IMAGE -> prefix + uuid + "." + ext;
         };
     }
 
@@ -43,19 +46,36 @@ public class ObjectKeyGenerator {
     private String resolvePrefix(MediaAssetCategory category,
                                  MediaAssetScope scope,
                                  Long ownerUserId,
+                                 Long artistId,
                                  String postIdOrTemp,
-                                 String replayIdOrTemp) {
-        String base = switch (category) {
-            case PROFILE_IMAGE -> "profiles/" + requireValue(ownerUserId, "ownerUserId") + "/";
-            case POST_IMAGE, POST_VIDEO -> "posts/" + (category == MediaAssetCategory.POST_IMAGE ? "images/" : "videos/")
-                    + requireText(postIdOrTemp, "postIdOrTemp") + "/";
-            case REPLAY_VIDEO, REPLAY_THUMBNAIL -> "live/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
+                                 String replayIdOrTemp,
+                                 String productIdOrTemp) {
+        return switch (category) {
+            case PROFILE_IMAGE ->
+                    "public/profiles/" + requireValue(ownerUserId, "ownerUserId") + "/";
+            case ARTIST_COVER_IMAGE ->
+                    "public/covers/" + requireValue(artistId, "artistId") + "/";
+            case POST_IMAGE ->
+                    buildPostPrefix("images", scope, postIdOrTemp);
+            case POST_VIDEO ->
+                    buildPostPrefix("videos", scope, postIdOrTemp);
+            case REPLAY_VIDEO ->
+                    "raw/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
+            case REPLAY_THUMBNAIL ->
+                    "public/replays/" + requireText(replayIdOrTemp, "replayIdOrTemp") + "/";
+            case PRODUCT_IMAGE ->
+                    "public/products/images/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
+            case PRODUCT_DESCRIBE_IMAGE ->
+                    "public/products/describe/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
         };
+    }
 
+    private String buildPostPrefix(String type, MediaAssetScope scope, String postIdOrTemp) {
+        String suffix = "posts/" + type + "/" + requireText(postIdOrTemp, "postIdOrTemp") + "/";
         if (scope == MediaAssetScope.RESTRICTED) {
-            return "restricted/" + base;
+            return "restricted/" + suffix;
         }
-        return base;
+        return "public/" + suffix;
     }
 
     // 확장자에 대한 기본 sanitize(영숫자/길이 제한)를 수행한다.

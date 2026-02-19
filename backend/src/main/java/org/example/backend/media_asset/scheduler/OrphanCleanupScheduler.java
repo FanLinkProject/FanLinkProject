@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Component
 @RequiredArgsConstructor
@@ -22,7 +22,7 @@ public class OrphanCleanupScheduler {
     @Scheduled(fixedDelayString = "${media.orphan-cleanup.fixed-delay-ms}")
     @Transactional
     public void cleanupExpiredInitiated() {
-        LocalDateTime now = LocalDateTime.now(mediaClock);
+        Instant now = Instant.now(mediaClock);
         mediaAssetRepository.findExpiredInitiated(now).forEach(mediaAsset -> {
             mediaAsset.markOrphan(now);
             s3MediaClient.deleteObjectQuietly(mediaAsset.getObjectKey());

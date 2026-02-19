@@ -69,6 +69,10 @@ public class SecurityConfig {
                         "/oauth2/**",             // OAuth2 관련 URL
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )
                     ).permitAll()
+                    .requestMatchers(GET, "/api/artists/*/music-videos").permitAll()
+                    .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
+                    .requestMatchers("/api/payments/toss/**").permitAll()
+                    .requestMatchers("/api/artist-posts/notices").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)
                     .requestMatchers("/api/settlements/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -79,11 +83,15 @@ public class SecurityConfig {
                             "/api/subscriptions/**",
                             "/api/orders/**")
                     .authenticated()
+                    // 티켓: public-key는 인증 없이 (스캐너용), 나머지는 인증 필요
+                    .requestMatchers(GET, "/api/tickets/public-key").permitAll()
+                    .requestMatchers("/api/tickets/**").authenticated()
 
                 .requestMatchers(
 					"/ws-chat/**",
 					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
                 ).permitAll()
+				.requestMatchers(GET, "/api/live-sessions/*/access").authenticated()
 				.requestMatchers(GET, "/api/live-sessions/**").permitAll()
 
                     // 관리자
@@ -92,19 +100,23 @@ public class SecurityConfig {
                 
                 // 아티스트, 관리자
                 .requestMatchers("/api/artist/**")
-                    .hasAnyRole("ARTIST", "ADMIN")
+                    .hasAnyRole("ARTIST", "GROUP", "ADMIN")
 
                 // 마일스톤(등급) - 아티스트 전용
                 .requestMatchers("/api/milestones/**", "/api/milestone/**")
-                    .hasAnyRole("ARTIST", "ADMIN")
+                    .hasAnyRole("ARTIST", "GROUP", "ADMIN")
 
                 // 팬 프로필(등급 현황) - 인증된 사용자
                 .requestMatchers("/api/fan-profiles/**")
                     .authenticated()
-                
+
                 // 유저(팬), 아티스트, 그룹, 관리자
                 .requestMatchers("/api/user/**")
                     .hasAnyRole("USER", "ARTIST", "GROUP", "ADMIN")
+
+                // 공연 CRUD - 아티스트, 관리자
+                .requestMatchers("/api/concerts/**")
+                    .hasAnyRole("ARTIST", "ADMIN")
                 
                 // 그 외 모든 요청은 인증 필요
                 .anyRequest().authenticated()

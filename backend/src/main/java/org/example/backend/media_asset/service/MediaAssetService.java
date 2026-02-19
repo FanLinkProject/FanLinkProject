@@ -1,6 +1,7 @@
 package org.example.backend.media_asset.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.config.MediaProperties;
 import org.example.backend.media_asset.dto.request.CompleteRequest;
@@ -18,12 +19,17 @@ import org.example.backend.media_asset.exception.MediaAssetErrorCode;
 import org.example.backend.media_asset.exception.MediaAssetException;
 import org.example.backend.media_asset.metadata.VideoMetadataExtractor;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.replay.entity.Replay;
+import org.example.backend.replay.repository.ReplayRepository;
+import org.example.backend.replay.service.MediaConvertJobService;
+import org.example.backend.replay.entity.ReplayStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.user.enums.UserRole;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -37,25 +43,31 @@ public class MediaAssetService {
     private final MediaAssetRepository mediaAssetRepository;
     private final ObjectKeyGenerator objectKeyGenerator;
     private final MediaPolicyValidator mediaPolicyValidator;
+    private final MediaOwnershipValidator mediaOwnershipValidator;
     private final S3MediaClient s3MediaClient;
     private final MediaProperties mediaProperties;
     private final AwsProperties awsProperties;
     private final Clock mediaClock;
     private final VideoMetadataExtractor videoMetadataExtractor;
+    private final ReplayRepository replayRepository;
+    private final MediaConvertJobService mediaConvertJobService;
 
     // 업로드용 presigned URL을 배치 발급하고 INITIATED 상태를 저장한다.
     @Transactional
-    public PresignResponse presign(PresignRequest request) {
+    public PresignResponse presign(PresignRequest request, PrincipalDetails principalDetails) {
+        Long userId = principalDetails.getUserId();
+        UserRole userRole = principalDetails.getUser().getRole();
         List<PresignItemResponse> responses = new ArrayList<>();
         for (PresignItemRequest item : request.items()) {
-            mediaPolicyValidator.validatePresign(item);
-            String objectKey = objectKeyGenerator.generate(item);
+            mediaOwnershipValidator.validatePresignOwnership(item, userId, userRole);
+            mediaPolicyValidator.validatePresign(item, userRole);
+            String objectKey = objectKeyGenerator.generate(item, userId);
             if (mediaAssetRepository.findByObjectKey(objectKey).isPresent()) {
                 throw new MediaAssetException(MediaAssetErrorCode.DUPLICATE_MEDIA_ASSET);
             }
-            LocalDateTime now = LocalDateTime.now(mediaClock);
-            LocalDateTime orphanExpiresAt = now.plusMinutes(mediaProperties.getOrphan().getExpiresMinutes());
-            LocalDateTime presignExpiresAt = now.plusSeconds(mediaProperties.getPresign().getExpireSeconds());
+            Instant now = Instant.now(mediaClock);
+            Instant orphanExpiresAt = now.plus(Duration.ofMinutes(mediaProperties.getOrphan().getExpiresMinutes()));
+            Instant presignExpiresAt = now.plusSeconds(mediaProperties.getPresign().getExpireSeconds());
 
             S3MediaClient.PresignedUpload presignedUpload = s3MediaClient.presignPut(
                     objectKey,
@@ -64,7 +76,7 @@ public class MediaAssetService {
             );
 
             MediaAsset mediaAsset = new MediaAsset(
-                    item.ownerUserId(),
+                    userId,
                     item.category(),
                     item.scope(),
                     objectKey,
@@ -88,7 +100,8 @@ public class MediaAssetService {
 
     // 업로드 완료 배치를 처리해 S3 HEAD 검증 후 상태를 확정한다.
     @Transactional
-    public CompleteResponse complete(CompleteRequest request) {
+    public CompleteResponse complete(CompleteRequest request, PrincipalDetails principalDetails) {
+        Long userId = principalDetails.getUserId();
         List<CompleteItemResponse> responses = new ArrayList<>();
         for (var item : request.items()) {
             String objectKey = item.objectKey();
@@ -122,7 +135,20 @@ public class MediaAssetService {
             }
 
             MediaAsset mediaAsset = optionalMediaAsset.get();
-            LocalDateTime now = LocalDateTime.now(mediaClock);
+            if (!mediaAsset.getOwnerUserId().equals(userId)) {
+                responses.add(new CompleteItemResponse(
+                        mediaAsset.getId(),
+                        mediaAsset.getObjectKey(),
+                        MediaAssetStatus.REJECTED,
+                        null,
+                        null,
+                        null,
+                        null,
+                        MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED.getCode()
+                ));
+                continue;
+            }
+            Instant now = Instant.now(mediaClock);
             if (mediaAsset.getStatus() == MediaAssetStatus.INITIATED
                     && mediaAsset.getExpiresAt() != null
                     && mediaAsset.getExpiresAt().isBefore(now)) {
@@ -183,11 +209,13 @@ public class MediaAssetService {
 
             mediaAsset.markReady(actualContentType, actualSizeBytes);
             mediaAssetRepository.save(mediaAsset);
+            applyReplayMapping(mediaAsset);
             responses.add(toCompleteResponse(mediaAsset));
         }
         return new CompleteResponse(responses);
     }
 
+    // presign 요청의 owner/userRole이 로그인 사용자와 일치하는지 확인한다.
     // HEAD 결과가 정책/요청값과 일치하는지 검사하고 거부 사유를 리턴한다.
     private MediaAssetRejectedReason validateHead(MediaAsset mediaAsset, String actualContentType, long actualSizeBytes) {
         if (!mediaPolicyValidator.isContentTypeAllowed(mediaAsset.getCategory(), actualContentType)) {
@@ -224,6 +252,7 @@ public class MediaAssetService {
         return requested == null || actualSeconds <= requested;
     }
 
+
     // 엔티티 상태에 맞는 complete 응답 DTO를 구성한다.
     private CompleteItemResponse toCompleteResponse(MediaAsset mediaAsset) {
         String url = null;
@@ -240,6 +269,97 @@ public class MediaAssetService {
                 mediaAsset.getSizeBytesActual(),
                 null
         );
+    }
+
+    // Replay 업로드 결과를 Replay 엔티티에 반영한다.
+    private void applyReplayMapping(MediaAsset mediaAsset) {
+        if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
+            return;
+        }
+        if (mediaAsset.getCategory() != MediaAssetCategory.REPLAY_VIDEO
+                && mediaAsset.getCategory() != MediaAssetCategory.REPLAY_THUMBNAIL) {
+            return;
+        }
+        String replayIdOrTemp = extractReplayIdOrTemp(mediaAsset.getObjectKey());
+        if (replayIdOrTemp == null || replayIdOrTemp.startsWith("tmp_")) {
+            return;
+        }
+        Long replayId = parseLongSafely(replayIdOrTemp);
+        if (replayId == null) {
+            return;
+        }
+        Replay replay = replayRepository.findById(replayId).orElse(null);
+        if (replay == null) {
+            return;
+        }
+        if (mediaAsset.getCategory() == MediaAssetCategory.REPLAY_VIDEO) {
+            replay.updateMp4Key(mediaAsset.getObjectKey());
+            submitMediaConvertIfNeeded(replay, mediaAsset.getObjectKey());
+        } else {
+            replay.updateThumbnailKey(mediaAsset.getObjectKey());
+        }
+    }
+
+    private void submitMediaConvertIfNeeded(Replay replay, String objectKey) {
+        if (replay.getMediaConvertJobId() != null && !replay.getMediaConvertJobId().isBlank()) {
+            return;
+        }
+        if (!isRawReplayObjectKey(objectKey)) {
+            return;
+        }
+        String jobId = mediaConvertJobService.submitReplayJob(replay, objectKey);
+        if (jobId == null || jobId.isBlank()) {
+            return;
+        }
+        replay.updateMediaConvertJobId(jobId);
+        replay.changeStatus(ReplayStatus.VALIDATING);
+        replayRepository.save(replay);
+    }
+
+    private boolean isRawReplayObjectKey(String objectKey) {
+        if (objectKey == null) {
+            return false;
+        }
+        String normalized = objectKey.startsWith("restricted/")
+                ? objectKey.substring("restricted/".length())
+                : objectKey;
+        return normalized.startsWith("raw/replays/");
+    }
+
+    // objectKey에서 replayIdOrTemp를 추출한다.
+    private String extractReplayIdOrTemp(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return null;
+        }
+        String normalized = objectKey.startsWith("restricted/")
+                ? objectKey.substring("restricted/".length())
+                : objectKey;
+        String[] prefixes = {
+                "raw/replays/",
+                "public/replays/",
+                "live/replays/"
+        };
+        for (String prefix : prefixes) {
+            if (!normalized.startsWith(prefix)) {
+                continue;
+            }
+            String remainder = normalized.substring(prefix.length());
+            int idx = remainder.indexOf('/');
+            if (idx <= 0) {
+                return null;
+            }
+            return remainder.substring(0, idx);
+        }
+        return null;
+    }
+
+    // 문자열을 Long으로 안전하게 변환한다.
+    private Long parseLongSafely(String value) {
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     // CloudFront 도메인과 objectKey로 CDN URL을 생성한다.

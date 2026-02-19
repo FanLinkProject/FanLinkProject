@@ -5,8 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,15 +22,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     // 스케줄러용: 결제일이 지난 활성 구독 조회
     @Query("SELECT s FROM Subscription s WHERE s.nextPaymentDate <= :date AND s.isActive = true")
-    List<Subscription> findByNextPaymentDateBeforeAndIsActive(@Param("date") LocalDateTime date);
+    List<Subscription> findByNextPaymentDateBeforeAndIsActive(@Param("date") Instant date);
 
     // 현금 구독만 조회 (빌링키 있음)
     @Query("SELECT s FROM Subscription s WHERE s.billingKey IS NOT NULL AND s.isActive = true AND s.nextPaymentDate <= :date")
-    List<Subscription> findCashSubscriptionsDue(@Param("date") LocalDateTime date);
+    List<Subscription> findCashSubscriptionsDue(@Param("date") Instant date);
 
     // 캔디 구독만 조회 (빌링키 없음)
     @Query("SELECT s FROM Subscription s WHERE s.billingKey IS NULL AND s.isActive = true AND s.nextPaymentDate <= :date")
-    List<Subscription> findCandySubscriptionsDue(@Param("date") LocalDateTime date);
+    List<Subscription> findCandySubscriptionsDue(@Param("date") Instant date);
 
 	// 유저가 해당 아티스트를 현재 구독 중인지 여부 확인 (유료 라이브 채팅/접근 권한 검증용)
 	@Query("""
@@ -47,7 +46,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 	boolean existsActiveSubscriptionForArtist(
 		@Param("userId") Long userId,
 		@Param("artistId") Long artistId,
-		@Param("now") LocalDateTime now
+		@Param("now") Instant now
 	);
 
 	// 해당 아티스트를 구독 중인 팬 userId 목록 조회 (라이브 시작 알림 발송용)
@@ -62,6 +61,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 	""")
 	List<Long> findActiveSubscriberUserIdsByArtistId(
 		@Param("artistId") Long artistId,
-		@Param("now") LocalDateTime now
+		@Param("now") Instant now
 	);
 }
