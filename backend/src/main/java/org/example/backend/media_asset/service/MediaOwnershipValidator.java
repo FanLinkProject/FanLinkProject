@@ -6,7 +6,6 @@ import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetScope;
 import org.example.backend.media_asset.exception.MediaAssetErrorCode;
 import org.example.backend.media_asset.exception.MediaAssetException;
-import org.example.backend.media_asset.gateway.FanMembershipGateway;
 import org.example.backend.media_asset.gateway.FanPageGateway;
 import org.example.backend.media_asset.gateway.PostGateway;
 import org.example.backend.media_asset.gateway.ProductGateway;
@@ -22,7 +21,6 @@ public class MediaOwnershipValidator {
     private static final String TEMP_PREFIX = "tmp_";
 
     private final FanPageGateway fanPageGateway;
-    private final FanMembershipGateway fanMembershipGateway;
     private final PostGateway postGateway;
     private final ReplayGateway replayGateway;
     private final ProductGateway productGateway;
@@ -71,15 +69,14 @@ public class MediaOwnershipValidator {
         }
     }
 
-    // 게시물 업로드 권한을 검증한다.
+    // 게시물(공지 포함) 첨부 업로드는 팬페이지 관리 계정만 허용한다.
     private void validatePostOwnership(PresignItemRequest item, Long userId, UserRole role) {
         Long artistId = resolveArtistIdForPost(item);
-        boolean isOwner = isArtistOwner(artistId, userId, role);
-        if (item.scope() == MediaAssetScope.RESTRICTED && !isOwner) {
+        if (!isManageAccountOwner(artistId, userId, role)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
-        if (!isOwner && !fanMembershipGateway.isFan(artistId, userId)) {
-            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        if (item.scope() == MediaAssetScope.RESTRICTED) {
+            return;
         }
     }
 

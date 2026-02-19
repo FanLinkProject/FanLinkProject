@@ -5,6 +5,7 @@ import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
+import org.example.backend.media_asset.gateway.FanPageGateway;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.product.dto.request.ProductRequestDto;
 import org.example.backend.product.dto.response.ProductDetailResponse;
@@ -15,6 +16,8 @@ import org.example.backend.product.exception.ProductErrorCode;
 import org.example.backend.product.exception.ProductException;
 import org.example.backend.product.repository.ProductMediaAssetRepository;
 import org.example.backend.product.repository.ProductRepository;
+import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -32,6 +35,8 @@ public class ProductService {
     private final ProductMediaAssetRepository productMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
+    private final FanPageGateway fanPageGateway;
+    private final ArtistPermissionService artistPermissionService;
 
     public List<ProductDetailResponse> getAllProducts() {
         List<Product> products = productRepository.findAll();
@@ -43,7 +48,9 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductDetailResponse createProduct(ProductRequestDto request) {
+    public ProductDetailResponse createProduct(Long userId, UserRole role, ProductRequestDto request) {
+        validateManageAccountForArtist(request.artistId(), userId, role);
+
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
         boolean isExclusive = isMembershipOnly || (request.isExclusive() != null && request.isExclusive());
@@ -105,8 +112,9 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductDetailResponse updateProduct(Long id, ProductRequestDto request) {
+    public ProductDetailResponse updateProduct(Long id, Long userId, UserRole role, ProductRequestDto request) {
         Product product = getProduct(id);
+        validateManageAccountForArtist(product.getArtistId(), userId, role);
 
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
         // 멤버십 전용 상품인 경우, 단독 상품 여부도 true로 설정
@@ -151,10 +159,27 @@ public class ProductService {
     }
 
     @Transactional
-    public void deleteProduct(Long id) {
+    public void deleteProduct(Long id, Long userId, UserRole role) {
         Product product = getProduct(id);
+        validateManageAccountForArtist(product.getArtistId(), userId, role);
         productMediaAssetRepository.deleteAllByProduct_Id(id);
         productRepository.delete(product);
+    }
+
+    private void validateManageAccountForArtist(Long artistId, Long userId, UserRole role) {
+        if (artistId == null) {
+            return;
+        }
+        if (userId == null || role == null) {
+            throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
+        }
+        Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
+        if (!ownerUserId.equals(userId)) {
+            throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
+        }
+        if (!artistPermissionService.isManageAccount(userId, role)) {
+            throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
+        }
     }
 
     private ProductDetailResponse toDetailResponse(Product product) {

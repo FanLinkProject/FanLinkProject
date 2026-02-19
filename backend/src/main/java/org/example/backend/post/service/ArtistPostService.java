@@ -20,6 +20,7 @@ import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ public class ArtistPostService {
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
     private final SubscriptionRepository subscriptionRepository;
+    private final ArtistPermissionService artistPermissionService;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -92,6 +94,11 @@ public class ArtistPostService {
         if (user.getRole() == UserRole.USER) {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
         }
+        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
+            throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        validateRepresentativeMediaAssetId(request.getMediaAssetIds(), request.getRepresentativeMediaAssetId());
 
         User group = null;
         if (request.getGroupId() != null) {
@@ -106,6 +113,7 @@ public class ArtistPostService {
                 .content(request.getContent())
                 .isMembershipOnly(request.getIsMembershipOnly())
                 .status(false)
+                .representativeMediaAssetId(request.getRepresentativeMediaAssetId())
                 .build();
 
         ArtistPost savedPost = artistPostRepository.save(artistPost);
@@ -129,7 +137,7 @@ public class ArtistPostService {
 
         List<PostMediaAsset> attachments = postMediaAssetRepository
                 .findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, artistPost.getId());
-        return buildPostResponseWithAccess(artistPost, attachments, userId, role);
+        return buildPostResponseWithAccess(artistPost, attachments, userId, role, false);
     }
 
     public List<ArtistPostResponse> getPosts(Long groupId, Long lastPostId, int limit, Long userId, UserRole role) {
@@ -137,7 +145,7 @@ public class ArtistPostService {
         return artistPostRepository.findPosts(groupId, lastPostId, pageable).stream()
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
-                        userId, role))
+                        userId, role, true))
                 .collect(Collectors.toList());
     }
 
@@ -146,7 +154,7 @@ public class ArtistPostService {
         return artistPostRepository.findNotices(lastPostId, pageable).stream()
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
-                        userId, role))
+                        userId, role, true))
                 .collect(Collectors.toList());
     }
 
@@ -155,20 +163,36 @@ public class ArtistPostService {
         return artistPostRepository.findArtistPosts(groupId, lastPostId, pageable).stream()
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
-                        userId, role))
+                        userId, role, true))
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public ArtistPostResponse updatePost(Long userId, Long postId, ArtistPostRequest request) {
-        ArtistPost artistPost = artistPostRepository.findById(postId)
-                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
-
-        if (!artistPost.getUser().getId().equals(userId)) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PostException(PostErrorCode.USER_NOT_FOUND));
+        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
         }
 
-        artistPost.update(request.getTitle(), request.getContent(), request.getIsMembershipOnly());
+        ArtistPost artistPost = artistPostRepository.findById(postId)
+                .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
+
+        boolean isWriter = artistPost.getUser().getId().equals(userId);
+        boolean isGroupOwner = artistPost.getGroup() != null && artistPost.getGroup().getId().equals(userId);
+        if (!isWriter && !isGroupOwner) {
+            throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        Long newRepresentativeId = null;
+        if (request.getMediaAssetIds() != null) {
+            validateRepresentativeMediaAssetId(request.getMediaAssetIds(), request.getRepresentativeMediaAssetId());
+            newRepresentativeId = request.getRepresentativeMediaAssetId();
+        } else {
+            newRepresentativeId = artistPost.getRepresentativeMediaAssetId();
+        }
+
+        artistPost.update(request.getTitle(), request.getContent(), request.getIsMembershipOnly(), newRepresentativeId);
 
         if (request.getMediaAssetIds() != null) {
             postMediaAssetRepository.deleteAllByPostTypeAndPostId(PostMediaAssetType.ARTIST, postId);
@@ -197,12 +221,15 @@ public class ArtistPostService {
     }
 
     private ArtistPostResponse buildPostResponseWithAccess(ArtistPost post, List<PostMediaAsset> attachments,
-                                                          Long userId, UserRole role) {
+                                                          Long userId, UserRole role, boolean onlyRepresentative) {
+        List<PostMediaAssetResponse> attachmentResponses = onlyRepresentative
+                ? buildRepresentativeAttachmentResponses(post, attachments)
+                : buildAttachmentResponses(attachments);
         if (!Boolean.TRUE.equals(post.getIsMembershipOnly())) {
-            return ArtistPostResponse.from(post, buildAttachmentResponses(attachments));
+            return ArtistPostResponse.from(post, attachmentResponses);
         }
         if (canAccessPaidPost(post, userId, role)) {
-            return ArtistPostResponse.from(post, buildAttachmentResponses(attachments));
+            return ArtistPostResponse.from(post, attachmentResponses);
         }
         return ArtistPostResponse.builder()
                 .id(post.getId())
@@ -211,10 +238,37 @@ public class ArtistPostService {
                 .title(post.getTitle())
                 .content(null)
                 .isMembershipOnly(post.getIsMembershipOnly())
+                .representativeMediaAssetId(post.getRepresentativeMediaAssetId())
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .attachments(Collections.emptyList())
                 .build();
+    }
+
+    private void validateRepresentativeMediaAssetId(List<Long> mediaAssetIds, Long representativeMediaAssetId) {
+        if (representativeMediaAssetId == null) {
+            return;
+        }
+        if (CollectionUtils.isEmpty(mediaAssetIds) || !mediaAssetIds.contains(representativeMediaAssetId)) {
+            throw new PostException(PostErrorCode.INVALID_MEDIA_ASSET_CATEGORY);
+        }
+    }
+
+    private List<PostMediaAssetResponse> buildRepresentativeAttachmentResponses(ArtistPost post, List<PostMediaAsset> attachments) {
+        if (CollectionUtils.isEmpty(attachments)) {
+            return Collections.emptyList();
+        }
+        String cdnBaseUrl = getCdnBaseUrl();
+        Long repId = post.getRepresentativeMediaAssetId();
+        if (repId != null) {
+            for (PostMediaAsset pma : attachments) {
+                MediaAsset ma = pma.getMediaAsset();
+                if (ma != null && repId.equals(ma.getId())) {
+                    return List.of(PostMediaAssetResponse.from(ma, cdnBaseUrl));
+                }
+            }
+        }
+        return List.of(PostMediaAssetResponse.from(attachments.get(0).getMediaAsset(), cdnBaseUrl));
     }
 
     private boolean canAccessPaidPost(ArtistPost post, Long userId, UserRole role) {

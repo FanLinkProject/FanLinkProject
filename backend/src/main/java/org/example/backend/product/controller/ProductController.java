@@ -1,17 +1,16 @@
 package org.example.backend.product.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.security.details.PrincipalDetails;
+import org.example.backend.user.enums.UserRole;
+import org.example.backend.product.dto.request.ProductRequestDto;
 import org.example.backend.product.dto.response.ProductDetailResponse;
 import org.example.backend.product.service.ProductService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
-import org.example.backend.product.dto.request.ProductRequestDto;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/products")
@@ -31,8 +30,12 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<ProductDetailResponse> createProduct(@RequestBody ProductRequestDto request) {
-        ProductDetailResponse product = productService.createProduct(request);
+    public ResponseEntity<ProductDetailResponse> createProduct(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @RequestBody ProductRequestDto request) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        UserRole role = principalDetails != null ? principalDetails.getUser().getRole() : null;
+        ProductDetailResponse product = productService.createProduct(userId, role, request);
         return ResponseEntity.ok(product);
     }
 
@@ -43,14 +46,23 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProductDetailResponse> updateProduct(@PathVariable Long id, @RequestBody ProductRequestDto request) {
-        ProductDetailResponse product = productService.updateProduct(id, request);
+    public ResponseEntity<ProductDetailResponse> updateProduct(
+            @PathVariable Long id,
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @RequestBody ProductRequestDto request) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        UserRole role = principalDetails != null ? principalDetails.getUser().getRole() : null;
+        ProductDetailResponse product = productService.updateProduct(id, userId, role, request);
         return ResponseEntity.ok(product);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        productService.deleteProduct(id);
+    public ResponseEntity<Void> deleteProduct(
+            @PathVariable Long id,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        UserRole role = principalDetails != null ? principalDetails.getUser().getRole() : null;
+        productService.deleteProduct(id, userId, role);
         return ResponseEntity.noContent().build();
     }
 }

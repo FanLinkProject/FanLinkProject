@@ -55,14 +55,19 @@ public class ArtistPost {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "representative_media_asset_id")
+    private Long representativeMediaAssetId;
+
     @Builder
-    public ArtistPost(User user, User group, String title, String content, Boolean status, Boolean isMembershipOnly) {
+    public ArtistPost(User user, User group, String title, String content, Boolean status, Boolean isMembershipOnly,
+                      Long representativeMediaAssetId) {
         this.user = user;
         this.group = group;
         this.title = title;
         this.content = content;
         this.status = status != null ? status : false;
         this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.representativeMediaAssetId = representativeMediaAssetId;
     }
 
     public void delete() {
@@ -70,9 +75,10 @@ public class ArtistPost {
         this.deletedAt = LocalDateTime.now();
     }
 
-    public void update(String title, String content, Boolean isMembershipOnly) {
+    public void update(String title, String content, Boolean isMembershipOnly, Long representativeMediaAssetId) {
         this.title = title;
         this.content = content;
         this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.representativeMediaAssetId = representativeMediaAssetId;
     }
 }

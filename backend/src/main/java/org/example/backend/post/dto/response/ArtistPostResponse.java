@@ -17,6 +17,7 @@ public class ArtistPostResponse {
     private String title;
     private String content;
     private Boolean isMembershipOnly;
+    private Long representativeMediaAssetId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<PostMediaAssetResponse> attachments;
@@ -29,6 +30,7 @@ public class ArtistPostResponse {
                 .title(post.getTitle())
                 .content(post.getContent())
                 .isMembershipOnly(post.getIsMembershipOnly())
+                .representativeMediaAssetId(post.getRepresentativeMediaAssetId())
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .attachments(Collections.emptyList())
@@ -43,6 +45,7 @@ public class ArtistPostResponse {
                 .title(post.getTitle())
                 .content(post.getContent())
                 .isMembershipOnly(post.getIsMembershipOnly())
+                .representativeMediaAssetId(post.getRepresentativeMediaAssetId())
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .attachments(attachments != null ? attachments : Collections.emptyList())
