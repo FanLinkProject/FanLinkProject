@@ -44,12 +44,20 @@ public class NotificationService {
             emitterRepository.delete(userId);
         }
         
-        SseEmitter emitter = new SseEmitter(5L * 60 * 1000); // 5분
+        // 0L = 무한 타임아웃 (AsyncRequestTimeoutException 완화, 실제 종료는 onCompletion/onTimeout/onError로 처리)
+        SseEmitter emitter = new SseEmitter(0L);
         emitterRepository.save(userId, emitter);
 
-        // 연결 끊기면 제거
+        // 연결 끊기면 제거 (스트림 내 예외가 GlobalExceptionHandler로 튀지 않도록 정리만 수행)
         emitter.onCompletion(() -> emitterRepository.delete(userId));
-        emitter.onTimeout(() -> emitterRepository.delete(userId));
+        emitter.onTimeout(() -> {
+            emitterRepository.delete(userId);
+            try { emitter.complete(); } catch (Exception ignored) { }
+        });
+        emitter.onError(e -> {
+            emitterRepository.delete(userId);
+            try { emitter.complete(); } catch (Exception ignored) { }
+        });
 
         // event-stream 연결 확인용 더미 데이터 전송
         try {
@@ -58,6 +66,7 @@ public class NotificationService {
                     .data("SSE 연결 완료"));
         } catch (IOException e) {
             emitterRepository.delete(userId);
+            try { emitter.complete(); } catch (Exception ignored) { }
         }
 
         return emitter;
@@ -86,13 +95,16 @@ public class NotificationService {
         if (emitter != null) {
             try {
                 NotificationResponse response = toResponse(notification);
-                // ObjectMapper를 사용하여 JSON 문자열로 명시적 변환
                 String jsonData = objectMapper.writeValueAsString(response);
                 emitter.send(SseEmitter.event()
                         .name("notification")
                         .data(jsonData));
+            } catch (IOException e) {
+                emitterRepository.delete(request.getReceiverId());
+                try { emitter.complete(); } catch (Exception ignored) { }
             } catch (Exception e) {
                 emitterRepository.delete(request.getReceiverId());
+                try { emitter.complete(); } catch (Exception ignored) { }
             }
         }
     }

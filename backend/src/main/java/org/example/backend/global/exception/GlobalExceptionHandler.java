@@ -2,8 +2,10 @@ package org.example.backend.global.exception;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -21,10 +23,26 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * SSE 요청이거나 응답이 이미 커밋된 경우 JSON(ErrorResponse)을 쓰지 않고 빈 응답만 반환해야 함.
+     * (text/event-stream + JSON 변환 시 HttpMessageNotWritableException / response committed 연쇄 예외 방지)
+     */
+    private boolean shouldSkipJsonErrorBody(HttpServletRequest request, HttpServletResponse response) {
+        if (response.isCommitted()) {
+            return true;
+        }
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE);
+    }
+
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(
-            BusinessException e, HttpServletRequest request
+    public ResponseEntity<?> handleBusinessException(
+            BusinessException e, HttpServletRequest request, HttpServletResponse response
     ) {
+        if (shouldSkipJsonErrorBody(request, response)) {
+            log.debug("SSE or committed response, skipping JSON error body for BusinessException");
+            return ResponseEntity.status(e.getErrorCode().getStatus()).build();
+        }
         ErrorCode ec = e.getErrorCode();
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(Instant.now())
@@ -38,10 +56,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
+    public ResponseEntity<?> handleMethodArgumentNotValid(
             MethodArgumentNotValidException e,
-            HttpServletRequest request
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
+        if (shouldSkipJsonErrorBody(request, response)) {
+            log.debug("SSE or committed response, skipping JSON error body for MethodArgumentNotValidException");
+            return ResponseEntity.badRequest().build();
+        }
         Map<String, Object> details = new LinkedHashMap<>();
         e.getBindingResult().getFieldErrors().forEach(error ->
                 details.put(error.getField(), error.getDefaultMessage())
@@ -61,10 +84,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(
+    public ResponseEntity<?> handleConstraintViolation(
             ConstraintViolationException e,
-            HttpServletRequest request
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
+        if (shouldSkipJsonErrorBody(request, response)) {
+            log.debug("SSE or committed response, skipping JSON error body for ConstraintViolationException");
+            return ResponseEntity.badRequest().build();
+        }
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(Instant.now())
                 .status(400)
@@ -84,10 +112,15 @@ public class GlobalExceptionHandler {
 
     //Body(JSON) enum 오타 → NotReadable
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleNotReadable(
+    public ResponseEntity<?> handleNotReadable(
             HttpMessageNotReadableException e,
-            HttpServletRequest request
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
+        if (shouldSkipJsonErrorBody(request, response)) {
+            log.debug("SSE or committed response, skipping JSON error body for HttpMessageNotReadableException");
+            return ResponseEntity.badRequest().build();
+        }
         Throwable cause = e.getCause();
 
         if (cause instanceof InvalidFormatException ife) {
@@ -134,10 +167,15 @@ public class GlobalExceptionHandler {
 
     //Query/Path enum 오타 → TypeMismatch
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+    public ResponseEntity<?> handleTypeMismatch(
             MethodArgumentTypeMismatchException e,
-            HttpServletRequest request
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
+        if (shouldSkipJsonErrorBody(request, response)) {
+            log.debug("SSE or committed response, skipping JSON error body for MethodArgumentTypeMismatchException");
+            return ResponseEntity.badRequest().build();
+        }
         Class<?> required = e.getRequiredType();
 
         Map<String, Object> details = new LinkedHashMap<>();
@@ -177,11 +215,14 @@ public class GlobalExceptionHandler {
 
     // 예상하지 못한 예외: 내부 로그는 상세, 클라이언트 메시지는 단순
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(
-            Exception e, HttpServletRequest request
+    public ResponseEntity<?> handleException(
+            Exception e, HttpServletRequest request, HttpServletResponse response
     ) {
         log.error("Unhandled exception", e);
-
+        if (shouldSkipJsonErrorBody(request, response)) {
+            log.debug("SSE or committed response, skipping JSON error body for Exception");
+            return ResponseEntity.status(500).build();
+        }
         ErrorResponse body = ErrorResponse.builder()
                 .timestamp(Instant.now())
                 .status(500)
