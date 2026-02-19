@@ -104,6 +104,9 @@ export default function ArtistDetailPage({ params }) {
 
   const handleTabClick = (tabId) => {
     if (tabId === "MARKET") {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("artistMarketReturnPath", window.location.pathname);
+      }
       router.push(`/artists/${artist.id}/market`);
       return;
     }

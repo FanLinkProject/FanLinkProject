@@ -189,7 +189,15 @@ export default function MarketPage() {
                 return (
                   <div key={`group-${store.id}`} className="space-y-8">
                     <div className="flex items-center justify-between px-2">
-                      <Link href={`/artists/${store.id}/market`} className="flex items-center gap-4 group">
+                      <Link
+                        href={`/artists/${store.id}/market`}
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            sessionStorage.setItem("artistMarketReturnPath", window.location.pathname);
+                          }
+                        }}
+                        className="flex items-center gap-4 group"
+                      >
                         <div className="size-10 rounded-2xl border border-white/[0.08] bg-white/5 flex items-center justify-center">
                           <span className="material-symbols-outlined text-white/50">groups</span>
                         </div>
@@ -207,6 +215,11 @@ export default function MarketPage() {
                       </Link>
                       <Link
                         href={`/artists/${store.id}/market`}
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            sessionStorage.setItem("artistMarketReturnPath", window.location.pathname);
+                          }
+                        }}
                         className="text-xs font-bold text-violet-300 hover:text-violet-200"
                       >
                         전체 상품 보기

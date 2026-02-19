@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getProductsByArtist } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
@@ -42,20 +43,41 @@ function ProductCard({ product, artist }) {
         <h3 className="text-lg font-bold text-white mb-1 line-clamp-2">{product.name}</h3>
         <p className="text-xl font-black text-violet-300 tabular-nums mt-auto">{formatPrice(product)}</p>
       </div>
-      <Button variant="primary" className="w-full mt-4 py-3 text-[11px] uppercase tracking-widest" href={`/market/products/${product.id}`}>
+      <Link
+        href={`/market/products/${product.id}`}
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("productDetailReturnPath", window.location.pathname);
+          }
+        }}
+        className="block w-full mt-4 py-3 text-[11px] uppercase tracking-widest text-center font-bold rounded-full bg-[#6d28d9] text-white hover:brightness-110 transition-all"
+      >
         상세보기
-      </Button>
+      </Link>
     </Surface>
   );
 }
 
+const RETURN_PATH_KEY = "artistMarketReturnPath";
+
 export default function ArtistMarketPage({ params }) {
   const resolvedParams = React.use(params);
   const id = resolvedParams?.id;
+  const router = useRouter();
 
   const [artist, setArtist] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [returnPath, setReturnPath] = useState(`/artists/${id}`);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem(RETURN_PATH_KEY);
+      if (saved && saved.startsWith("/")) {
+        setReturnPath(saved);
+      }
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -91,15 +113,20 @@ export default function ArtistMarketPage({ params }) {
 
   const artistName = artist?.name || "아티스트";
 
+  const handleBack = () => {
+    router.push(returnPath);
+  };
+
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
       <div className="flex items-center gap-4">
-        <Link
-          href={`/artists/${id}`}
+        <button
+          type="button"
+          onClick={handleBack}
           className="flex items-center justify-center size-10 rounded-full bg-white/[0.06] border border-white/[0.08] text-white/55 hover:text-violet-300 transition-colors"
         >
           <span className="material-symbols-outlined">arrow_back</span>
-        </Link>
+        </button>
         <div>
           <SectionTitle className="text-2xl font-bold">
             {artistName} {artist?.isGroup ? "그룹 공식 스토어" : "개인 스토어"}
