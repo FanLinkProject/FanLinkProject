@@ -3,22 +3,32 @@ package org.example.backend.concert.service;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.concert.dto.request.ConcertCreateRequest;
 import org.example.backend.concert.dto.request.ConcertUpdateRequest;
+import org.example.backend.concert.dto.response.ConcertMediaAssetResponse;
 import org.example.backend.concert.dto.response.ConcertResponse;
 import org.example.backend.concert.entity.Concert;
 import org.example.backend.concert.entity.ConcertArtist;
+import org.example.backend.concert.entity.ConcertMediaAsset;
+import org.example.backend.concert.entity.ConcertMediaAssetType;
 import org.example.backend.concert.entity.Location;
 import org.example.backend.concert.exception.ConcertErrorCode;
 import org.example.backend.concert.exception.ConcertException;
 import org.example.backend.concert.repository.ConcertArtistRepository;
+import org.example.backend.concert.repository.ConcertMediaAssetRepository;
 import org.example.backend.concert.repository.ConcertRepository;
 import org.example.backend.concert.repository.LocationRepository;
+import org.example.backend.media_asset.config.AwsProperties;
+import org.example.backend.media_asset.entity.MediaAsset;
+import org.example.backend.media_asset.entity.MediaAssetStatus;
+import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,7 +40,10 @@ public class ConcertService {
     private final ConcertRepository concertRepository;
     private final LocationRepository locationRepository;
     private final ConcertArtistRepository concertArtistRepository;
+    private final ConcertMediaAssetRepository concertMediaAssetRepository;
+    private final MediaAssetRepository mediaAssetRepository;
     private final UserRepository userRepository;
+    private final AwsProperties awsProperties;
 
     /**
      * 공연 생성
@@ -63,7 +76,6 @@ public class ConcertService {
                 .timezone(request.getTimezone())
                 .venueName(request.getVenueName())
                 .location(location)
-                .concertImageUrl(request.getConcertImageUrl())
                 .presaleTicketCount(request.getPresaleTicketCount() != null ? request.getPresaleTicketCount() : 0)
                 .saleTicketCount(request.getSaleTicketCount() != null ? request.getSaleTicketCount() : 0)
                 .presaleStartDateTime(request.getPresaleStartDateTime())
@@ -74,6 +86,13 @@ public class ConcertService {
 
         Concert savedConcert = concertRepository.save(concert);
 
+        if (request.getPosterMediaAssetId() != null && request.getPosterMediaAssetId() > 0) {
+            MediaAsset posterAsset = validatePosterMediaAsset(request.getPosterMediaAssetId(), creatorId);
+            ConcertMediaAsset cma = new ConcertMediaAsset(savedConcert, ConcertMediaAssetType.POSTER, posterAsset);
+            savedConcert.addMediaAsset(cma);
+            concertMediaAssetRepository.save(cma);
+        }
+
         // 아티스트 추가 (artistIds가 없으면 생성자 본인을 추가)
         List<Long> artistIds = request.getArtistIds();
         if (artistIds == null || artistIds.isEmpty()) {
@@ -81,7 +100,7 @@ public class ConcertService {
         }
         addArtistsToConcert(savedConcert, artistIds);
 
-        return ConcertResponse.from(savedConcert);
+        return buildConcertResponse(savedConcert);
     }
 
     /**
@@ -91,7 +110,7 @@ public class ConcertService {
     public ConcertResponse getConcert(Long concertId) {
         Concert concert = concertRepository.findById(concertId)
                 .orElseThrow(() -> new ConcertException(ConcertErrorCode.CONCERT_NOT_FOUND));
-        return ConcertResponse.from(concert);
+        return buildConcertResponse(concert);
     }
 
     /**
@@ -100,7 +119,7 @@ public class ConcertService {
     @Transactional(readOnly = true)
     public List<ConcertResponse> getAllConcerts() {
         return concertRepository.findAll().stream()
-                .map(ConcertResponse::from)
+                .map(this::buildConcertResponse)
                 .collect(Collectors.toList());
     }
 
@@ -135,9 +154,16 @@ public class ConcertService {
                 request.getStartDateTime(),
                 request.getEndDateTime(),
                 request.getTimezone(),
-                request.getVenueName(),
-                request.getConcertImageUrl()
+                request.getVenueName()
         );
+
+        if (request.getPosterMediaAssetId() != null && request.getPosterMediaAssetId() > 0) {
+            concertMediaAssetRepository.deleteAllByConcertIdAndType(concert.getId(), ConcertMediaAssetType.POSTER);
+            MediaAsset posterAsset = validatePosterMediaAsset(request.getPosterMediaAssetId(), userId);
+            ConcertMediaAsset cma = new ConcertMediaAsset(concert, ConcertMediaAssetType.POSTER, posterAsset);
+            concert.addMediaAsset(cma);
+            concertMediaAssetRepository.save(cma);
+        }
 
         // 티켓 정보 업데이트
         concert.updateTicketInfo(
@@ -154,7 +180,53 @@ public class ConcertService {
             updateArtists(concert, request.getArtistIds());
         }
 
-        return ConcertResponse.from(concert);
+        return buildConcertResponse(concert);
+    }
+
+    private String getCdnBaseUrl() {
+        if (awsProperties.getCloudfront() == null) {
+            return null;
+        }
+        String domain = awsProperties.getCloudfront().getDomain();
+        if (domain == null || domain.isBlank()) {
+            return null;
+        }
+        return domain.startsWith("http") ? domain : "https://" + domain;
+    }
+
+    private MediaAsset validatePosterMediaAsset(Long mediaAssetId, Long ownerUserId) {
+        MediaAsset asset = mediaAssetRepository.findById(mediaAssetId)
+                .orElseThrow(() -> new ConcertException(ConcertErrorCode.MEDIA_ASSET_NOT_FOUND));
+        if (!asset.getOwnerUserId().equals(ownerUserId)) {
+            throw new ConcertException(ConcertErrorCode.NOT_ARTIST_USER);
+        }
+        if (asset.getStatus() != MediaAssetStatus.READY) {
+            throw new ConcertException(ConcertErrorCode.MEDIA_ASSET_NOT_READY);
+        }
+        return asset;
+    }
+
+    private ConcertResponse buildConcertResponse(Concert concert) {
+        List<ConcertMediaAsset> mediaAssetList = concertMediaAssetRepository.findAllByConcertIdOrderById(concert.getId());
+        String cdnBaseUrl = getCdnBaseUrl();
+        String posterImageUrl = null;
+        List<ConcertMediaAssetResponse> mediaAssetResponses = Collections.emptyList();
+        if (!CollectionUtils.isEmpty(mediaAssetList)) {
+            mediaAssetResponses = mediaAssetList.stream()
+                    .map(cma -> ConcertMediaAssetResponse.from(cma.getMediaAsset(), cma.getType(), cdnBaseUrl))
+                    .collect(Collectors.toList());
+            posterImageUrl = mediaAssetList.stream()
+                    .filter(cma -> cma.getType() == ConcertMediaAssetType.POSTER)
+                    .findFirst()
+                    .map(cma -> {
+                        String base = cdnBaseUrl != null && !cdnBaseUrl.isBlank()
+                                ? (cdnBaseUrl.endsWith("/") ? cdnBaseUrl : cdnBaseUrl + "/")
+                                : "";
+                        return base + cma.getMediaAsset().getObjectKey();
+                    })
+                    .orElse(null);
+        }
+        return ConcertResponse.from(concert, posterImageUrl, mediaAssetResponses);
     }
 
     /**

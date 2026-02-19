@@ -24,7 +24,8 @@ public class ConcertResponse {
     private String timezone;
     private String venueName;
     private LocationResponse location;
-    private String concertImageUrl;
+    private String posterImageUrl;
+    private List<ConcertMediaAssetResponse> mediaAssets;
     private Integer presaleTicketCount;
     private Integer saleTicketCount;
     private Instant presaleStartDateTime;
@@ -35,7 +36,7 @@ public class ConcertResponse {
     private Instant updatedAt;
     private List<ArtistResponse> artists;
 
-    public static ConcertResponse from(Concert concert) {
+    public static ConcertResponse from(Concert concert, String posterImageUrl, List<ConcertMediaAssetResponse> mediaAssets) {
         return ConcertResponse.builder()
                 .id(concert.getId())
                 .title(concert.getTitle())
@@ -47,7 +48,8 @@ public class ConcertResponse {
                 .location(concert.getLocation() != null
                         ? LocationResponse.from(concert.getLocation())
                         : null)
-                .concertImageUrl(concert.getConcertImageUrl())
+                .posterImageUrl(posterImageUrl)
+                .mediaAssets(mediaAssets != null ? mediaAssets : Collections.emptyList())
                 .presaleTicketCount(concert.getPresaleTicketCount())
                 .saleTicketCount(concert.getSaleTicketCount())
                 .presaleStartDateTime(concert.getPresaleStartDateTime())

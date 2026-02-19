@@ -48,8 +48,9 @@ public class Concert {
     @JoinColumn(name = "location_id")
     private Location location;
 
-    @Column(length = 500)
-    private String concertImageUrl;
+    @OneToMany(mappedBy = "concert", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ConcertMediaAsset> mediaAssets = new ArrayList<>();
 
     @Column(nullable = false)
     @Builder.Default
@@ -92,8 +93,7 @@ public class Concert {
             Instant startDateTime,
             Instant endDateTime,
             String timezone,
-            String venueName,
-            String concertImageUrl
+            String venueName
     ) {
         this.title = title;
         this.description = description;
@@ -101,7 +101,16 @@ public class Concert {
         this.endDateTime = endDateTime;
         this.timezone = timezone;
         this.venueName = venueName;
-        this.concertImageUrl = concertImageUrl;
+    }
+
+    public void addMediaAsset(ConcertMediaAsset concertMediaAsset) {
+        this.mediaAssets.add(concertMediaAsset);
+        concertMediaAsset.setConcert(this);
+    }
+
+    public void removeMediaAsset(ConcertMediaAsset concertMediaAsset) {
+        this.mediaAssets.remove(concertMediaAsset);
+        concertMediaAsset.setConcert(null);
     }
 
     /**

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import axios from "axios";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 const CONCERTS_API = "http://localhost:8080/api/concerts";
+const USER_PROFILE_API = "http://localhost:8080/api/user/profile";
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -34,19 +35,34 @@ function parseJwt(token) {
   }
 }
 
-export default function NewConcertPage() {
+function toLocalDateTime(instantStr) {
+  if (!instantStr) return "";
+  const d = new Date(instantStr);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 16);
+}
+
+export default function EditConcertPage() {
   const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const id = params?.id;
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [fetchError, setFetchError] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [userId, setUserId] = useState(null);
 
+  // JWT에는 userId가 없고 subject가 이메일이므로, 프로필 API로 현재 사용자 ID 조회
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-    if (token) {
-      const payload = parseJwt(token);
-      if (payload?.userId != null) setUserId(payload.userId);
-      else if (payload?.sub != null && /^\d+$/.test(String(payload.sub))) setUserId(Number(payload.sub));
-    }
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+    axios
+      .get(USER_PROFILE_API, { headers: getAuthHeaders() })
+      .then((res) => {
+        if (res?.data?.id != null) setUserId(Number(res.data.id));
+      })
+      .catch(() => {});
   }, []);
 
   const [title, setTitle] = useState("");
@@ -58,55 +74,153 @@ export default function NewConcertPage() {
   const [locationId, setLocationId] = useState("");
   const [posterMediaAssetId, setPosterMediaAssetId] = useState("");
   const [selectedArtists, setSelectedArtists] = useState([]);
-
-  // select-artists에서 돌아온 뒤: 저장해 둔 폼 초안 복원 + 추가 아티스트 병합
-  useEffect(() => {
-    try {
-      const draftRaw = sessionStorage.getItem("concertNewDraft");
-      if (draftRaw) {
-        sessionStorage.removeItem("concertNewDraft");
-        const draft = JSON.parse(draftRaw);
-        if (draft && typeof draft === "object") {
-          if (draft.title != null) setTitle(String(draft.title));
-          if (draft.description != null) setDescription(String(draft.description));
-          if (draft.startDateTime != null) setStartDateTime(String(draft.startDateTime));
-          if (draft.endDateTime != null) setEndDateTime(String(draft.endDateTime));
-          if (draft.timezone != null) setTimezone(String(draft.timezone));
-          if (draft.venueName != null) setVenueName(String(draft.venueName));
-          if (draft.locationId != null) setLocationId(String(draft.locationId));
-          if (draft.posterMediaAssetId != null) setPosterMediaAssetId(String(draft.posterMediaAssetId));
-          if (draft.presaleTicketCount != null) setPresaleTicketCount(String(draft.presaleTicketCount));
-          if (draft.saleTicketCount != null) setSaleTicketCount(String(draft.saleTicketCount));
-          if (draft.presaleStartDateTime != null) setPresaleStartDateTime(String(draft.presaleStartDateTime));
-          if (draft.presaleEndDateTime != null) setPresaleEndDateTime(String(draft.presaleEndDateTime));
-          if (draft.saleStartDateTime != null) setSaleStartDateTime(String(draft.saleStartDateTime));
-          if (draft.saleEndDateTime != null) setSaleEndDateTime(String(draft.saleEndDateTime));
-          if (Array.isArray(draft.selectedArtists) && draft.selectedArtists.length > 0) {
-            setSelectedArtists(draft.selectedArtists.map((a) => ({ id: a.id, nickname: a.nickname ?? "", profileImageUrl: a.profileImageUrl ?? null })));
-          }
-        }
-      }
-      const raw = sessionStorage.getItem("concertAddArtists");
-      if (raw) {
-        sessionStorage.removeItem("concertAddArtists");
-        const added = JSON.parse(raw);
-        if (Array.isArray(added) && added.length > 0) {
-          setSelectedArtists((prev) => {
-            const byId = new Map(prev.map((a) => [a.id, a]));
-            added.forEach((a) => byId.set(a.id, { id: a.id, nickname: a.nickname, profileImageUrl: a.profileImageUrl }));
-            return Array.from(byId.values());
-          });
-        }
-      }
-    } catch (_) {}
-  }, []);
-
   const [presaleTicketCount, setPresaleTicketCount] = useState("");
   const [saleTicketCount, setSaleTicketCount] = useState("");
   const [presaleStartDateTime, setPresaleStartDateTime] = useState("");
   const [presaleEndDateTime, setPresaleEndDateTime] = useState("");
   const [saleStartDateTime, setSaleStartDateTime] = useState("");
   const [saleEndDateTime, setSaleEndDateTime] = useState("");
+  const [initialized, setInitialized] = useState(false);
+  // select-artists에서 돌아올 때 추가한 아티스트 (마운트 직후 한 번만 읽어서 fetch 완료 시 병합에 사용)
+  const pendingAddedArtistsRef = useRef(null);
+  // searchParams effect에서 이미 병합했으면 fetch 완료 시 selectedArtists 덮어쓰지 않음
+  const mergedInSearchParamsRef = useRef(false);
+  // Strict Mode 등으로 fetch가 두 번 완료될 때, 이미 저장 목록(concertEditSelectedArtists) 적용했으면 API로 덮어쓰지 않음
+  const appliedSavedArtistsRef = useRef(false);
+
+  // 마운트 시 sessionStorage에 추가 아티스트가 있으면 ref에 보관 (fetch 완료 후 병합)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("concertAddArtists");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        pendingAddedArtistsRef.current = parsed;
+      }
+    } catch (_) {}
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchConcert = async () => {
+      try {
+        setFetchError("");
+        const res = await axios.get(`${CONCERTS_API}/${id}`, { headers: getAuthHeaders() });
+        const c = res.data;
+        setTitle(c.title ?? "");
+        setDescription(c.description ?? "");
+        setStartDateTime(toLocalDateTime(c.startDateTime));
+        setEndDateTime(toLocalDateTime(c.endDateTime));
+        setTimezone(c.timezone ?? "Asia/Seoul");
+        setVenueName(c.venueName ?? "");
+        setLocationId(c.location?.id != null ? String(c.location.id) : "");
+        setPosterMediaAssetId("");
+        let baseArtists = Array.isArray(c.artists)
+          ? c.artists.map((a) => ({ id: a.id, nickname: a.nickname ?? "", profileImageUrl: null }))
+          : [];
+        let usedSavedArtists = false;
+        try {
+          const savedRaw = sessionStorage.getItem("concertEditSelectedArtists");
+          if (savedRaw) {
+            const saved = JSON.parse(savedRaw);
+            if (Array.isArray(saved) && saved.length >= 0) {
+              baseArtists = saved.map((a) => ({ id: a.id, nickname: a.nickname ?? "", profileImageUrl: a.profileImageUrl ?? null }));
+              sessionStorage.removeItem("concertEditSelectedArtists");
+              usedSavedArtists = true;
+            }
+          }
+        } catch (_) {}
+        let artistsToSet = baseArtists;
+        let added = pendingAddedArtistsRef.current;
+        if (!added || !Array.isArray(added) || added.length === 0) {
+          try {
+            const raw = sessionStorage.getItem("concertAddArtists");
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed) && parsed.length > 0) added = parsed;
+            }
+          } catch (_) {}
+        }
+        if (Array.isArray(added) && added.length > 0) {
+          const byId = new Map(baseArtists.map((a) => [a.id, a]));
+          added.forEach((a) => byId.set(a.id, { id: a.id, nickname: a.nickname ?? "", profileImageUrl: a.profileImageUrl ?? null }));
+          artistsToSet = Array.from(byId.values());
+          pendingAddedArtistsRef.current = null;
+        }
+        if (!mergedInSearchParamsRef.current && !appliedSavedArtistsRef.current) {
+          setSelectedArtists(artistsToSet);
+        }
+        if (usedSavedArtists) appliedSavedArtistsRef.current = true;
+        else appliedSavedArtistsRef.current = false;
+        mergedInSearchParamsRef.current = false;
+        setPresaleTicketCount(c.presaleTicketCount != null ? String(c.presaleTicketCount) : "");
+        setSaleTicketCount(c.saleTicketCount != null ? String(c.saleTicketCount) : "");
+        setPresaleStartDateTime(toLocalDateTime(c.presaleStartDateTime));
+        setPresaleEndDateTime(toLocalDateTime(c.presaleEndDateTime));
+        setSaleStartDateTime(toLocalDateTime(c.saleStartDateTime));
+        setSaleEndDateTime(toLocalDateTime(c.saleEndDateTime));
+      } catch (err) {
+        setFetchError(err.response?.data?.message || err.response?.status === 404 ? "공연을 찾을 수 없습니다." : "불러오기에 실패했습니다.");
+      } finally {
+        setInitialized(true);
+      }
+    };
+    fetchConcert();
+  }, [id]);
+
+  // select-artists에서 돌아왔을 때: concertEditSelectedArtists가 있으면 그걸 기준으로, 없으면 현재 state 기준으로 추가 아티스트만 병합
+  useEffect(() => {
+    if (!id || searchParams?.get("from") !== "select-artists") return;
+    try {
+      let base = [];
+      const savedRaw = sessionStorage.getItem("concertEditSelectedArtists");
+      if (savedRaw) {
+        const saved = JSON.parse(savedRaw);
+        if (Array.isArray(saved)) {
+          base = saved.map((a) => ({ id: a.id, nickname: a.nickname ?? "", profileImageUrl: a.profileImageUrl ?? null }));
+          // 제거는 fetch에서만 함 (fetch가 나중에 완료돼도 덮어쓰지 않도록 mergedInSearchParamsRef 사용)
+        }
+      }
+      const raw = sessionStorage.getItem("concertAddArtists");
+      const added = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(added) && added.length > 0) {
+        mergedInSearchParamsRef.current = true;
+        const byId = new Map(base.map((a) => [a.id, a]));
+        added.forEach((a) => byId.set(a.id, { id: a.id, nickname: a.nickname ?? "", profileImageUrl: a.profileImageUrl ?? null }));
+        setSelectedArtists(Array.from(byId.values()));
+      } else if (base.length > 0) {
+        mergedInSearchParamsRef.current = true;
+        setSelectedArtists(base);
+      }
+    } catch (_) {}
+  }, [id, searchParams]);
+
+  // initialized 후 한 번 더 sessionStorage 병합 (fetch가 먼저 끝나 ref가 비었을 때 대비)
+  useEffect(() => {
+    if (!id || !initialized) return;
+    try {
+      const raw = sessionStorage.getItem("concertAddArtists");
+      if (!raw) return;
+      const added = JSON.parse(raw);
+      if (!Array.isArray(added) || added.length === 0) return;
+      setSelectedArtists((prev) => {
+        const byId = new Map(prev.map((a) => [a.id, a]));
+        added.forEach((a) => byId.set(a.id, { id: a.id, nickname: a.nickname ?? "", profileImageUrl: a.profileImageUrl ?? null }));
+        return Array.from(byId.values());
+      });
+    } catch (_) {}
+  }, [id, initialized]);
+
+  // 생성 시처럼 수정 시에도 참여 아티스트에 본인(userId)이 없으면 목록에 유지
+  useEffect(() => {
+    if (userId == null || !initialized) return;
+    const uid = Number(userId);
+    if (!Number.isInteger(uid) || uid <= 0) return;
+    setSelectedArtists((prev) => {
+      if (prev.some((a) => Number(a.id) === uid)) return prev;
+      return [{ id: uid, nickname: "나", profileImageUrl: null }, ...prev];
+    });
+  }, [userId, initialized]);
 
   const toInstant = (localDateTimeStr) => {
     if (!localDateTimeStr || !localDateTimeStr.trim()) return null;
@@ -121,35 +235,46 @@ export default function NewConcertPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setSubmitError("");
     if (!title.trim()) {
-      setError("공연 제목을 입력해주세요.");
+      setSubmitError("공연 제목을 입력해주세요.");
       return;
     }
     if (!startDateTime) {
-      setError("공연 시작 시간을 입력해주세요.");
+      setSubmitError("공연 시작 시간을 입력해주세요.");
       return;
     }
     if (!endDateTime) {
-      setError("공연 종료 시간을 입력해주세요.");
+      setSubmitError("공연 종료 시간을 입력해주세요.");
       return;
     }
     if (!venueName.trim()) {
-      setError("장소명을 입력해주세요.");
+      setSubmitError("장소명을 입력해주세요.");
       return;
     }
 
     setLoading(true);
     try {
       const posterId = toNum(posterMediaAssetId);
-      const rawIds = [
-        ...(userId != null && Number.isInteger(Number(userId)) ? [Number(userId)] : []),
-        ...selectedArtists.map((a) => Number(a.id)),
-      ].filter((id) => id > 0 && Number.isInteger(id));
-      const artistIds = rawIds.length > 0 ? [...new Set(rawIds)] : undefined;
+      // 본인 ID: state → 없으면 프로필 API로 조회 (JWT에는 userId가 없음)
+      let uid = userId != null && Number.isInteger(Number(userId)) ? Number(userId) : null;
+      if (uid == null && typeof window !== "undefined") {
+        try {
+          const res = await axios.get(USER_PROFILE_API, { headers: getAuthHeaders() });
+          if (res?.data?.id != null) uid = Number(res.data.id);
+        } catch (_) {}
+      }
+      const idsFromSelection = selectedArtists
+        .map((a) => Number(a.id))
+        .filter((id) => id > 0 && Number.isInteger(id));
+      // 참여 아티스트 목록에 자신이 없으면 무조건 맨 앞에 넣어서 수정 완료되게 함
+      const hasSelf = uid != null && idsFromSelection.some((id) => id === uid);
+      const rawIds = hasSelf ? idsFromSelection : uid != null ? [uid, ...idsFromSelection] : idsFromSelection;
+      // 본인만 있어도 최소 1명이므로 항상 배열로 전송 (undefined면 백엔드가 아티스트를 갱신하지 않음)
+      const artistIds = rawIds.length > 0 ? [...new Set(rawIds)] : uid != null ? [uid] : undefined;
 
-      await axios.post(
-        CONCERTS_API,
+      await axios.put(
+        `${CONCERTS_API}/${id}`,
         {
           title: title.trim(),
           description: description.trim() || null,
@@ -170,15 +295,37 @@ export default function NewConcertPage() {
         { headers: getAuthHeaders() }
       );
       try {
-        sessionStorage.removeItem("concertNewDraft");
+        sessionStorage.removeItem("concertAddArtists");
+        sessionStorage.removeItem("concertEditSelectedArtists");
       } catch (_) {}
       router.push("/artist-console/concerts");
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.errorCode || err.message || "저장에 실패했습니다.");
+      setSubmitError(err.response?.data?.message || err.response?.data?.errorCode || err.message || "수정에 실패했습니다.");
     } finally {
       setLoading(false);
     }
   };
+
+  if (!initialized) {
+    return (
+      <div className="p-8 lg:p-12 max-w-3xl mx-auto">
+        <div className="text-white/55 text-center py-12">로딩 중...</div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-6">
+        <Button variant="ghost" href="/artist-console/concerts" className="size-10 rounded-full">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </Button>
+        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400/90 text-sm">
+          {fetchError}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-8">
@@ -187,14 +334,14 @@ export default function NewConcertPage() {
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
         <div>
-          <SectionTitle className="text-2xl font-bold">새 공연 등록</SectionTitle>
-          <p className="text-white/55 text-sm font-medium mt-1">공연 정보와 예매 일정을 입력하세요.</p>
+          <SectionTitle className="text-2xl font-bold">공연 수정</SectionTitle>
+          <p className="text-white/55 text-sm font-medium mt-1">공연 정보와 예매 일정을 수정하세요.</p>
         </div>
       </header>
 
-      {error && (
+      {submitError && (
         <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400/90 text-sm">
-          {error}
+          {submitError}
         </div>
       )}
 
@@ -295,7 +442,7 @@ export default function NewConcertPage() {
               type="number"
               value={posterMediaAssetId}
               onChange={(e) => setPosterMediaAssetId(e.target.value)}
-              placeholder="없으면 비워두세요"
+              placeholder="변경 시에만 입력, 없으면 비워두세요"
               min="0"
               className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
             />
@@ -328,26 +475,10 @@ export default function NewConcertPage() {
               className="text-violet-400 hover:text-violet-300"
               onClick={() => {
                 try {
-                  sessionStorage.setItem("concertSelectArtistsReturn", "/artist-console/concerts/new");
+                  sessionStorage.setItem("concertSelectArtistsReturn", `/artist-console/concerts/${id}/edit`);
                   sessionStorage.setItem(
-                    "concertNewDraft",
-                    JSON.stringify({
-                      title,
-                      description,
-                      startDateTime,
-                      endDateTime,
-                      timezone,
-                      venueName,
-                      locationId,
-                      posterMediaAssetId,
-                      presaleTicketCount,
-                      saleTicketCount,
-                      presaleStartDateTime,
-                      presaleEndDateTime,
-                      saleStartDateTime,
-                      saleEndDateTime,
-                      selectedArtists: selectedArtists.map((a) => ({ id: a.id, nickname: a.nickname, profileImageUrl: a.profileImageUrl })),
-                    })
+                    "concertEditSelectedArtists",
+                    JSON.stringify(selectedArtists.map((a) => ({ id: a.id, nickname: a.nickname, profileImageUrl: a.profileImageUrl })))
                   );
                 } catch (_) {}
                 router.push("/artist-console/concerts/new/select-artists");
@@ -432,7 +563,7 @@ export default function NewConcertPage() {
             취소
           </Button>
           <Button type="submit" variant="primary" className="px-8 py-3" disabled={loading}>
-            {loading ? "저장 중…" : "공연 등록"}
+            {loading ? "저장 중…" : "수정 완료"}
           </Button>
         </div>
       </form>

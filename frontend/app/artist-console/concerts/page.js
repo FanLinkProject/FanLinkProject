@@ -11,9 +11,10 @@ const CONCERTS_API = "http://localhost:8080/api/concerts";
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  const bearer = token && (token.startsWith("Bearer ") ? token : `Bearer ${token.trim()}`);
   return {
     "Content-Type": "application/json",
-    ...(token && { Authorization: token }),
+    ...(bearer && { Authorization: bearer }),
   };
 }
 
@@ -102,9 +103,9 @@ export default function ArtistConcertsPage() {
               <div className="flex items-start justify-between gap-6">
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-4">
-                    {concert.concertImageUrl && (
-                      <img
-                        src={concert.concertImageUrl}
+{(concert.posterImageUrl || concert.concertImageUrl) && (
+                        <img
+                          src={concert.posterImageUrl || concert.concertImageUrl}
                         className="size-24 rounded-xl object-cover border border-white/[0.08]"
                         alt=""
                       />
