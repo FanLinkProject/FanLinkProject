@@ -19,6 +19,7 @@ export default function PostFeed({
   onComment,
   likeCountMap = {},
   commentCountMap = {},
+  isLockedMap = {},
   className = "",
 }) {
   if (!posts?.length) return null;
@@ -35,6 +36,7 @@ export default function PostFeed({
           likeCount={likeCountMap[post.id] ?? undefined}
           commentCount={commentCountMap[post.id] ?? undefined}
           onComment={onComment}
+          isLocked={isLockedMap[post.id] ?? false}
         />
       ))}
     </div>

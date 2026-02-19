@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
+import { request } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
@@ -22,34 +23,180 @@ function getAuthHeaders() {
   };
 }
 
+// JWT 페이로드에서 email, role 추출 (sub는 email 문자열)
+function getCurrentUser() {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("accessToken");
+  if (!raw) return null;
+  try {
+    const token = raw.replace(/^Bearer\s+/i, "").trim();
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    return {
+      email: payload.sub,
+      role: (payload.role || "").replace("ROLE_", ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Instant(ISO) → 한국어 상대시간
+function formatTimestamp(instant) {
+  if (!instant) return "";
+  try {
+    const date = new Date(instant);
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+    if (diffSec < 60) return "방금 전";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}분 전`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}시간 전`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 7) return `${diffDay}일 전`;
+    return date.toLocaleDateString("ko-KR");
+  } catch {
+    return "";
+  }
+}
+
+// API 응답 → PostCard 포맷
+// ArtistPostResponse: { id, writerId, writerNickname, writerProfileImageUrl, title, content, createdAt, attachments[] }
+// groupAvatar: writerProfileImageUrl이 없을 때 그룹 아바타로 폴백
+function transformArtistPost(p, groupAvatar = "") {
+  return {
+    id: p.id,
+    authorName: p.writerNickname || "",
+    authorMemberName: null,
+    authorAvatar: p.writerProfileImageUrl || groupAvatar,
+    content: p.content || "",
+    image: p.attachments?.[0]?.url || null,
+    timestamp: formatTimestamp(p.createdAt),
+    isMembershipOnly: p.isMembershipOnly ?? false,
+    type: "ARTIST",
+  };
+}
+
+// FanPostResponse: { id, writerId, writerNickname, writerProfileImageUrl, title, content, createdAt, attachments[] }
+function transformFanPost(p) {
+  return {
+    id: p.id,
+    authorName: p.writerNickname || "",
+    authorMemberName: null,
+    authorAvatar: p.writerProfileImageUrl || "",
+    content: p.content || "",
+    image: p.attachments?.[0]?.url || null,
+    timestamp: formatTimestamp(p.createdAt),
+    type: "FAN",
+  };
+}
+
 export default function ArtistDetailPage({ params }) {
   const resolvedParams = React.use(params);
   const id = resolvedParams?.id;
 
   const router = useRouter();
   const [artist, setArtist] = useState(null);
-  const [activeTab, setActiveTab] = useState("ARTIST");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === "undefined") return "ARTIST";
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "NOTICE", "MV"];
+    return tab && VALID_TABS.includes(tab) ? tab : "ARTIST";
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostImagePreview, setNewPostImagePreview] = useState(null);
   const [newPostImageFile, setNewPostImageFile] = useState(null);
   const fanPostFileInputRef = useRef(null);
   const [candyBalance] = useState(1500);
-  const [localFanPosts, setLocalFanPosts] = useState([]);
-  const [likedPostIds, setLikedPostIds] = useState(() => new Set());
   const [fanProfiles, setFanProfiles] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [musicVideos, setMusicVideos] = useState([]);
+  const [musicVideosLoading, setMusicVideosLoading] = useState(false);
 
+  // API 연결 state
+  const [artistPosts, setArtistPosts] = useState([]);
+  const [fanPosts, setFanPosts] = useState([]);
+  const [artistPostsLoading, setArtistPostsLoading] = useState(false);
+  const [fanPostsLoading, setFanPostsLoading] = useState(false);
+  const [artistLikeCountMap, setArtistLikeCountMap] = useState({});
+  const [artistIsLikedMap, setArtistIsLikedMap] = useState({});
+  const [artistCommentCountMap, setArtistCommentCountMap] = useState({});
+  const [fanLikeCountMap, setFanLikeCountMap] = useState({});
+  const [fanIsLikedMap, setFanIsLikedMap] = useState({});
+  const [fanCommentCountMap, setFanCommentCountMap] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
+  const [myNickname, setMyNickname] = useState("");
+  const [myProfileImageUrl, setMyProfileImageUrl] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+
+  const groupId = Number(id);
+  const isRealGroup = !isNaN(groupId) && groupId > 0;
+
+  // 아티스트 메타데이터
   useEffect(() => {
-    const a = MOCK_ARTISTS.find((x) => x.id === id);
-    setArtist(a || MOCK_ARTISTS[0]);
-    setLocalFanPosts(
-      MOCK_POSTS.filter(
-        (p) => p.artistId === (a?.id || id) && p.type === "FAN",
-      ),
-    );
-  }, [id]);
+    if (isRealGroup) {
+      // 실제 groupId → 대시보드 API로 아티스트 정보 조회
+      request(`/api/user/artists/${groupId}/dashboard`)
+        .then((data) => {
+          const info = data?.artistInfo || {};
+          const follow = data?.followStatus || {};
+          const membership = data?.membershipInfo || {};
+          setArtist({
+            id: String(groupId),
+            name: info.nickname || "",
+            avatar: info.profileImageUrl || "",
+            cover: info.bannerImageUrl || "",
+            isFollowing: follow.isFollowing || false,
+            hasMembership: membership.hasActiveMembership || false,
+            membershipUrl: membership.membershipButtonUrl || `/candy/payment?artistId=${groupId}`,
+            memberCount: "",
+            postCount: "",
+            members: [],
+          });
+        })
+        .catch(() => {
+          // API 실패 시 mock fallback
+          const a = MOCK_ARTISTS.find((x) => x.id === id) || MOCK_ARTISTS[0];
+          setArtist(a);
+        });
+    } else {
+      // mock slug(비숫자 ID) → MOCK_ARTISTS + MOCK_POSTS 사용
+      const a = MOCK_ARTISTS.find((x) => x.id === id);
+      const found = a || MOCK_ARTISTS[0];
+      setArtist({
+        ...found,
+        isFollowing: found.isSubscribed || false,
+        hasMembership: found.isPremiumSubscribed || false,
+      });
+      const artId = found.id;
+      setArtistPosts(
+        MOCK_POSTS.filter((p) => p.artistId === artId && p.type === "ARTIST"),
+      );
+      setFanPosts(
+        MOCK_POSTS.filter((p) => p.artistId === artId && p.type === "FAN"),
+      );
+    }
+  }, [id, groupId, isRealGroup]);
 
+  // JWT에서 currentUser 추출 + 닉네임 조회
+  useEffect(() => {
+    const user = getCurrentUser();
+    setCurrentUser(user);
+    if (user) {
+      request("/api/user/profile")
+        .then((data) => {
+          setMyNickname(data.nickname || "");
+          setMyProfileImageUrl(data.profileImageUrl || "");
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // fan profiles
   useEffect(() => {
     const token =
       typeof window !== "undefined"
@@ -62,7 +209,103 @@ export default function ArtistDetailPage({ params }) {
       .catch(() => setFanProfiles([]));
   }, [id]);
 
+  const artistIdForApi = Number(id) || 1;
+
+  // MV 탭
+  useEffect(() => {
+    if (activeTab !== "MV") return;
+    setMusicVideosLoading(true);
+    listMusicVideos(artistIdForApi)
+      .then(setMusicVideos)
+      .catch(() => setMusicVideos([]))
+      .finally(() => setMusicVideosLoading(false));
+  }, [activeTab, artistIdForApi]);
+
+  // [A] ARTIST 탭 활성화 시 아티스트 포스트 로드
+  useEffect(() => {
+    if (activeTab !== "ARTIST" || !isRealGroup) return;
+    setArtistPostsLoading(true);
+    const user = getCurrentUser();
+    request("/api/artist-posts/artist-only", {
+      query: { groupId, limit: 20 },
+    })
+      .then(async (data) => {
+        const raw = Array.isArray(data)
+          ? data
+          : (data?.content ?? data?.posts ?? []);
+        const groupAvatar = artist?.avatar || "";
+        const transformed = raw.map((p) => transformArtistPost(p, groupAvatar));
+        setArtistPosts(transformed);
+        if (transformed.length === 0) return;
+        const ids = transformed.map((p) => p.id).join(",");
+        const [countRes, checkRes, commentCountRes] = await Promise.all([
+          request("/api/likes/counts", {
+            query: { targetType: "ARTIST_POST", targetIds: ids },
+          }).catch(() => ({})),
+          user
+            ? request("/api/likes/check", {
+                query: { targetType: "ARTIST_POST", targetIds: ids },
+              }).catch(() => [])
+            : Promise.resolve([]),
+          request("/api/comments/counts", {
+            query: { targetType: "ARTIST", targetIds: ids },
+          }).catch(() => ({})),
+        ]);
+        setArtistLikeCountMap(countRes || {});
+        setArtistCommentCountMap(commentCountRes || {});
+        // checkRes는 List<Long> 배열 (좋아요한 ID 목록) → boolean map으로 변환
+        const likedSet = new Set((Array.isArray(checkRes) ? checkRes : []).map(Number));
+        setArtistIsLikedMap(
+          Object.fromEntries(transformed.map((p) => [p.id, likedSet.has(Number(p.id))]))
+        );
+      })
+      .catch(() => setArtistPosts([]))
+      .finally(() => setArtistPostsLoading(false));
+  }, [activeTab, groupId, isRealGroup]);
+
+  // [B] FAN 탭 활성화 시 팬 포스트 로드
+  useEffect(() => {
+    if (activeTab !== "FAN" || !isRealGroup) return;
+    setFanPostsLoading(true);
+    const user = getCurrentUser();
+    request("/api/fan-posts", { query: { groupId, limit: 20 } })
+      .then(async (data) => {
+        const raw = Array.isArray(data)
+          ? data
+          : (data?.content ?? data?.posts ?? []);
+        const transformed = raw.map(transformFanPost);
+        setFanPosts(transformed);
+        if (transformed.length === 0) return;
+        const ids = transformed.map((p) => p.id).join(",");
+        const [countRes, checkRes, commentCountRes] = await Promise.all([
+          request("/api/likes/counts", {
+            query: { targetType: "FAN_POST", targetIds: ids },
+          }).catch(() => ({})),
+          user
+            ? request("/api/likes/check", {
+                query: { targetType: "FAN_POST", targetIds: ids },
+              }).catch(() => [])
+            : Promise.resolve([]),
+          request("/api/comments/counts", {
+            query: { targetType: "FAN", targetIds: ids },
+          }).catch(() => ({})),
+        ]);
+        setFanLikeCountMap(countRes || {});
+        setFanCommentCountMap(commentCountRes || {});
+        // checkRes는 List<Long> 배열 (좋아요한 ID 목록) → boolean map으로 변환
+        const likedSet = new Set((Array.isArray(checkRes) ? checkRes : []).map(Number));
+        setFanIsLikedMap(
+          Object.fromEntries(transformed.map((p) => [p.id, likedSet.has(Number(p.id))]))
+        );
+      })
+      .catch(() => setFanPosts([]))
+      .finally(() => setFanPostsLoading(false));
+  }, [activeTab, groupId, isRealGroup]);
+
   if (!artist) return null;
+
+  // 포스트 상세 링크에 사용할 groupId (숫자 ID 또는 mock slug)
+  const postGroupId = isRealGroup ? groupId : artist.id;
 
   // URL id가 숫자면 artistId로 매칭, mock 페이지(luna-ray 등)면 artistName으로 매칭
   const fanProfileForArtist =
@@ -71,6 +314,9 @@ export default function ArtistDetailPage({ params }) {
       fanProfiles.find(
         (p) => p.artistName && p.artistName.trim() === artist.name.trim(),
       ));
+
+  // 팬 포스트 작성 가능 여부: USER 역할만 (비로그인·아티스트·어드민 숨김)
+  const canCreateFanPost = currentUser?.role === "USER";
 
   const handleAttendance = async () => {
     if (!fanProfileForArtist || attendanceLoading) return;
@@ -95,9 +341,27 @@ export default function ArtistDetailPage({ params }) {
     }
   };
 
-  const artistPosts = MOCK_POSTS.filter(
-    (p) => p.artistId === artist.id && p.type === "ARTIST",
-  );
+  const handleSubscribe = async () => {
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+    if (subscribeLoading) return;
+    if (!isRealGroup) {
+      setArtist((prev) => ({ ...prev, isFollowing: true }));
+      return;
+    }
+    setSubscribeLoading(true);
+    try {
+      await request(`/api/user/follow/${groupId}`, { method: "POST" });
+      setArtist((prev) => ({ ...prev, isFollowing: true }));
+    } catch (err) {
+      console.error("구독 실패", err);
+    } finally {
+      setSubscribeLoading(false);
+    }
+  };
+
   const artistNotices = MOCK_POSTS.filter(
     (p) => p.artistId === artist.id && p.type === "NOTICE",
   );
@@ -125,37 +389,111 @@ export default function ArtistDetailPage({ params }) {
     if (fanPostFileInputRef.current) fanPostFileInputRef.current.value = "";
   };
 
-  const handleLike = (postId) => {
-    setLikedPostIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(postId)) next.delete(postId);
-      else next.add(postId);
-      return next;
+  // 아티스트 포스트 좋아요 토글
+  const handleArtistPostLike = (postId) => {
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+    const wasLiked = !!artistIsLikedMap[postId];
+    // Optimistic update
+    setArtistIsLikedMap((prev) => ({ ...prev, [postId]: !wasLiked }));
+    setArtistLikeCountMap((prev) => ({
+      ...prev,
+      [postId]: (prev[postId] ?? 0) + (wasLiked ? -1 : 1),
+    }));
+    if (!isRealGroup) return;
+    request("/api/likes", {
+      method: "POST",
+      body: { targetType: "ARTIST_POST", targetId: postId },
+    }).catch(() => {
+      // Revert on error
+      setArtistIsLikedMap((prev) => ({ ...prev, [postId]: wasLiked }));
+      setArtistLikeCountMap((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? 0) + (wasLiked ? 1 : -1),
+      }));
     });
   };
 
-  const handleCreatePost = () => {
-    if (!newPostContent.trim()) return;
-    const newPost = {
-      id: `p-new-${Date.now()}`,
-      artistId: artist.id,
-      authorName: "Alex Rivers",
-      authorAvatar: "https://picsum.photos/seed/alex/100/100",
-      content: newPostContent,
-      image: newPostImagePreview || null,
-      likes: "0",
-      comments: 0,
-      timestamp: "방금 전",
-      type: "FAN",
-    };
-    setLocalFanPosts([newPost, ...localFanPosts]);
-    setNewPostContent("");
-    if (newPostImagePreview && newPostImageFile)
-      URL.revokeObjectURL(newPostImagePreview);
-    setNewPostImagePreview(null);
-    setNewPostImageFile(null);
-    if (fanPostFileInputRef.current) fanPostFileInputRef.current.value = "";
-    setShowCreateModal(false);
+  // 팬 포스트 좋아요 토글
+  const handleFanPostLike = (postId) => {
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+    const wasLiked = !!fanIsLikedMap[postId];
+    // Optimistic update
+    setFanIsLikedMap((prev) => ({ ...prev, [postId]: !wasLiked }));
+    setFanLikeCountMap((prev) => ({
+      ...prev,
+      [postId]: (prev[postId] ?? 0) + (wasLiked ? -1 : 1),
+    }));
+    if (!isRealGroup) return;
+    request("/api/likes", {
+      method: "POST",
+      body: { targetType: "FAN_POST", targetId: postId },
+    }).catch(() => {
+      // Revert on error
+      setFanIsLikedMap((prev) => ({ ...prev, [postId]: wasLiked }));
+      setFanLikeCountMap((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? 0) + (wasLiked ? 1 : -1),
+      }));
+    });
+  };
+
+  const handleCreatePost = async () => {
+    if (!newPostContent.trim() || createLoading) return;
+
+    // mock slug의 경우 로컬 추가
+    if (!isRealGroup) {
+      const newPost = {
+        id: `p-new-${Date.now()}`,
+        authorName: myNickname || "팬",
+        authorMemberName: null,
+        authorAvatar: myProfileImageUrl || "",
+        content: newPostContent,
+        image: newPostImagePreview || null,
+        timestamp: "방금 전",
+        type: "FAN",
+      };
+      setFanPosts((prev) => [newPost, ...prev]);
+      setNewPostContent("");
+      if (newPostImagePreview && newPostImageFile)
+        URL.revokeObjectURL(newPostImagePreview);
+      setNewPostImagePreview(null);
+      setNewPostImageFile(null);
+      if (fanPostFileInputRef.current) fanPostFileInputRef.current.value = "";
+      setShowCreateModal(false);
+      return;
+    }
+
+    setCreateLoading(true);
+    try {
+      const created = await request("/api/fan-posts", {
+        method: "POST",
+        body: {
+          groupId,
+          title: "",
+          content: newPostContent,
+          mediaAssetIds: [],
+        },
+      });
+      const newPost = transformFanPost(created);
+      setFanPosts((prev) => [newPost, ...prev]);
+      setNewPostContent("");
+      if (newPostImagePreview && newPostImageFile)
+        URL.revokeObjectURL(newPostImagePreview);
+      setNewPostImagePreview(null);
+      setNewPostImageFile(null);
+      if (fanPostFileInputRef.current) fanPostFileInputRef.current.value = "";
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error("팬 포스트 생성 실패", err);
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   const tabs = [
@@ -166,17 +504,6 @@ export default function ArtistDetailPage({ params }) {
     { id: "MARKET", label: "Market" },
     { id: "MV", label: "뮤직비디오" },
   ];
-
-  const artistIdForApi = Number(id) || 1;
-
-  useEffect(() => {
-    if (activeTab !== "MV") return;
-    setMusicVideosLoading(true);
-    listMusicVideos(artistIdForApi)
-      .then(setMusicVideos)
-      .catch(() => setMusicVideos([]))
-      .finally(() => setMusicVideosLoading(false));
-  }, [activeTab, artistIdForApi]);
 
   const artistLives = MOCK_LIVES.filter((l) => l.artistId === artist.id);
   const liveNow = artistLives.filter((l) => l.status === "LIVE");
@@ -214,13 +541,17 @@ export default function ArtistDetailPage({ params }) {
                   verified
                 </span>
               </div>
-              <p className="text-white/55 font-medium text-sm mt-1">
-                팔로워 {artist.memberCount} • 포스트 {artist.postCount}개
-              </p>
+              {(artist.memberCount || artist.postCount) && (
+                <p className="text-white/55 font-medium text-sm mt-1">
+                  {artist.memberCount && `팔로워 ${artist.memberCount}`}
+                  {artist.memberCount && artist.postCount && " • "}
+                  {artist.postCount && `포스트 ${artist.postCount}개`}
+                </p>
+              )}
             </div>
           </div>
           <div className="pb-1 flex items-center gap-2">
-            {artist.isSubscribed ? (
+            {artist.isFollowing ? (
               <>
                 <Button variant="ghost" className="px-8 py-3" disabled>
                   구독 중
@@ -237,8 +568,13 @@ export default function ArtistDetailPage({ params }) {
                 )}
               </>
             ) : (
-              <Button variant="primary" className="px-8 py-3">
-                구독하기
+              <Button
+                variant="primary"
+                className="px-8 py-3"
+                onClick={handleSubscribe}
+                disabled={subscribeLoading}
+              >
+                {subscribeLoading ? "처리 중…" : "구독하기"}
               </Button>
             )}
           </div>
@@ -268,46 +604,72 @@ export default function ArtistDetailPage({ params }) {
       <div className="max-w-6xl w-full mx-auto px-8 py-8 flex-1 grid grid-cols-12 gap-8">
         <div className="col-span-12 lg:col-span-8 space-y-6">
           {activeTab === "ARTIST" && (
-            <PostFeed
-              posts={artistPosts}
-              postLinkBase="/posts"
-              showVerifiedByType={true}
-              isLikedMap={Object.fromEntries(
-                [...likedPostIds].map((id) => [id, true]),
+            <>
+              {artistPostsLoading ? (
+                <Surface variant="primary" className="py-12 text-center">
+                  <p className="text-white/55">로딩 중...</p>
+                </Surface>
+              ) : (
+                <PostFeed
+                  posts={artistPosts}
+                  postLinkBase="/posts"
+                  postLinkQuery={`type=ARTIST&groupId=${postGroupId}`}
+                  showVerifiedByType={true}
+                  isLikedMap={artistIsLikedMap}
+                  likeCountMap={artistLikeCountMap}
+                  commentCountMap={artistCommentCountMap}
+                  onLike={handleArtistPostLike}
+                  onComment={(postId) =>
+                    router.push(`/posts/${postId}?type=ARTIST&groupId=${postGroupId}`)
+                  }
+                  isLockedMap={Object.fromEntries(
+                    artistPosts.map((p) => [
+                      p.id,
+                      !!(p.isMembershipOnly && !artist.hasMembership),
+                    ])
+                  )}
+                />
               )}
-              onLike={handleLike}
-              onComment={(postId) => router.push(`/posts/${postId}#comments`)}
-            />
+            </>
           )}
 
           {activeTab === "FAN" && (
             <>
-              {artist.isSubscribed ? (
+              {artist.isFollowing ? (
                 <>
-                  <div className="flex justify-end items-center px-2 mb-4">
-                    <Button
-                      variant="primary"
-                      className="text-xs uppercase tracking-widest"
-                      onClick={() => setShowCreateModal(true)}
-                    >
-                      <span className="material-symbols-outlined text-lg mr-1.5 align-middle">
-                        edit_note
-                      </span>
-                      팬 포스트 작성
-                    </Button>
-                  </div>
-                  <PostFeed
-                    posts={localFanPosts}
-                    postLinkBase="/posts"
-                    showVerifiedByType={true}
-                    isLikedMap={Object.fromEntries(
-                      [...likedPostIds].map((id) => [id, true]),
-                    )}
-                    onLike={handleLike}
-                    onComment={(postId) =>
-                      router.push(`/posts/${postId}#comments`)
-                    }
-                  />
+                  {canCreateFanPost && (
+                    <div className="flex justify-end items-center px-2 mb-4">
+                      <Button
+                        variant="primary"
+                        className="text-xs uppercase tracking-widest"
+                        onClick={() => setShowCreateModal(true)}
+                      >
+                        <span className="material-symbols-outlined text-lg mr-1.5 align-middle">
+                          edit_note
+                        </span>
+                        팬 포스트 작성
+                      </Button>
+                    </div>
+                  )}
+                  {fanPostsLoading ? (
+                    <Surface variant="primary" className="py-12 text-center">
+                      <p className="text-white/55">로딩 중...</p>
+                    </Surface>
+                  ) : (
+                    <PostFeed
+                      posts={fanPosts}
+                      postLinkBase="/posts"
+                      postLinkQuery={`type=FAN&groupId=${postGroupId}`}
+                      showVerifiedByType={true}
+                      isLikedMap={fanIsLikedMap}
+                      likeCountMap={fanLikeCountMap}
+                      commentCountMap={fanCommentCountMap}
+                      onLike={handleFanPostLike}
+                      onComment={(postId) =>
+                        router.push(`/posts/${postId}?type=FAN&groupId=${postGroupId}`)
+                      }
+                    />
+                  )}
                 </>
               ) : (
                 <Surface variant="primary" className="p-12 text-center">
@@ -658,8 +1020,9 @@ export default function ArtistDetailPage({ params }) {
                 variant="primary"
                 className="w-full py-4 text-sm uppercase tracking-widest"
                 onClick={handleCreatePost}
+                disabled={createLoading}
               >
-                게시하기
+                {createLoading ? "게시 중..." : "게시하기"}
               </Button>
             </div>
           </Surface>

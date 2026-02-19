@@ -14,6 +14,7 @@ public class FanPostResponse {
     private Long id;
     private Long writerId;
     private String writerNickname;
+    private String writerProfileImageUrl;
     private String title;
     private String content;
     private Instant createdAt;
@@ -25,6 +26,7 @@ public class FanPostResponse {
                 .id(post.getId())
                 .writerId(post.getUser().getId())
                 .writerNickname(post.getUser().getNickname())
+                .writerProfileImageUrl(post.getUser().getProfileImageUrl())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .createdAt(post.getCreatedAt())
@@ -38,6 +40,7 @@ public class FanPostResponse {
                 .id(post.getId())
                 .writerId(post.getUser().getId())
                 .writerNickname(post.getUser().getNickname())
+                .writerProfileImageUrl(post.getUser().getProfileImageUrl())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .createdAt(post.getCreatedAt())
