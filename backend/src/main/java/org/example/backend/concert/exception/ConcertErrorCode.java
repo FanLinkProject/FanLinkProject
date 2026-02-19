@@ -11,6 +11,7 @@ public enum ConcertErrorCode implements ErrorCode {
     CONCERT_NOT_FOUND(HttpStatus.NOT_FOUND, "CONCERT_NOT_FOUND", "존재하지 않는 공연입니다."),
     LOCATION_NOT_FOUND(HttpStatus.NOT_FOUND, "LOCATION_NOT_FOUND", "존재하지 않는 위치입니다."),
     CONCERT_ARTIST_NOT_FOUND(HttpStatus.NOT_FOUND, "CONCERT_ARTIST_NOT_FOUND", "공연-아티스트 관계를 찾을 수 없습니다."),
+    MEDIA_ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "MEDIA_ASSET_NOT_FOUND", "존재하지 않는 미디어 에셋입니다."),
 
     // ====== 권한/소유 관련 ======
     NOT_CONCERT_OWNER(HttpStatus.FORBIDDEN, "NOT_CONCERT_OWNER", "본인이 생성한 공연이 아닙니다."),
@@ -22,6 +23,7 @@ public enum ConcertErrorCode implements ErrorCode {
     INVALID_TICKET_COUNT(HttpStatus.BAD_REQUEST, "INVALID_TICKET_COUNT", "티켓 수량은 0 이상이어야 합니다."),
     EMPTY_ARTIST_LIST(HttpStatus.BAD_REQUEST, "EMPTY_ARTIST_LIST", "공연에는 최소 1명의 아티스트가 필요합니다."),
     DUPLICATE_ARTIST(HttpStatus.BAD_REQUEST, "DUPLICATE_ARTIST", "이미 추가된 아티스트입니다."),
+    MEDIA_ASSET_NOT_READY(HttpStatus.BAD_REQUEST, "MEDIA_ASSET_NOT_READY", "미디어 에셋이 아직 업로드 완료되지 않았습니다."),
 
     // ====== 비즈니스 로직 ======
     TICKET_SALE_NOT_STARTED(HttpStatus.BAD_REQUEST, "TICKET_SALE_NOT_STARTED", "아직 예매 시작 시간이 아닙니다."),

@@ -20,7 +20,7 @@ public class ConcertUpdateRequest {
     private String timezone;
     private String venueName;
     private Long locationId;
-    private String concertImageUrl;
+    private Long posterMediaAssetId;
     private Integer presaleTicketCount;
     private Integer saleTicketCount;
     private Instant presaleStartDateTime;
