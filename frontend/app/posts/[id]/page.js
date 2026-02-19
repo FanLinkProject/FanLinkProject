@@ -64,7 +64,7 @@ function PostDetailContent({ id }) {
   const fromArtistConsole = searchParams.get("from") === "artist-console";
 
   const numericId = Number(id);
-  const isRealPost = !!(type && groupId && !isNaN(numericId) && numericId > 0);
+  const isRealPost = !!(type && !isNaN(numericId) && numericId > 0);
   const likeTargetType = type === "FAN" ? "FAN_POST" : "ARTIST_POST";
   const commentTargetType = type === "FAN" ? "FAN" : "ARTIST";
 
@@ -160,6 +160,8 @@ function PostDetailContent({ id }) {
           image: postData.attachments?.[0]?.url || null,
           timestamp: formatTimestamp(postData.createdAt),
           postType: type,
+          // 서버가 content를 null로 반환 = 멤버십 전용 + 접근 권한 없음
+          isLocked: !!(postData.isMembershipOnly && postData.content === null),
         });
         const countVal = countRes?.[numericId] ?? countRes?.[String(numericId)] ?? 0;
         const isLikedVal = Array.isArray(checkRes)
@@ -713,11 +715,19 @@ function PostDetailContent({ id }) {
                 </p>
               </div>
             </div>
-            <div className="prose max-w-none">
-              <p className="text-white/85 text-xl leading-relaxed font-light">
-                &quot;{post.content}&quot;
-              </p>
-            </div>
+            {post.isLocked ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                <span className="material-symbols-outlined text-6xl text-white/25 fill-icon">lock</span>
+                <p className="text-white/60 font-semibold">프리미엄 멤버십 전용 콘텐츠</p>
+                <p className="text-white/40 text-sm">멤버십에 가입하면 모든 콘텐츠를 즐길 수 있습니다</p>
+              </div>
+            ) : (
+              <div className="prose max-w-none">
+                <p className="text-white/85 text-xl leading-relaxed font-light">
+                  &quot;{post.content}&quot;
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.06]">
               <button
                 type="button"

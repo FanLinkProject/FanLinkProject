@@ -38,6 +38,10 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     // 그룹의 모든 멤버 조회
     List<GroupMember> findByGroup(User group);
 
+    // ID만으로 그룹-멤버 관계 존재 여부 확인 (User 객체 로드 없이)
+    @Query("SELECT COUNT(gm) > 0 FROM GroupMember gm WHERE gm.group.id = :groupId AND gm.member.id = :memberId")
+    boolean existsByGroupIdAndMemberId(@Param("groupId") Long groupId, @Param("memberId") Long memberId);
+
     // [정산] 특정 멤버(ARTIST)가 속한 그룹의 그룹명 조회
     @Query("SELECT DISTINCT gm.groupName FROM GroupMember gm WHERE gm.member.id = :memberId")
     Optional<String> findGroupNameByMemberId(@Param("memberId") Long memberId);

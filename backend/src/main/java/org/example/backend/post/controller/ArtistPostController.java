@@ -53,6 +53,19 @@ public class ArtistPostController {
         return ResponseEntity.ok(responses);
     }
 
+    @GetMapping("/my")
+    public ResponseEntity<List<ArtistPostResponse>> getMyPosts(
+            @RequestParam(required = false) Long lastPostId,
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        if (principalDetails == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<ArtistPostResponse> responses = artistPostService.getMyArtistPosts(
+                principalDetails.getUserId(), lastPostId, limit);
+        return ResponseEntity.ok(responses);
+    }
+
     @GetMapping("/artist-only")
     public ResponseEntity<List<ArtistPostResponse>> getArtistPosts(
             @RequestParam(required = false) Long groupId,

@@ -75,6 +75,8 @@ function transformArtistPost(p, groupAvatar = "") {
     image: p.attachments?.[0]?.url || null,
     timestamp: formatTimestamp(p.createdAt),
     isMembershipOnly: p.isMembershipOnly ?? false,
+    // 서버가 content를 null로 반환하면 실제 접근 권한 없음 (백엔드 판단 기준)
+    isLockedByServer: !!(p.isMembershipOnly && p.content === null),
     type: "ARTIST",
   };
 }
@@ -752,7 +754,8 @@ function ArtistDetailPageInner({ id }) {
                     isLockedMap={Object.fromEntries(
                       artistPosts.map((p) => [
                         p.id,
-                        !!(p.isMembershipOnly && !artist.hasMembership && !isGroupMember),
+                        // 서버 판단 우선, 프론트 조건 보조
+                        p.isLockedByServer || !!(p.isMembershipOnly && !artist.hasMembership && !isGroupMember),
                       ])
                     )}
                   />
