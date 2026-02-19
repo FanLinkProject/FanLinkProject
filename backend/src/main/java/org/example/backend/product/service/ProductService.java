@@ -69,6 +69,7 @@ public class ProductService {
                 .isMembershipOnly(isMembershipOnly)
                 .isExclusive(isExclusive)
                 .isMembership(isMembership)
+                .concertId(request.concertId())
                 .representativeMediaAssetId(request.representativeMediaAssetId())
                 .build();
 
@@ -133,7 +134,8 @@ public class ProductService {
                 isMembershipOnly,
                 isExclusive,
                 isMembership,
-                request.representativeMediaAssetId());
+                request.representativeMediaAssetId(),
+                request.concertId());
 
         if (request.mediaAssetIds() != null) {
             productMediaAssetRepository.deleteAllByProduct_Id(id);

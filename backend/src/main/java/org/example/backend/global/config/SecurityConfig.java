@@ -83,6 +83,9 @@ public class SecurityConfig {
                             "/api/subscriptions/**",
                             "/api/orders/**")
                     .authenticated()
+                    // 티켓: public-key는 인증 없이 (스캐너용), 나머지는 인증 필요
+                    .requestMatchers(GET, "/api/tickets/public-key").permitAll()
+                    .requestMatchers("/api/tickets/**").authenticated()
 
                 .requestMatchers(
 					"/ws-chat/**",
