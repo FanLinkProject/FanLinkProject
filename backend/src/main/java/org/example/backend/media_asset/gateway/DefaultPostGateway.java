@@ -34,6 +34,15 @@ public class DefaultPostGateway implements PostGateway {
         throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_NOT_FOUND, "postId를 찾을 수 없습니다.");
     }
 
+    @Override
+    public boolean isNoticePost(Long postId) {
+        if (postId == null || postId <= 0) {
+            return false;
+        }
+        ArtistPost artistPost = artistPostRepository.findById(postId).orElse(null);
+        return artistPost != null && artistPost.getGroup() == null;
+    }
+
     // 그룹/작성자 정보를 기준으로 아티스트 ID를 계산한다.
     private Long resolveArtistId(User group, User author) {
         if (group != null) {
