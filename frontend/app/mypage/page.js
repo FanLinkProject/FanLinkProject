@@ -399,9 +399,15 @@ export default function MyPage() {
         </div>
         {!isAdmin && (
           <div className="flex flex-col gap-2 text-right text-xs text-white/60">
-            <p>
-              팔로우 아티스트: <span className="font-bold text-white/90">{data?.totalFollowingsCount ?? 0}</span>
-            </p>
+            {isArtistAccount ? (
+              <p>
+                팔로우한 팬: <span className="font-bold text-white/90">{artistFanGraph?.totalFollowers ?? 0}</span>
+              </p>
+            ) : (
+              <p>
+                팔로우 아티스트: <span className="font-bold text-white/90">{data?.totalFollowingsCount ?? 0}</span>
+              </p>
+            )}
             {!isArtistAccount && (
               <p>
                 멤버십(결제) 구독: <span className="font-bold text-white/90">{data?.totalMembershipsCount ?? 0}</span>

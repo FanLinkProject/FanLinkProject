@@ -44,6 +44,16 @@ public class ArtistService {
             throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
         }
 
+        GroupMember membership = null;
+        User followerStatsTarget = artistOrGroup;
+        if (artistOrGroup.getRole() == UserRole.ARTIST) {
+            membership = groupMemberRepository.findByMember(artistOrGroup).orElse(null);
+            if (membership != null && membership.getGroup() != null) {
+                // 그룹 소속 개인 아티스트는 그룹 기준으로 팬 지표를 보여준다.
+                followerStatsTarget = membership.getGroup();
+            }
+        }
+
         // 1) 프로필
         ArtistMyPageResponse.Profile profile = new ArtistMyPageResponse.Profile(
                 artistOrGroup.getId(),
@@ -55,12 +65,12 @@ public class ArtistService {
         );
 
         // 2) 팬 수 변화 그래프 (최근 7일 daily 신규 팔로워 수)
-        long totalFollowers = followRepository.countByArtist(artistOrGroup);
+        long totalFollowers = followRepository.countByArtist(followerStatsTarget);
 
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(6);
 
-        List<Object[]> rows = followRepository.countDailyNewFollowers(artistOrGroup.getId(), from, to);
+        List<Object[]> rows = followRepository.countDailyNewFollowers(followerStatsTarget.getId(), from, to);
         Map<String, Long> dateToCount = new HashMap<>();
         for (Object[] row : rows) {
             // row[0] = date (java.sql.Date or String), row[1] = count (Number)
@@ -102,9 +112,7 @@ public class ArtistService {
             );
         } else {
             // 개인 아티스트: 소속 그룹이 있으면 그 그룹의 멤버 정보까지 조회 (단, 권한 변경은 불가)
-            var groupMembershipOpt = groupMemberRepository.findByMember(artistOrGroup);
-            if (groupMembershipOpt.isPresent()) {
-                GroupMember membership = groupMembershipOpt.get();
+            if (membership != null) {
                 String groupName = membership.getGroupName();
                 User group = membership.getGroup();
 

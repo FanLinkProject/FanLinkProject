@@ -41,7 +41,7 @@ function getNavbarVariant(pathname, role) {
     pathname.startsWith("/posts")
   ) {
     if (role === "ROLE_ADMIN") return "admin";
-    if (role === "ROLE_GROUP") return "group";
+    if (role === "ROLE_GROUP") return "artist";
     if (role === "ROLE_ARTIST") return "artist";
     return "fan";
   }
@@ -52,7 +52,7 @@ function getNavbarVariant(pathname, role) {
   )
     return "artist";
   if (pathname.startsWith("/group") || pathname.startsWith("/studio"))
-    return "group";
+    return "artist";
   return "fan";
 }
 
@@ -66,7 +66,7 @@ function getSidebarVariant(pathname, role) {
     pathname.startsWith("/posts")
   ) {
     if (role === "ROLE_ADMIN") return "admin";
-    if (role === "ROLE_GROUP") return "group";
+    if (role === "ROLE_GROUP") return "artist";
     if (role === "ROLE_ARTIST") return "artist";
     return "fan";
   }
@@ -77,7 +77,7 @@ function getSidebarVariant(pathname, role) {
   )
     return "artist";
   if (pathname.startsWith("/group") || pathname.startsWith("/studio"))
-    return "group";
+    return "artist";
   return "fan";
 }
 

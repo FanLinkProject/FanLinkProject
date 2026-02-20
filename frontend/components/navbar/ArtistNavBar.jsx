@@ -14,14 +14,33 @@ function getAuthHeaders() {
   return pure ? { Authorization: `Bearer ${pure}` } : {};
 }
 
+function getRoleFromToken() {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("accessToken");
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
+  if (!pure) return null;
+  try {
+    const base64Url = pure.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    return payload?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Artist 영역 NavBar. 아티스트 메인 홈은 /home. */
 export default function ArtistNavBar({ showSidebarToggle, sidebarOpen, onSidebarToggle }) {
   const pathname = usePathname();
   const [profile, setProfile] = useState(null);
+  const [isGroupRole, setIsGroupRole] = useState(false);
 
   useEffect(() => {
     const headers = getAuthHeaders();
     if (!headers.Authorization) return;
+    setIsGroupRole(getRoleFromToken() === "ROLE_GROUP");
     axios
       .get(`${BASE_URL}/api/user/profile`, { headers })
       .then((res) => setProfile(res.data))
@@ -50,8 +69,12 @@ export default function ArtistNavBar({ showSidebarToggle, sidebarOpen, onSidebar
         <h2 className="text-xl font-black tracking-tighter text-white">
           FanLink
         </h2>
-        <span className="ml-2 inline-flex items-center justify-center leading-none px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest bg-violet-500/80 text-white">
-          ARTIST
+        <span
+          className={`ml-2 inline-flex items-center justify-center leading-none px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest text-white ${
+            isGroupRole ? "bg-[#c4b5fd]/90 text-[#2a1b45]" : "bg-violet-500/80"
+          }`}
+        >
+          {isGroupRole ? "GROUP" : "ARTIST"}
         </span>
       </Link>
 
