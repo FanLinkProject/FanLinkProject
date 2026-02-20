@@ -37,27 +37,29 @@ jobs:
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           echo "account_id=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
           echo "ecr_uri=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "ECR_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> "$GITHUB_ENV"
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # immutable tag면 같은 SHA 재푸시가 막히므로 "이미 있으면 스킵"이 실무적으로 안전
+      # Immutable 태그면 같은 SHA 재푸시가 막히므로, "이미 있으면 스킵"이 정석
       - name: Build & Push backend image (tag=GITHUB_SHA, skip if exists)
         shell: bash
-        env:
-          ECR_URI: ${{ steps.ecr.outputs.ecr_uri }}
         run: |
           set -euo pipefail
-          IMAGE_TAG="${GITHUB_SHA}"
+          echo "[INFO] ECR_URI=${ECR_URI}"
+          echo "[INFO] IMAGE_TAG=${IMAGE_TAG}"
 
           if aws ecr describe-images \
               --region "${AWS_REGION}" \
               --repository-name "${ECR_REPO}" \
               --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
-            echo "Image ${ECR_URI}:${IMAGE_TAG} already exists. Skip build/push."
+            echo "[INFO] Image already exists. Skip build/push."
             exit 0
           fi
 
+          # Dockerfile은 backend/Dockerfile 을 전제로 함
           docker build -t "${ECR_URI}:${IMAGE_TAG}" ./backend
           docker push "${ECR_URI}:${IMAGE_TAG}"
 
@@ -66,13 +68,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE_TAG="${GITHUB_SHA}"
+          echo "[INFO] Deploy IMAGE_TAG=${IMAGE_TAG} to EC2=${EC2_INSTANCE_ID}"
 
           CMD_ID="$(aws ssm send-command \
             --region "${AWS_REGION}" \
             --instance-ids "${EC2_INSTANCE_ID}" \
             --document-name "AWS-RunShellScript" \
-            --comment "FanLink deploy (dev) ${IMAGE_TAG}" \
+            --comment "FanLink deploy(dev) ${IMAGE_TAG}" \
             --parameters commands="[
               \"set -euo pipefail\",
               \"sudo bash -lc '/opt/fanlink/deploy.sh ${IMAGE_TAG}'\"
@@ -81,21 +83,34 @@ jobs:
             --output text)"
 
           echo "command_id=${CMD_ID}" >> "$GITHUB_OUTPUT"
-          echo "SSM CommandId=${CMD_ID}"
+          echo "[INFO] SSM CommandId=${CMD_ID}"
 
-      - name: Wait & Fetch SSM Result
+      # ✅ 여기 핵심: SSM이 실패해도 stdout/stderr를 반드시 출력한다
+      - name: Fetch SSM Result (always print stdout/stderr)
         shell: bash
         run: |
           set -euo pipefail
           CMD_ID="${{ steps.ssm.outputs.command_id }}"
+
           aws ssm wait command-executed \
             --region "${AWS_REGION}" \
             --command-id "${CMD_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}"
+            --instance-id "${EC2_INSTANCE_ID}" || true
 
           aws ssm get-command-invocation \
             --region "${AWS_REGION}" \
             --command-id "${CMD_ID}" \
             --instance-id "${EC2_INSTANCE_ID}" \
-            --query "{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}" \
+            --query "{Status:Status,ResponseCode:ResponseCode,Stdout:StandardOutputContent,Stderr:StandardErrorContent}" \
             --output json
+
+          STATUS="$(aws ssm get-command-invocation \
+            --region "${AWS_REGION}" \
+            --command-id "${CMD_ID}" \
+            --instance-id "${EC2_INSTANCE_ID}" \
+            --query "Status" --output text)"
+
+          if [[ "${STATUS}" != "Success" ]]; then
+            echo "[ERROR] SSM command failed: ${STATUS}"
+            exit 1
+          fi
