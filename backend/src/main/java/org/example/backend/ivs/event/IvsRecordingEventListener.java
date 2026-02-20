@@ -11,6 +11,7 @@ import org.example.backend.replay.entity.Replay;
 import org.example.backend.replay.entity.ReplayAccessType;
 import org.example.backend.replay.entity.ReplayStatus;
 import org.example.backend.replay.repository.ReplayRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,7 @@ public class IvsRecordingEventListener {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
+    @Qualifier("ivsRecordingSqsClient")
     private final SqsClient sqsClient;
     private final IvsRecordingEventProperties properties;
     private final LiveSessionRepository liveSessionRepository;

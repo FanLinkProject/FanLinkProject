@@ -9,6 +9,7 @@ import org.example.backend.replay.entity.Replay;
 import org.example.backend.replay.entity.ReplayStatus;
 import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.replay.service.MediaConvertJobService;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ public class MediaConvertEventListener {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
+    @Qualifier("mediaConvertSqsClient")
     private final SqsClient sqsClient;
     private final MediaConvertProperties properties;
     private final ReplayRepository replayRepository;
