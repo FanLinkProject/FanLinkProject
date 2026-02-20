@@ -10,7 +10,7 @@ spring:
     # 한글 깨짐 방지
     # - characterEncoding은 "utf8mb4"가 아니라 자바 charset 이름인 "UTF-8"을 써야 합니다.
     # - 실제 저장/정렬은 서버/테이블의 utf8mb4 + connectionCollation으로 처리됩니다.
-    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&useSSL=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://${MYSQL_HOST:db}:${MYSQL_PORT:3306}/${MYSQL_DATABASE}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&useSSL=false&serverTimezone=Asia/Seoul
     username: ${MYSQL_USER}
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -35,8 +35,9 @@ spring:
   # redis 디폴트(기본기능)-슬레이브(읽기만가능)모드 전환시 별도 작업필요
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
   # 이메일 발송 설정 (Gmail SMTP 예시)
   mail:
