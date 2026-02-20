@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.backend.live_session.enums.LiveSessionStatus;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 /**
  * LiveSession 단건/목록 응답.
@@ -25,10 +25,10 @@ public class LiveSessionResponse {
 	private Boolean isPaid;
 	private String title;
 	private LiveSessionStatus status;
-	private OffsetDateTime startedAt;
-	private OffsetDateTime endedAt;
+	private Instant startedAt;
+	private Instant endedAt;
 	private String streamId;
 	private String recordingS3Bucket;
 	private String recordingS3Prefix;
-	private OffsetDateTime expiresAt;
+	private Instant expiresAt;
 }

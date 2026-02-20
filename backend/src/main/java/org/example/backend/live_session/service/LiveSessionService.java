@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -100,7 +99,7 @@ public class LiveSessionService {
 		session = liveSessionRepository.save(session);
 
 		Instant endedAtInstant = session.getEndedAt() != null
-			? session.getEndedAt().toInstant()
+			? session.getEndedAt()
 			: Instant.now();
 		eventPublisher.publishEvent(new LiveEndedEvent(liveSessionId, endedAtInstant));
 	}
@@ -136,7 +135,7 @@ public class LiveSessionService {
 			liveSessionRepository.findByArtistIdAndStatusInAndNotExpired(
 				artistId,
 				statuses,
-				OffsetDateTime.now()
+				Instant.now()
 			);
 
 		User artist = userRepository.findById(artistId).orElse(null);
