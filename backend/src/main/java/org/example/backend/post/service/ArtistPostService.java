@@ -20,7 +20,6 @@ import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
-import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -44,7 +43,6 @@ public class ArtistPostService {
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
     private final SubscriptionRepository subscriptionRepository;
-    private final ArtistPermissionService artistPermissionService;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -92,9 +90,6 @@ public class ArtistPostService {
                 .orElseThrow(() -> new PostException(PostErrorCode.USER_NOT_FOUND));
 
         if (user.getRole() == UserRole.USER) {
-            throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
-        }
-        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
         }
 
@@ -171,9 +166,6 @@ public class ArtistPostService {
     public ArtistPostResponse updatePost(Long userId, Long postId, ArtistPostRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new PostException(PostErrorCode.USER_NOT_FOUND));
-        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
-            throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
-        }
 
         ArtistPost artistPost = artistPostRepository.findById(postId)
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));

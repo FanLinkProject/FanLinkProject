@@ -5,7 +5,7 @@ import org.example.backend.comment.enums.TargetType;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * 내가 작성한 댓글 조회 응답 DTO
@@ -21,7 +21,7 @@ public record MyCommentResponse(
         boolean isArtist,
         String content,
         Integer status,
-        LocalDateTime createdAt,
+        Instant createdAt,
         TargetType targetType,  // 어떤 게시판 타입인지
         Long targetId,          // 어떤 게시물에 달린 댓글인지
         Long parentId,          // null이면 부모 댓글, 값이 있으면 대댓글

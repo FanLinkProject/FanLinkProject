@@ -17,7 +17,6 @@ import org.example.backend.product.exception.ProductException;
 import org.example.backend.product.repository.ProductMediaAssetRepository;
 import org.example.backend.product.repository.ProductRepository;
 import org.example.backend.user.enums.UserRole;
-import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -36,7 +35,6 @@ public class ProductService {
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
     private final FanPageGateway fanPageGateway;
-    private final ArtistPermissionService artistPermissionService;
 
     public List<ProductDetailResponse> getAllProducts() {
         List<Product> products = productRepository.findAll();
@@ -177,9 +175,6 @@ public class ProductService {
         }
         Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
         if (!ownerUserId.equals(userId)) {
-            throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
-        }
-        if (!artistPermissionService.isManageAccount(userId, role)) {
             throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
         }
     }
