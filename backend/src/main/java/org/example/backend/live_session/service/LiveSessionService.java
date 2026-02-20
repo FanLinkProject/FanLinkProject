@@ -13,14 +13,17 @@ import org.example.backend.live_session.repository.LiveSessionRepository;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.notification.service.NotificationService;
+import org.example.backend.live_session.event.LiveEndedEvent;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -34,6 +37,8 @@ public class LiveSessionService {
 	private final LiveSessionRepository liveSessionRepository;
 	private final NotificationService notificationService;
 	private final SubscriptionRepository subscriptionRepository;
+	private final ApplicationEventPublisher eventPublisher;
+	private final UserRepository userRepository;
 
 	/**
 	 * 라이브 시작(세션 생성). ARTIST만 허용.
@@ -86,13 +91,18 @@ public class LiveSessionService {
 			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_FORBIDDEN_NOT_OWNER);
 		}
 
-		// LIVE → ENDED; 이미 ENDED/RECORDED/READY/REJECTED/EXPIRED면 멱등 200 OK
+		// LIVE → ENDED; 이미 ENDED/RECORDED/READY/REJECTED/EXPIRED면 멱등 200 OK (이벤트 미발행)
 		if (session.getStatus() != LiveSessionStatus.LIVE) {
 			session.endNowIdempotent();
 			return;
 		}
 		session.endNowIdempotent();
-		liveSessionRepository.save(session);
+		session = liveSessionRepository.save(session);
+
+		Instant endedAtInstant = session.getEndedAt() != null
+			? session.getEndedAt().toInstant()
+			: Instant.now();
+		eventPublisher.publishEvent(new LiveEndedEvent(liveSessionId, endedAtInstant));
 	}
 
 	/**
@@ -129,8 +139,11 @@ public class LiveSessionService {
 				OffsetDateTime.now()
 			);
 
+		User artist = userRepository.findById(artistId).orElse(null);
+		String artistNickname = artist != null ? artist.getNickname() : "Unknown Artist";
+
 		return list.stream()
-			.map(this::toCandidateResponse)
+			.map(s -> toCandidateResponse(s, artistNickname))
 			.toList();
 	}
 
@@ -183,10 +196,11 @@ public class LiveSessionService {
 		}
 	}
 
-	private LiveSessionCandidateResponse toCandidateResponse(LiveSession s) {
+	private LiveSessionCandidateResponse toCandidateResponse(LiveSession s, String artistNickname) {
 		return LiveSessionCandidateResponse.builder()
 			.id(s.getId())
 			.artistId(s.getArtistId())
+			.artistNickname(artistNickname)
 			.title(s.getTitle())
 			.isPaid(s.isPaid())
 			.endedAt(s.getEndedAt())
@@ -197,9 +211,12 @@ public class LiveSessionService {
 	}
 
 	private LiveSessionResponse toResponse(LiveSession s) {
+		User artist = userRepository.findById(s.getArtistId()).orElse(null);
+		String nickname = artist != null ? artist.getNickname() : "Unknown Artist";
 		return LiveSessionResponse.builder()
 			.id(s.getId())
 			.artistId(s.getArtistId())
+			.artistNickname(nickname)
 			.channelArn(s.getChannelArn())
 			.isPaid(s.isPaid())
 			.title(s.getTitle())

@@ -22,10 +22,10 @@ public class LiveSessionServiceGateway implements LiveSessionGateway {
         return toRecordingInfo(response);
     }
 
-    // 아티스트별 후보 라이브 세션 목록을 조회한다.
+    // 현재 사용자가 발행 가능한 후보 라이브 세션 목록을 조회한다. (방송 주체만 발행 가능)
     @Override
-    public List<LiveSessionRecordingInfo> findCandidates(Long artistId) {
-        return liveSessionService.getLiveSessionsByArtist(artistId, null)
+    public List<LiveSessionRecordingInfo> findCandidates(Long userId) {
+        return liveSessionService.getLiveSessionsByArtist(userId, null)
                 .stream()
                 .map(this::toRecordingInfo)
                 .filter(this::isRecordedOrReady)

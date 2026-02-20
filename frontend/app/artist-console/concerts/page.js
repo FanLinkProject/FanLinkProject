@@ -10,8 +10,10 @@ import Button from "@/components/ui/Button";
 const CONCERTS_API = "http://localhost:8080/api/concerts";
 
 function getAuthHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-  const bearer = token && (token.startsWith("Bearer ") ? token : `Bearer ${token.trim()}`);
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  const bearer =
+    token && (token.startsWith("Bearer ") ? token : `Bearer ${token.trim()}`);
   return {
     "Content-Type": "application/json",
     ...(bearer && { Authorization: bearer }),
@@ -22,6 +24,7 @@ export default function ArtistConcertsPage() {
   const [concerts, setConcerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchConcerts();
@@ -34,19 +37,31 @@ export default function ArtistConcertsPage() {
       const res = await axios.get(CONCERTS_API, { headers: getAuthHeaders() });
       setConcerts(res.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || "공연 목록을 불러오는데 실패했습니다.");
+      setError(
+        err.response?.data?.message || "공연 목록을 불러오는데 실패했습니다.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (concertId) => {
+    if (concertId == null || concertId === "") return;
     if (!confirm("정말 이 공연을 삭제하시겠습니까?")) return;
+    setDeletingId(concertId);
     try {
-      await axios.delete(`${CONCERTS_API}/${id}`, { headers: getAuthHeaders() });
-      await fetchConcerts();
+      await axios.delete(`${CONCERTS_API}/${concertId}`, {
+        headers: getAuthHeaders(),
+      });
+      setConcerts((prev) =>
+        prev.filter((c) => String(c.id) !== String(concertId)),
+      );
     } catch (err) {
-      alert(err.response?.data?.message || "삭제에 실패했습니다.");
+      const message = err.response?.data?.message || "삭제에 실패했습니다.";
+      alert(message);
+      await fetchConcerts();
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -75,9 +90,14 @@ export default function ArtistConcertsPage() {
       <header className="flex items-center justify-between">
         <div>
           <SectionTitle className="text-2xl font-bold">공연 관리</SectionTitle>
-          <p className="text-sm text-white/55 font-medium mt-1">공연 정보를 관리하고 예매 일정을 설정합니다.</p>
+          <p className="text-sm text-white/55 font-medium mt-1">
+            공연 정보를 관리하고 예매 일정을 설정합니다.
+          </p>
         </div>
-        <Button variant="primary" href="/artist-console/concerts/new" className="text-xs uppercase tracking-widest">
+        <Button
+          variant="primary"
+          href="/artist-console/concerts/new"
+          className="text-xs uppercase tracking-widest">
           <span className="material-symbols-outlined text-sm mr-1.5">add</span>
           새 공연 등록
         </Button>
@@ -92,60 +112,86 @@ export default function ArtistConcertsPage() {
       <div className="space-y-4">
         {concerts.length === 0 ? (
           <Surface variant="primary" className="p-12 text-center">
-            <p className="text-white/55 font-medium mb-4">등록된 공연이 없습니다.</p>
-            <Button variant="primary" href="/artist-console/concerts/new" className="text-xs uppercase tracking-widest">
+            <p className="text-white/55 font-medium mb-4">
+              등록된 공연이 없습니다.
+            </p>
+            <Button
+              variant="primary"
+              href="/artist-console/concerts/new"
+              className="text-xs uppercase tracking-widest">
               첫 공연 등록하기
             </Button>
           </Surface>
         ) : (
           concerts.map((concert) => (
-            <Surface key={concert.id} variant="primary" className="p-8 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-shadow">
+            <Surface
+              key={concert.id}
+              variant="primary"
+              className="p-8 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-shadow">
               <div className="flex items-start justify-between gap-6">
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-4">
-{(concert.posterImageUrl || concert.concertImageUrl) && (
-                        <img
-                          src={concert.posterImageUrl || concert.concertImageUrl}
+                    {(concert.posterImageUrl || concert.concertImageUrl) && (
+                      <img
+                        src={concert.posterImageUrl || concert.concertImageUrl}
                         className="size-24 rounded-xl object-cover border border-white/[0.08]"
                         alt=""
                       />
                     )}
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white mb-2">{concert.title}</h3>
-                      <p className="text-sm text-white/70 mb-3 line-clamp-2">{concert.description}</p>
+                      <h3 className="text-xl font-bold text-white mb-2">
+                        {concert.title}
+                      </h3>
+                      <p className="text-sm text-white/70 mb-3 line-clamp-2">
+                        {concert.description}
+                      </p>
                       <div className="flex flex-wrap gap-4 text-xs text-white/55">
                         <span>
-                          <span className="font-bold">장소:</span> {concert.venueName}
+                          <span className="font-bold">장소:</span>{" "}
+                          {concert.venueName}
                         </span>
                         <span>
-                          <span className="font-bold">시작:</span> {formatDateTime(concert.startDateTime)}
+                          <span className="font-bold">시작:</span>{" "}
+                          {formatDateTime(concert.startDateTime)}
                         </span>
                         <span>
-                          <span className="font-bold">종료:</span> {formatDateTime(concert.endDateTime)}
+                          <span className="font-bold">종료:</span>{" "}
+                          {formatDateTime(concert.endDateTime)}
                         </span>
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-4 text-xs text-white/55 mt-4">
                     <span>
-                      선예매: {concert.presaleTicketCount}장 ({formatDateTime(concert.presaleStartDateTime)} ~ {formatDateTime(concert.presaleEndDateTime)})
+                      선예매: {concert.presaleTicketCount}장 (
+                      {formatDateTime(concert.presaleStartDateTime)} ~{" "}
+                      {formatDateTime(concert.presaleEndDateTime)})
                     </span>
                     <span>
-                      일반 예매: {concert.saleTicketCount}장 ({formatDateTime(concert.saleStartDateTime)} ~ {formatDateTime(concert.saleEndDateTime)})
+                      일반 예매: {concert.saleTicketCount}장 (
+                      {formatDateTime(concert.saleStartDateTime)} ~{" "}
+                      {formatDateTime(concert.saleEndDateTime)})
                     </span>
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Button variant="ghost" href={`/artist-console/concerts/${concert.id}/edit`} className="px-4 py-2 text-[10px] uppercase tracking-widest">
+                  <Button
+                    variant="ghost"
+                    href={`/artist-console/concerts/${concert.id}/edit`}
+                    className="px-4 py-2 text-xs uppercase tracking-widest">
                     수정
                   </Button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(concert.id)}
-                    className="px-4 py-2 bg-red-500/15 text-red-400/90 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/25 transition-colors"
-                  >
-                    삭제
-                  </button>
+                  <Button
+                    variant="danger"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDelete(concert.id);
+                    }}
+                    disabled={deletingId === concert.id}
+                    className="px-4 py-2 text-xs uppercase tracking-widest">
+                    {deletingId === concert.id ? "삭제 중..." : "삭제"}
+                  </Button>
                 </div>
               </div>
             </Surface>

@@ -2,6 +2,10 @@ server:
   port: 8080
 
 spring:
+  mvc:
+    # SSE 등 async 요청 타임아웃: 0 = 무제한 (AsyncRequestTimeoutException 완화)
+    async:
+      request-timeout: 0
   datasource:
     # 한글 깨짐 방지
     # - characterEncoding은 "utf8mb4"가 아니라 자바 charset 이름인 "UTF-8"을 써야 합니다.
