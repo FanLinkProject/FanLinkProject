@@ -1,12 +1,11 @@
-name: Deploy Backend (dev)
+name: deploy-dev-backend
 
 on:
   push:
-    branches: ["dev"]
+    branches: [ "dev" ]
     paths:
       - "backend/**"
       - ".github/workflows/deploy-dev.yml"
-  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -15,11 +14,9 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   ROLE_TO_ASSUME: arn:aws:iam::058264188049:role/fanlink-github-actions-deploy-role
-  ECR_REPO: fanlink-backend
   EC2_INSTANCE_ID: i-014bd83d14bf502d9
-
-  # dev 환경 envfile 파라미터 경로
-  SSM_ENV_PARAM: /fanlink/dev/backend/envfile
+  ECR_REPO: fanlink-backend
+  SSM_ENV_PARAM: /fanlink/prod/backend/envfile
 
 jobs:
   deploy:
@@ -29,67 +26,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Resolve ECR URI + IMAGE_TAG
-        id: vars
-        run: |
-          set -euo pipefail
-          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-          echo "account_id=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
-          echo "ecr_uri=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
       - name: Login to ECR
+        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Check if image tag already exists (ECR immutable tag 대응)
-        id: ecr_check
+      - name: Build & Push backend image (tag = GITHUB_SHA)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ github.sha }}
+
+      - name: Deploy to EC2 via SSM (run deploy.sh <SHA>)
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
-          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
-          set +e
-          aws ecr describe-images \
-            --region "${AWS_REGION}" \
-            --repository-name "${ECR_REPO}" \
-            --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1
-          RC=$?
-          set -e
-          if [[ $RC -eq 0 ]]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "[INFO] ECR tag exists -> skip build/push"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "[INFO] ECR tag not found -> will build/push"
-          fi
 
-      - name: Build & Push backend image (tag=GITHUB_SHA)
-        if: steps.ecr_check.outputs.exists != 'true'
-        run: |
+          # SSM에 보낼 "원격 실행 스크립트" (bash -lc 로 강제)
+          # - SSM은 기본이 /bin/sh라서 pipefail 같은 옵션은 bash에서만 의미 있음
+          # - JSON 형태로 parameters를 넘겨서 quoting 지옥을 피함
+          REMOTE_CMD=$(cat <<'EOF'
           set -euo pipefail
-          ECR_URI="${{ steps.vars.outputs.ecr_uri }}"
-          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
+          cd /opt/fanlink
+          export SSM_ENV_PARAM="__SSM_ENV_PARAM__"
+          sudo ./deploy.sh "__IMAGE_TAG__"
+          EOF
+          )
 
-          docker build \
-            -f backend/Dockerfile \
-            -t "${ECR_URI}:${IMAGE_TAG}" \
-            backend
+          # 토큰 치환(로컬에서만)
+          REMOTE_CMD="${REMOTE_CMD/__SSM_ENV_PARAM__/${SSM_ENV_PARAM}}"
+          REMOTE_CMD="${REMOTE_CMD/__IMAGE_TAG__/${IMAGE_TAG}}"
 
-          docker push "${ECR_URI}:${IMAGE_TAG}"
+          # bash -lc 로 감싸서 실행
+          JSON_PARAMS=$(python3 - <<PY
+import json, os
+cmd = os.environ["REMOTE_CMD"]
+payload = {"commands": [f"bash -lc {json.dumps(cmd)}"]}
+print(json.dumps(payload))
+PY
+          )
 
-      - name: Deploy on EC2 via SSM (run /opt/fanlink/deploy.sh)
-        run: |
-          set -euo pipefail
-          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
-
-          PARAM_JSON="$(cat <<JSON
-          {"commands":["sudo -E SSM_ENV_PARAM=${SSM_ENV_PARAM} AWS_REGION=${AWS_REGION} /opt/fanlink/deploy.sh ${IMAGE_TAG}"]}
-          JSON
-          )"
+          export REMOTE_CMD
 
           COMMAND_ID="$(
             aws ssm send-command \
@@ -97,7 +83,7 @@ jobs:
               --instance-ids "${EC2_INSTANCE_ID}" \
               --document-name "AWS-RunShellScript" \
               --comment "fanlink dev deploy backend ${IMAGE_TAG}" \
-              --parameters "${PARAM_JSON}" \
+              --parameters "${JSON_PARAMS}" \
               --query "Command.CommandId" --output text
           )"
 
