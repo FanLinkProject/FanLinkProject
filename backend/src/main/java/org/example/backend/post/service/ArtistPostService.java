@@ -187,12 +187,6 @@ public class ArtistPostService {
     public ArtistPostResponse updatePost(Long userId, Long postId, ArtistPostRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new PostException(PostErrorCode.USER_NOT_FOUND));
-        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
-            // 그룹 소속 ARTIST: isWriter 체크로 위임
-            if (user.getRole() != UserRole.ARTIST) {
-                throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
-            }
-        }
 
         ArtistPost artistPost = artistPostRepository.findById(postId)
                 .orElseThrow(() -> new PostException(PostErrorCode.POST_NOT_FOUND));
