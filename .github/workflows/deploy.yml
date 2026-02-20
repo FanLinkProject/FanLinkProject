@@ -1,113 +1,65 @@
-name: deploy-dev-backend
+name: Deploy Backend (dev)
 
 on:
   push:
-    branches: [ "dev" ]
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-dev.yml"
+    branches: ["dev"]
 
 permissions:
   id-token: write
   contents: read
 
-env:
-  AWS_REGION: ap-northeast-2
-  ROLE_TO_ASSUME: arn:aws:iam::058264188049:role/fanlink-github-actions-deploy-role
-  EC2_INSTANCE_ID: i-014bd83d14bf502d9
-  ECR_REPO: fanlink-backend
-  SSM_ENV_PARAM: /fanlink/prod/backend/envfile
+concurrency:
+  group: deploy-backend-dev
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build-push-deploy:
     runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      APP_DIR: ${{ secrets.APP_DIR }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS (OIDC)
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: fanlink-deploy-dev
 
       - name: Login to ECR
-        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & Push backend image (tag = GITHUB_SHA)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push backend image (tag=GITHUB_SHA)
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
+          file: backend/Dockerfile
           push: true
-          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ github.sha }}
+          tags: |
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Deploy to EC2 via SSM (run deploy.sh <SHA>)
-        shell: bash
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+      - name: Setup SSH key
         run: |
-          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${EC2_HOST}" >> ~/.ssh/known_hosts
 
-          # SSM에 보낼 "원격 실행 스크립트" (bash -lc 로 강제)
-          # - SSM은 기본이 /bin/sh라서 pipefail 같은 옵션은 bash에서만 의미 있음
-          # - JSON 형태로 parameters를 넘겨서 quoting 지옥을 피함
-          REMOTE_CMD=$(cat <<'EOF'
-          set -euo pipefail
-          cd /opt/fanlink
-          export SSM_ENV_PARAM="__SSM_ENV_PARAM__"
-          sudo ./deploy.sh "__IMAGE_TAG__"
-          EOF
-          )
-
-          # 토큰 치환(로컬에서만)
-          REMOTE_CMD="${REMOTE_CMD/__SSM_ENV_PARAM__/${SSM_ENV_PARAM}}"
-          REMOTE_CMD="${REMOTE_CMD/__IMAGE_TAG__/${IMAGE_TAG}}"
-
-          # bash -lc 로 감싸서 실행
-          JSON_PARAMS=$(python3 - <<PY
-import json, os
-cmd = os.environ["REMOTE_CMD"]
-payload = {"commands": [f"bash -lc {json.dumps(cmd)}"]}
-print(json.dumps(payload))
-PY
-          )
-
-          export REMOTE_CMD
-
-          COMMAND_ID="$(
-            aws ssm send-command \
-              --region "${AWS_REGION}" \
-              --instance-ids "${EC2_INSTANCE_ID}" \
-              --document-name "AWS-RunShellScript" \
-              --comment "fanlink dev deploy backend ${IMAGE_TAG}" \
-              --parameters "${JSON_PARAMS}" \
-              --query "Command.CommandId" --output text
-          )"
-
-          echo "SSM CommandId=${COMMAND_ID}"
-
-          aws ssm wait command-executed \
-            --region "${AWS_REGION}" \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}"
-
-          aws ssm get-command-invocation \
-            --region "${AWS_REGION}" \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}" \
-            --query "{Status:Status,ResponseCode:ResponseCode,Stdout:StandardOutputContent,Stderr:StandardErrorContent}" \
-            --output json
-
-          STATUS="$(aws ssm get-command-invocation \
-            --region "${AWS_REGION}" \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}" \
-            --query "Status" --output text)"
-
-          if [[ "${STATUS}" != "Success" ]]; then
-            echo "[ERROR] SSM command failed: ${STATUS}"
-            exit 1
-          fi
+      - name: Deploy on EC2 (run deploy.sh)
+        run: |
+          ssh -i ~/.ssh/id_rsa "${EC2_USER}@${EC2_HOST}" \
+            "bash ${APP_DIR}/deploy.sh '${{ github.sha }}'"
