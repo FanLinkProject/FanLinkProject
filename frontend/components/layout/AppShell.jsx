@@ -37,7 +37,8 @@ function getNavbarVariant(pathname, role) {
   if (
     pathname === "/home" ||
     pathname === "/mypage" ||
-    pathname === "/notifications"
+    pathname === "/notifications" ||
+    pathname.startsWith("/posts")
   ) {
     if (role === "ROLE_ADMIN") return "admin";
     if (role === "ROLE_GROUP") return "group";
@@ -61,7 +62,8 @@ function getSidebarVariant(pathname, role) {
   if (
     pathname === "/home" ||
     pathname === "/mypage" ||
-    pathname === "/notifications"
+    pathname === "/notifications" ||
+    pathname.startsWith("/posts")
   ) {
     if (role === "ROLE_ADMIN") return "admin";
     if (role === "ROLE_GROUP") return "group";
