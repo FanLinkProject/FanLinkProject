@@ -2,6 +2,7 @@ package org.example.backend.global.config;
 
 import static org.apache.tomcat.util.http.Method.*;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
@@ -91,8 +92,13 @@ public class SecurityConfig {
 					"/ws-chat/**",
 					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
                 ).permitAll()
-				.requestMatchers(GET, "/api/live-sessions/*/access").authenticated()
+                    .requestMatchers(GET, "/api/live-sessions/*/access").authenticated()
 				.requestMatchers(GET, "/api/live-sessions/**").permitAll()
+                    // SSE: ASYNC 재디스패치 시 인가 재검사로 AccessDenied + response committed 방지
+                    .requestMatchers(req -> req.getDispatcherType() == DispatcherType.ASYNC
+                            && req.getRequestURI() != null
+                            && req.getRequestURI().startsWith("/api/notifications/subscribe"))
+                    .permitAll()
 
                     // 관리자
                     .requestMatchers("/api/admin/**")
