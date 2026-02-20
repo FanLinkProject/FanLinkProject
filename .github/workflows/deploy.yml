@@ -1,13 +1,12 @@
-name: Deploy backend to EC2 (SSM + Docker Compose)
+name: Deploy Backend (dev)
 
 on:
   push:
-    branches: [ "dev" ]
+    branches: ["dev"]
     paths:
       - "backend/**"
-      - ".github/workflows/deploy.yml"
-      - "Dockerfile"
-  workflow_dispatch:
+      - ".github/workflows/deploy-dev.yml"
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -16,10 +15,11 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   ROLE_TO_ASSUME: arn:aws:iam::058264188049:role/fanlink-github-actions-deploy-role
-  EC2_INSTANCE_ID: i-014bd83d14bf502d9
-  ECR_URI: 058264188049.dkr.ecr.ap-northeast-2.amazonaws.com/fanlink-backend
   ECR_REPO: fanlink-backend
-  SSM_ENV_PARAM: /fanlink/prod/backend/envfile
+  EC2_INSTANCE_ID: i-014bd83d14bf502d9
+
+  # dev 환경 envfile 파라미터 경로
+  SSM_ENV_PARAM: /fanlink/dev/backend/envfile
 
 jobs:
   deploy:
@@ -35,38 +35,69 @@ jobs:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Resolve ECR URI + IMAGE_TAG
+        id: vars
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          echo "account_id=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "ecr_uri=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & Push backend image (tag=GITHUB_SHA)
-        working-directory: backend
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-          ECR_URI: ${{ env.ECR_URI }}
+      - name: Check if image tag already exists (ECR immutable tag 대응)
+        id: ecr_check
         run: |
           set -euo pipefail
-          docker build -t "${ECR_URI}:${IMAGE_TAG}" .
+          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
+          set +e
+          aws ecr describe-images \
+            --region "${AWS_REGION}" \
+            --repository-name "${ECR_REPO}" \
+            --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1
+          RC=$?
+          set -e
+          if [[ $RC -eq 0 ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "[INFO] ECR tag exists -> skip build/push"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "[INFO] ECR tag not found -> will build/push"
+          fi
+
+      - name: Build & Push backend image (tag=GITHUB_SHA)
+        if: steps.ecr_check.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          ECR_URI="${{ steps.vars.outputs.ecr_uri }}"
+          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
+
+          docker build \
+            -f backend/Dockerfile \
+            -t "${ECR_URI}:${IMAGE_TAG}" \
+            backend
+
           docker push "${ECR_URI}:${IMAGE_TAG}"
 
-      - name: Deploy on EC2 via SSM (run /opt/fanlink/deploy.sh <tag>)
-        env:
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Deploy on EC2 via SSM (run /opt/fanlink/deploy.sh)
         run: |
           set -euo pipefail
+          IMAGE_TAG="${{ steps.vars.outputs.image_tag }}"
 
-          # NOTE: SSM runs via /bin/sh by default -> do NOT use "set -o pipefail" inside remote script.
-          # We explicitly run "bash -lc" on the instance to guarantee bash.
+          PARAM_JSON="$(cat <<JSON
+          {"commands":["sudo -E SSM_ENV_PARAM=${SSM_ENV_PARAM} AWS_REGION=${AWS_REGION} /opt/fanlink/deploy.sh ${IMAGE_TAG}"]}
+          JSON
+          )"
+
           COMMAND_ID="$(
             aws ssm send-command \
               --region "${AWS_REGION}" \
               --instance-ids "${EC2_INSTANCE_ID}" \
               --document-name "AWS-RunShellScript" \
-              --comment "fanlink deploy backend ${IMAGE_TAG}" \
-              --parameters commands="bash -lc '
-                set -euo pipefail
-                cd /opt/fanlink
-                sudo ./deploy.sh ${IMAGE_TAG}
-              '" \
+              --comment "fanlink dev deploy backend ${IMAGE_TAG}" \
+              --parameters "${PARAM_JSON}" \
               --query "Command.CommandId" --output text
           )"
 
