@@ -2,7 +2,6 @@ package org.example.backend.replay.event;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.replay.config.MediaConvertProperties;
 import org.example.backend.replay.entity.Replay;
@@ -25,18 +24,29 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "mediaconvert.events", name = "enabled", havingValue = "true")
 public class MediaConvertEventListener {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
-    @Qualifier("mediaConvertSqsClient")
     private final SqsClient sqsClient;
     private final MediaConvertProperties properties;
     private final ReplayRepository replayRepository;
     private final MediaConvertJobService jobService;
     private final ObjectMapper objectMapper;
+
+    public MediaConvertEventListener(
+            @Qualifier("mediaConvertSqsClient") SqsClient sqsClient,
+            MediaConvertProperties properties,
+            ReplayRepository replayRepository,
+            MediaConvertJobService jobService,
+            ObjectMapper objectMapper) {
+        this.sqsClient = sqsClient;
+        this.properties = properties;
+        this.replayRepository = replayRepository;
+        this.jobService = jobService;
+        this.objectMapper = objectMapper;
+    }
 
     // MediaConvert 완료 이벤트 SQS를 폴링한다.
     @Scheduled(fixedDelayString = "${mediaconvert.events.poll-fixed-delay-ms:5000}")
