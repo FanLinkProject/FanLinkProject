@@ -1,9 +1,13 @@
-name: deploy-dev
+name: Deploy backend to EC2 (SSM + Docker Compose)
 
 on:
   push:
-    branches: ["dev"]
-  workflow_dispatch: {}
+    branches: [ "dev" ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy.yml"
+      - "Dockerfile"
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -12,97 +16,77 @@ permissions:
 env:
   AWS_REGION: ap-northeast-2
   ROLE_TO_ASSUME: arn:aws:iam::058264188049:role/fanlink-github-actions-deploy-role
-  ECR_REPO: fanlink-backend
   EC2_INSTANCE_ID: i-014bd83d14bf502d9
+  ECR_URI: 058264188049.dkr.ecr.ap-northeast-2.amazonaws.com/fanlink-backend
+  ECR_REPO: fanlink-backend
+  SSM_ENV_PARAM: /fanlink/prod/backend/envfile
 
 jobs:
-  build_and_deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Resolve ECR URI + Tag
-        id: ecr
-        shell: bash
-        run: |
-          set -euo pipefail
-          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-          echo "ECR_URI=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> "$GITHUB_ENV"
-          echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
-
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Immutable 태그면 같은 SHA 재푸시가 막히므로, 이미 있으면 스킵
-      - name: Build & Push backend image (tag=GITHUB_SHA, skip if exists)
-        shell: bash
+      - name: Build & Push backend image (tag=GITHUB_SHA)
+        working-directory: backend
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          ECR_URI: ${{ env.ECR_URI }}
         run: |
           set -euo pipefail
-          echo "[INFO] ECR_URI=${ECR_URI}"
-          echo "[INFO] IMAGE_TAG=${IMAGE_TAG}"
-
-          if aws ecr describe-images \
-              --region "${AWS_REGION}" \
-              --repository-name "${ECR_REPO}" \
-              --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
-            echo "[INFO] Image already exists. Skip build/push."
-            exit 0
-          fi
-
-          docker build -t "${ECR_URI}:${IMAGE_TAG}" ./backend
+          docker build -t "${ECR_URI}:${IMAGE_TAG}" .
           docker push "${ECR_URI}:${IMAGE_TAG}"
 
-      - name: Deploy on EC2 via SSM RunCommand
-        id: ssm
-        shell: bash
+      - name: Deploy on EC2 via SSM (run /opt/fanlink/deploy.sh <tag>)
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-          echo "[INFO] Deploy IMAGE_TAG=${IMAGE_TAG} to EC2=${EC2_INSTANCE_ID}"
 
-          CMD_ID="$(aws ssm send-command \
-            --region "${AWS_REGION}" \
-            --instance-ids "${EC2_INSTANCE_ID}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "FanLink deploy(dev) ${IMAGE_TAG}" \
-            --parameters commands="[
-              \"sudo bash -lc '/opt/fanlink/deploy.sh ${IMAGE_TAG}'\"
-            ]" \
-            --query "Command.CommandId" \
-            --output text)"
+          # NOTE: SSM runs via /bin/sh by default -> do NOT use "set -o pipefail" inside remote script.
+          # We explicitly run "bash -lc" on the instance to guarantee bash.
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --region "${AWS_REGION}" \
+              --instance-ids "${EC2_INSTANCE_ID}" \
+              --document-name "AWS-RunShellScript" \
+              --comment "fanlink deploy backend ${IMAGE_TAG}" \
+              --parameters commands="bash -lc '
+                set -euo pipefail
+                cd /opt/fanlink
+                sudo ./deploy.sh ${IMAGE_TAG}
+              '" \
+              --query "Command.CommandId" --output text
+          )"
 
-          echo "command_id=${CMD_ID}" >> "$GITHUB_OUTPUT"
-          echo "[INFO] SSM CommandId=${CMD_ID}"
-
-      # ✅ 실패해도 stdout/stderr 무조건 출력
-      - name: Fetch SSM Result (always print stdout/stderr)
-        shell: bash
-        run: |
-          set -euo pipefail
-          CMD_ID="${{ steps.ssm.outputs.command_id }}"
+          echo "SSM CommandId=${COMMAND_ID}"
 
           aws ssm wait command-executed \
             --region "${AWS_REGION}" \
-            --command-id "${CMD_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}" || true
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${EC2_INSTANCE_ID}"
 
           aws ssm get-command-invocation \
             --region "${AWS_REGION}" \
-            --command-id "${CMD_ID}" \
+            --command-id "${COMMAND_ID}" \
             --instance-id "${EC2_INSTANCE_ID}" \
             --query "{Status:Status,ResponseCode:ResponseCode,Stdout:StandardOutputContent,Stderr:StandardErrorContent}" \
             --output json
 
           STATUS="$(aws ssm get-command-invocation \
             --region "${AWS_REGION}" \
-            --command-id "${CMD_ID}" \
+            --command-id "${COMMAND_ID}" \
             --instance-id "${EC2_INSTANCE_ID}" \
             --query "Status" --output text)"
 
