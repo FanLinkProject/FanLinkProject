@@ -1,6 +1,6 @@
 package org.example.backend.live_session.dto.response;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 import org.example.backend.live_session.enums.LiveSessionStatus;
 
@@ -40,5 +40,5 @@ public class LiveSessionCreateResponse {
 	private String channelArn;
 	private Boolean isPaid;
 	private LiveSessionStatus status;
-	private OffsetDateTime startedAt;
+	private Instant startedAt;
 }
