@@ -1,47 +1,101 @@
-name: deploy-backend-dev
+name: deploy-dev
 
 on:
   push:
     branches: ["dev"]
+  workflow_dispatch: {}
 
 permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: ap-northeast-2
+  ROLE_TO_ASSUME: arn:aws:iam::058264188049:role/fanlink-github-actions-deploy-role
+  ECR_REPO: fanlink-backend
+  EC2_INSTANCE_ID: i-014bd83d14bf502d9
+
 jobs:
-  deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.GHA_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ env.ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve ECR URI
+        id: ecr
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          echo "account_id=${ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "ecr_uri=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> "$GITHUB_OUTPUT"
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & Push backend image (tag = GITHUB_SHA)
+      # immutable tag면 같은 SHA 재푸시가 막히므로 "이미 있으면 스킵"이 실무적으로 안전
+      - name: Build & Push backend image (tag=GITHUB_SHA, skip if exists)
+        shell: bash
         env:
-          ECR_URI: ${{ secrets.ECR_URI }}
+          ECR_URI: ${{ steps.ecr.outputs.ecr_uri }}
         run: |
           set -euo pipefail
           IMAGE_TAG="${GITHUB_SHA}"
+
+          if aws ecr describe-images \
+              --region "${AWS_REGION}" \
+              --repository-name "${ECR_REPO}" \
+              --image-ids imageTag="${IMAGE_TAG}" >/dev/null 2>&1; then
+            echo "Image ${ECR_URI}:${IMAGE_TAG} already exists. Skip build/push."
+            exit 0
+          fi
+
           docker build -t "${ECR_URI}:${IMAGE_TAG}" ./backend
           docker push "${ECR_URI}:${IMAGE_TAG}"
 
       - name: Deploy on EC2 via SSM RunCommand
-        env:
-          EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+        id: ssm
+        shell: bash
         run: |
           set -euo pipefail
-          aws ssm send-command \
+          IMAGE_TAG="${GITHUB_SHA}"
+
+          CMD_ID="$(aws ssm send-command \
+            --region "${AWS_REGION}" \
             --instance-ids "${EC2_INSTANCE_ID}" \
             --document-name "AWS-RunShellScript" \
-            --comment "Deploy backend dev ${GITHUB_SHA}" \
-            --parameters '{"commands":["cd /opt/fanlink && ./deploy.sh '"${GITHUB_SHA}"'"]}' \
-            --region "${{ secrets.AWS_REGION }}"
+            --comment "FanLink deploy (dev) ${IMAGE_TAG}" \
+            --parameters commands="[
+              \"set -euo pipefail\",
+              \"sudo bash -lc '/opt/fanlink/deploy.sh ${IMAGE_TAG}'\"
+            ]" \
+            --query "Command.CommandId" \
+            --output text)"
+
+          echo "command_id=${CMD_ID}" >> "$GITHUB_OUTPUT"
+          echo "SSM CommandId=${CMD_ID}"
+
+      - name: Wait & Fetch SSM Result
+        shell: bash
+        run: |
+          set -euo pipefail
+          CMD_ID="${{ steps.ssm.outputs.command_id }}"
+          aws ssm wait command-executed \
+            --region "${AWS_REGION}" \
+            --command-id "${CMD_ID}" \
+            --instance-id "${EC2_INSTANCE_ID}"
+
+          aws ssm get-command-invocation \
+            --region "${AWS_REGION}" \
+            --command-id "${CMD_ID}" \
+            --instance-id "${EC2_INSTANCE_ID}" \
+            --query "{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}" \
+            --output json
