@@ -1,0 +1,47 @@
+name: deploy-backend-dev
+
+on:
+  push:
+    branches: ["dev"]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.GHA_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push backend image (tag = GITHUB_SHA)
+        env:
+          ECR_URI: ${{ secrets.ECR_URI }}
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="${GITHUB_SHA}"
+          docker build -t "${ECR_URI}:${IMAGE_TAG}" ./backend
+          docker push "${ECR_URI}:${IMAGE_TAG}"
+
+      - name: Deploy on EC2 via SSM RunCommand
+        env:
+          EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+          aws ssm send-command \
+            --instance-ids "${EC2_INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy backend dev ${GITHUB_SHA}" \
+            --parameters '{"commands":["cd /opt/fanlink && ./deploy.sh '"${GITHUB_SHA}"'"]}' \
+            --region "${{ secrets.AWS_REGION }}"
