@@ -55,12 +55,14 @@ export default function LoginPage() {
       if (data.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
+      // 현재 로그인한 계정 이메일을 저장해 메인 홈 등에서 식별에 사용
+      localStorage.setItem("userEmail", email);
       let role = "FAN";
       if (email.startsWith("artist")) role = "ARTIST";
       if (email.startsWith("group")) role = "GROUP";
       if (email.startsWith("admin")) role = "ADMIN";
-      if (role === "ARTIST") router.push("/artist-console");
-      else if (role === "GROUP") router.push("/artist-console/dashboard");
+      if (role === "ARTIST") router.push("/home");
+      else if (role === "GROUP") router.push("/home");
       else if (role === "ADMIN") router.push("/admin");
       else router.push("/home");
     } catch (err) {

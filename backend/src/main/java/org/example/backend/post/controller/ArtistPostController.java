@@ -53,6 +53,19 @@ public class ArtistPostController {
         return ResponseEntity.ok(responses);
     }
 
+    @GetMapping("/my-posts")
+    public ResponseEntity<List<ArtistPostResponse>> getMyPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @AuthenticationPrincipal PrincipalDetails principalDetails) {
+        if (principalDetails == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        List<ArtistPostResponse> responses = artistPostService.getMyPosts(principalDetails.getUser(), pageable);
+        return ResponseEntity.ok(responses);
+    }
+
     @GetMapping("/my")
     public ResponseEntity<List<ArtistPostResponse>> getMyPosts(
             @RequestParam(required = false) Long lastPostId,

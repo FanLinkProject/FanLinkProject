@@ -674,7 +674,7 @@ function PostDetailContent({ id }) {
   if (!post) return null;
 
   const backHref = fromArtistConsole
-    ? "/artist-console"
+    ? "/home"
     : backArtistId
     ? `/artists/${backArtistId}${type === "FAN" ? "?tab=FAN" : ""}`
     : "/";
@@ -688,7 +688,7 @@ function PostDetailContent({ id }) {
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           {fromArtistConsole
-            ? "아티스트 콘솔로 돌아가기"
+            ? "아티스트 홈으로 돌아가기"
             : type === "FAN"
             ? "팬 페이지로 돌아가기"
             : "아티스트 페이지로 돌아가기"}

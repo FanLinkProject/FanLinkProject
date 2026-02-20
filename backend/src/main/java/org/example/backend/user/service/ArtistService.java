@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.repository.ArtistPostRepository;
+import org.example.backend.user.dto.request.ArtistProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistHomeResponse;
 import org.example.backend.user.dto.response.ArtistMyPageResponse;
 import org.example.backend.user.entity.GroupMember;
@@ -12,6 +13,7 @@ import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
+import org.example.backend.user.repository.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class ArtistService {
     private final FollowRepository followRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ArtistPostRepository artistPostRepository;
+    private final UserRepository userRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -144,6 +147,36 @@ public class ArtistService {
                 teamInfo,
                 security,
                 settlementSummary
+        );
+    }
+
+    /** 아티스트(그룹 포함) 프로필 수정 - 소개, 프로필 이미지, 배너, 공식 링크 */
+    public ArtistMyPageResponse.Profile updateArtistProfile(User artistOrGroup, ArtistProfileUpdateRequest request) {
+        if (artistOrGroup.getRole() != UserRole.ARTIST && artistOrGroup.getRole() != UserRole.GROUP) {
+            throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
+        }
+        User user = userRepository.findById(artistOrGroup.getId())
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+        if (request.bio() != null) {
+            user.setBio(request.bio());
+        }
+        if (request.profileImageUrl() != null) {
+            user.setProfileImageUrl(request.profileImageUrl());
+        }
+        if (request.bannerImageUrl() != null) {
+            user.setBannerImageUrl(request.bannerImageUrl());
+        }
+        if (request.officialLinks() != null) {
+            user.setOfficialLinks(request.officialLinks());
+        }
+        User saved = userRepository.save(user);
+        return new ArtistMyPageResponse.Profile(
+                saved.getId(),
+                saved.getNickname(),
+                saved.getProfileImageUrl(),
+                saved.getBannerImageUrl(),
+                saved.getBio(),
+                saved.getOfficialLinks()
         );
     }
 

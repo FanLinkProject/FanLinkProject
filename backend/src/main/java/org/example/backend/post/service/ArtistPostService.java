@@ -183,6 +183,16 @@ public class ArtistPostService {
                 .collect(Collectors.toList());
     }
 
+    /** 본인이 작성한 게시글 목록 (관리용, 삭제되지 않은 것만) */
+    public List<ArtistPostResponse> getMyPosts(User user, Pageable pageable) {
+        return artistPostRepository.findByUserAndStatusOrderByCreatedAtDesc(user, false, pageable)
+                .getContent()
+                .stream()
+                .map(post -> ArtistPostResponse.from(post,
+                        buildAttachmentResponses(postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()))))
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ArtistPostResponse updatePost(Long userId, Long postId, ArtistPostRequest request) {
         User user = userRepository.findById(userId)

@@ -104,7 +104,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                 
-                // 아티스트, 관리자
+                // 아티스트, 그룹, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
 

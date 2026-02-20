@@ -12,6 +12,7 @@ import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
 import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 
 const CANDY_COST = 500;
 const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
@@ -645,7 +646,11 @@ function ArtistDetailPageInner({ id }) {
         <div className="flex flex-col min-h-full relative">
             {/* 커버 */}
             <div className="h-56 w-full relative overflow-hidden shrink-0">
-                <img src={artist.cover} className="w-full h-full object-cover" alt="" />
+                {artist.cover ? (
+                    <img src={artist.cover} className="w-full h-full object-cover" alt="" />
+                ) : (
+                    <div className="w-full h-full bg-[#201a33]" />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
             </div>
 
@@ -658,7 +663,7 @@ function ArtistDetailPageInner({ id }) {
                     <div className="flex items-end gap-6">
                         <div className="rounded-2xl border-2 border-white/[0.08] shadow-[0_8px_24px_rgba(0,0,0,0.4)] -mt-20 overflow-hidden bg-[#201a33]">
                             <img
-                                src={artist.avatar}
+                                src={artist.avatar || getDefaultAvatarUrl(artist?.name)}
                                 className="size-32 rounded-2xl object-cover w-full h-full"
                                 alt=""
                             />

@@ -1,9 +1,43 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import axios from "axios";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
+import { redirectToGuestHome } from "@/lib/authRedirect";
+import { settlementApi } from "@/lib/settlementApi";
+
+const BASE_URL = "http://localhost:8080";
+
+function getAuthHeaders() {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("accessToken");
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
+  return pure ? { Authorization: `Bearer ${pure}` } : {};
+}
+
+function formatCount(n, suffix = "") {
+  const v = Number(n || 0);
+  return `${v.toLocaleString("ko-KR")}${suffix}`;
+}
+
+function formatKRW(n) {
+  const v = Number(n || 0);
+  return `${v.toLocaleString("ko-KR")}원`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
 
 function KPIBox({ label, value, icon, color }) {
   return (
@@ -18,6 +52,58 @@ function KPIBox({ label, value, icon, color }) {
 }
 
 export default function AdminDashboardPage() {
+  const [kpi, setKpi] = useState({
+    totalUsers: 0,
+    activeArtists: 0,
+    pendingReports: 0,
+    pendingSettlements: 0,
+  });
+  const [kpiLoading, setKpiLoading] = useState(true);
+  const [recentSettlements, setRecentSettlements] = useState([]);
+
+  useEffect(() => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) {
+      redirectToGuestHome();
+      return;
+    }
+
+    setKpiLoading(true);
+    Promise.all([
+      axios.get(`${BASE_URL}/api/admin/home`, { headers }),
+      settlementApi.getAdminSummaries(),
+      settlementApi.getAdminHistory({ page: "0", size: "3", sort: "settledAt,desc" }),
+    ])
+      .then(([homeRes, summaries, history]) => {
+        const home = homeRes?.data ?? {};
+        const users = home.userStatistics?.totalUsers ?? 0;
+        const artists = home.artistStatistics?.totalArtists ?? 0;
+        const groups = home.artistStatistics?.totalGroups ?? 0;
+        const pendingReports = home.reportStatistics?.pendingReports ?? 0;
+        const pendingSettlements = Array.isArray(summaries)
+          ? summaries.filter((s) => Number(s?.pendingEstimate || 0) > 0).length
+          : 0;
+
+        setKpi({
+          totalUsers: users,
+          activeArtists: Number(artists) + Number(groups),
+          pendingReports,
+          pendingSettlements,
+        });
+        setRecentSettlements(Array.isArray(history?.content) ? history.content : []);
+      })
+      .catch(() => {
+        setKpi({
+          totalUsers: 0,
+          activeArtists: 0,
+          pendingReports: 0,
+          pendingSettlements: 0,
+        });
+        setRecentSettlements([]);
+      })
+      .finally(() => setKpiLoading(false));
+  }, []);
+
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-10">
       <header>
@@ -26,10 +112,30 @@ export default function AdminDashboardPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <KPIBox label="전체 회원수" value="45,820명" icon="group" color="text-white/80" />
-        <KPIBox label="활성 아티스트" value="342명" icon="brush" color="text-violet-300" />
-        <KPIBox label="미처리 신고" value="15건" icon="report" color="text-red-400/90" />
-        <KPIBox label="정산 대기" value="8건" icon="payments" color="text-emerald-400" />
+        <KPIBox
+          label="전체 회원수"
+          value={kpiLoading ? "..." : formatCount(kpi.totalUsers, "명")}
+          icon="group"
+          color="text-white/80"
+        />
+        <KPIBox
+          label="활성 아티스트"
+          value={kpiLoading ? "..." : formatCount(kpi.activeArtists, "명")}
+          icon="brush"
+          color="text-violet-300"
+        />
+        <KPIBox
+          label="미처리 신고"
+          value={kpiLoading ? "..." : formatCount(kpi.pendingReports, "건")}
+          icon="report"
+          color="text-red-400/90"
+        />
+        <KPIBox
+          label="정산 대기"
+          value={kpiLoading ? "..." : formatCount(kpi.pendingSettlements, "건")}
+          icon="payments"
+          color="text-emerald-400"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -37,33 +143,34 @@ export default function AdminDashboardPage() {
           <Surface variant="primary" className="overflow-hidden">
             <h3 className="text-lg font-black text-white mb-6 px-8 pt-8">최근 정산 요청</h3>
             <div className="space-y-0">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-4 px-8 border-t border-white/[0.06] first:border-t-0 hover:bg-white/[0.03] transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <img
-                      src={`https://picsum.photos/seed/artist${i}/100/100`}
-                      className="size-10 rounded-xl border border-white/[0.08]"
-                      alt=""
-                    />
-                    <div>
-                      <p className="font-bold text-white">아티스트_{i}</p>
-                      <p className="text-[10px] text-white/55 font-black uppercase">요청일: 2025.02.21</p>
+              {kpiLoading ? (
+                <div className="px-8 py-10 text-white/55 text-sm">불러오는 중...</div>
+              ) : recentSettlements.length === 0 ? (
+                <div className="px-8 py-10 text-white/50 text-sm">최근 정산 요청이 없습니다.</div>
+              ) : (
+                recentSettlements.map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex items-center justify-between p-4 px-8 border-t border-white/[0.06] first:border-t-0 hover:bg-white/[0.03] transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-white truncate">{row.artistName || "-"}</p>
+                      <p className="text-[10px] text-white/55 font-black uppercase">
+                        지급일: {formatDate(row.settledAt)}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-black text-white tabular-nums">{formatKRW(row.finalAmount)}</p>
+                      <Link
+                        href="/admin/settlements"
+                        className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
+                      >
+                        정산 관리
+                      </Link>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-black text-white tabular-nums">1,200,000원</p>
-                    <Link
-                      href="/admin/settlements"
-                      className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
-                    >
-                      승인 대기
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Surface>
         </section>
@@ -71,16 +178,7 @@ export default function AdminDashboardPage() {
         <aside className="lg:col-span-4 space-y-8">
           <Surface variant="primary" className="p-8">
             <h3 className="text-lg font-black text-white mb-6">운영 공지</h3>
-            <div className="space-y-4">
-              {[1, 2].map((i) => (
-                <div key={i} className="space-y-1">
-                  <p className="text-xs font-bold text-white/80 hover:text-violet-300 cursor-pointer transition-colors line-clamp-1">
-                    시스템 정기 점검 안내 (2025년 3월)
-                  </p>
-                  <p className="text-[10px] text-white/55 font-medium">2025.02.20</p>
-                </div>
-              ))}
-            </div>
+            <p className="text-sm text-white/55">등록된 공지가 없습니다.</p>
             <Button href="/admin/notices" variant="primary" className="w-full mt-6 py-3 text-[10px] uppercase tracking-widest">
               공지 관리
             </Button>
