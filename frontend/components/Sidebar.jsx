@@ -6,7 +6,7 @@ import { MOCK_ARTISTS } from "@/lib/mockData";
 
 const personalMenuItems = [
   { id: "ARTIST_ME", label: "My Studio", icon: "person", href: "/artist-console" },
-  { id: "ARTIST_POSTS", label: "게시물 관리", icon: "article", href: "/posts" },
+  { id: "ARTIST_POSTS", label: "게시물 관리", icon: "article", href: "/artist-console/posts" },
   { id: "ARTIST_LIVE_MGMT", label: "라이브 관리", icon: "sensors", href: "/artist-console/live" },
 ];
 

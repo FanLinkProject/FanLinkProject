@@ -15,7 +15,7 @@ const personalMenuItems = [
     id: "ARTIST_POSTS",
     label: "게시물 관리",
     icon: "article",
-    href: "/posts",
+    href: "/artist-console/posts",
   },
   {
     id: "ARTIST_LIVE_MGMT",
