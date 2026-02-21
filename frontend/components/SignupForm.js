@@ -50,6 +50,9 @@ export default function SignupForm({ role }) {
     gender: "FEMALE",
     birth: "",
     phoneNumber: "",
+    phonePart1: "010",
+    phonePart2: "",
+    phonePart3: "",
     privacyPolicyAgreed: false,
     marketingAgreed: false,
   });
@@ -86,11 +89,14 @@ export default function SignupForm({ role }) {
     }
   };
 
+  const phoneNumberCombined = [formData.phonePart1, formData.phonePart2, formData.phonePart3].filter(Boolean).join("-");
+
   const sendSmsCode = () => {
-    if (!formData.phoneNumber) {
-      setError("휴대폰 번호를 입력해주세요.");
+    if (!formData.phonePart1 || !formData.phonePart2 || !formData.phonePart3) {
+      setError("휴대폰 번호를 모두 입력해주세요.");
       return;
     }
+    setFormData((prev) => ({ ...prev, phoneNumber: phoneNumberCombined }));
     setIsTimerRunning(true);
     setTimer(180);
     setError("");
@@ -193,14 +199,17 @@ export default function SignupForm({ role }) {
                   onChange={(v) => updateField("name", v)}
                   required
                 />
-                <InputGroup
-                  label="생년월일"
-                  placeholder="YYYY-MM-DD"
-                  value={formData.birth}
-                  onChange={(v) => updateField("birth", v)}
+                <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">
+                  생년월일 <span className="text-violet-400">*</span>
+                </label>
+                <input
                   type="date"
-                  required
+                  value={formData.birth}
+                  onChange={(e) => updateField("birth", e.target.value)}
+                  className="w-full px-5 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-violet-500/20 [color-scheme:dark]"
                 />
+              </div>
                 <InputGroup
                   label="비밀번호"
                   placeholder="••••••••"
@@ -299,13 +308,44 @@ export default function SignupForm({ role }) {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">휴대폰 번호</label>
-                  <div className="flex gap-3">
+                  <div className="flex items-center gap-2">
                     <input
                       type="tel"
-                      value={formData.phoneNumber}
-                      onChange={(e) => updateField("phoneNumber", e.target.value)}
-                      placeholder="010-0000-0000"
-                      className="flex-1 px-5 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                      inputMode="numeric"
+                      maxLength={3}
+                      value={formData.phonePart1}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+                        updateField("phonePart1", v);
+                      }}
+                      placeholder="010"
+                      className="w-20 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                    />
+                    <span className="text-white/40 font-bold">-</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={formData.phonePart2}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        updateField("phonePart2", v);
+                      }}
+                      placeholder="1234"
+                      className="flex-1 min-w-0 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                    />
+                    <span className="text-white/40 font-bold">-</span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={formData.phonePart3}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        updateField("phonePart3", v);
+                      }}
+                      placeholder="5678"
+                      className="flex-1 min-w-0 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
                     />
                     <button
                       type="button"

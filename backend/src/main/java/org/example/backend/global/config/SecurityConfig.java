@@ -2,6 +2,7 @@ package org.example.backend.global.config;
 
 import static org.apache.tomcat.util.http.Method.*;
 
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
@@ -91,14 +92,19 @@ public class SecurityConfig {
 					"/ws-chat/**",
 					"/api/chat/DM/**" // ✅ 채팅 DM 방 조회 API 인증 없이 허용
                 ).permitAll()
-				.requestMatchers(GET, "/api/live-sessions/*/access").authenticated()
+                    .requestMatchers(GET, "/api/live-sessions/*/access").authenticated()
 				.requestMatchers(GET, "/api/live-sessions/**").permitAll()
+                    // SSE: ASYNC 재디스패치 시 인가 재검사로 AccessDenied + response committed 방지
+                    .requestMatchers(req -> req.getDispatcherType() == DispatcherType.ASYNC
+                            && req.getRequestURI() != null
+                            && req.getRequestURI().startsWith("/api/notifications/subscribe"))
+                    .permitAll()
 
                     // 관리자
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
                 
-                // 아티스트, 관리자
+                // 아티스트, 그룹, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
 
@@ -152,7 +158,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        // 패턴 사용 시 setAllowedOrigins 대신 setAllowedOriginPatterns 사용 (credentials=true 호환)
+        // http://localhost:3000 = 로컬 개발, https://*.vercel.app = Vercel 배포(프로덕션/프리뷰)
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:3000",
+                "https://*.vercel.app"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

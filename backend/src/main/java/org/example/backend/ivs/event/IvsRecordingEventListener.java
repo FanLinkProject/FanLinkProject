@@ -2,7 +2,6 @@ package org.example.backend.ivs.event;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.ivs.config.IvsRecordingEventProperties;
 import org.example.backend.live_session.entity.LiveSession;
@@ -11,6 +10,7 @@ import org.example.backend.replay.entity.Replay;
 import org.example.backend.replay.entity.ReplayAccessType;
 import org.example.backend.replay.entity.ReplayStatus;
 import org.example.backend.replay.repository.ReplayRepository;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -27,7 +27,6 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "ivs.recording-events", name = "enabled", havingValue = "true")
 public class IvsRecordingEventListener {
 
@@ -38,6 +37,19 @@ public class IvsRecordingEventListener {
     private final LiveSessionRepository liveSessionRepository;
     private final ReplayRepository replayRepository;
     private final ObjectMapper objectMapper;
+
+    public IvsRecordingEventListener(
+            @Qualifier("ivsRecordingSqsClient") SqsClient sqsClient,
+            IvsRecordingEventProperties properties,
+            LiveSessionRepository liveSessionRepository,
+            ReplayRepository replayRepository,
+            ObjectMapper objectMapper) {
+        this.sqsClient = sqsClient;
+        this.properties = properties;
+        this.liveSessionRepository = liveSessionRepository;
+        this.replayRepository = replayRepository;
+        this.objectMapper = objectMapper;
+    }
 
     // IVS 녹화 이벤트 SQS를 폴링한다.
     @Scheduled(fixedDelayString = "${ivs.recording-events.poll-fixed-delay-ms:5000}")

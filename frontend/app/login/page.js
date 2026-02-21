@@ -1,5 +1,6 @@
 "use client";
 
+import { BASE_URL } from "@/lib/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -44,7 +45,7 @@ export default function LoginPage() {
     }
     setError("");
     try {
-      const { data } = await axios.post("http://localhost:8080/api/auth/login", {
+      const { data } = await axios.post(`${BASE_URL}/api/auth/login`, {
         email,
         password,
       });
@@ -55,12 +56,14 @@ export default function LoginPage() {
       if (data.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
+      // 현재 로그인한 계정 이메일을 저장해 메인 홈 등에서 식별에 사용
+      localStorage.setItem("userEmail", email);
       let role = "FAN";
       if (email.startsWith("artist")) role = "ARTIST";
       if (email.startsWith("group")) role = "GROUP";
       if (email.startsWith("admin")) role = "ADMIN";
-      if (role === "ARTIST") router.push("/artist-console");
-      else if (role === "GROUP") router.push("/artist-console/dashboard");
+      if (role === "ARTIST") router.push("/home");
+      else if (role === "GROUP") router.push("/home");
       else if (role === "ADMIN") router.push("/admin");
       else router.push("/home");
     } catch (err) {
@@ -75,7 +78,7 @@ export default function LoginPage() {
 
   const handleOAuth = (provider) => {
     const registrationId = provider === "kakao" ? "kakao" : "google";
-    window.location.href = `http://localhost:8080/oauth2/authorization/${registrationId}`;
+    window.location.href = `${BASE_URL}/oauth2/authorization/${registrationId}`;
   };
 
   return (

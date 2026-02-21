@@ -2,13 +2,45 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
+
+import { BASE_URL } from "@/lib/api";
+function getAuthHeaders() {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("accessToken");
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
+  return pure ? { Authorization: `Bearer ${pure}` } : {};
+}
 
 /** Group/스튜디오 영역 NavBar. FanNavBar 레이아웃/스타일 동일, 배지·메뉴만 역할에 맞게. */
-export default function GroupNavBar() {
+export default function GroupNavBar({ showSidebarToggle, sidebarOpen, onSidebarToggle }) {
   const pathname = usePathname();
+  const [profile, setProfile] = useState(null);
+
+  useEffect(() => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) return;
+    axios
+      .get(`${BASE_URL}/api/user/profile`, { headers })
+      .then((res) => setProfile(res.data))
+      .catch(() => setProfile(null));
+  }, [pathname]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-100 z-50 px-6 lg:px-12 flex items-center justify-between">
+    <header className={`fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-100 z-50 flex items-center justify-between ${showSidebarToggle ? "pl-2 pr-6 lg:pr-12" : "px-6 lg:px-12"}`}>
+      {showSidebarToggle ? (
+        <button
+          type="button"
+          onClick={onSidebarToggle}
+          className="flex items-center justify-center w-10 h-10 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 mr-2"
+          aria-label={sidebarOpen ? "사이드바 닫기" : "사이드바 열기"}>
+          <span className="material-symbols-outlined text-xl">
+            {sidebarOpen ? "chevron_left" : "menu"}
+          </span>
+        </button>
+      ) : null}
       <Link
         href="/artist-console"
         className="flex items-center gap-3 text-primary-600 cursor-pointer shrink-0 hover:opacity-90">
@@ -50,9 +82,9 @@ export default function GroupNavBar() {
           className="flex items-center gap-3 pl-2 cursor-pointer group"
           aria-label="마이페이지">
           <img
-            src="https://picsum.photos/seed/alex/100/100"
-            alt="Profile"
-            className="size-9 rounded-full border border-slate-200 group-hover:border-primary-400 transition-colors shadow-sm"
+            src={profile?.profileImageUrl || getDefaultAvatarUrl(profile?.nickname)}
+            alt="프로필"
+            className="size-9 rounded-full border border-slate-200 group-hover:border-primary-400 transition-colors shadow-sm object-cover"
           />
         </Link>
       </div>

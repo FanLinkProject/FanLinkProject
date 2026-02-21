@@ -92,4 +92,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("status") String status,
             Pageable pageable
     );
+
+    // 관리자: 회원 목록 (탈퇴 제외, 페이징)
+    Page<User> findByDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
+    Page<User> findByRoleAndDeletedAtIsNullOrderByCreatedAtDesc(UserRole role, Pageable pageable);
+
+    // 관리자: 회원 검색 (닉네임 또는 이메일)
+    @Query("SELECT u FROM User u WHERE u.deletedAt IS NULL AND (LOWER(u.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY u.createdAt DESC")
+    Page<User> findForAdminUserSearch(@Param("keyword") String keyword, Pageable pageable);
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.deletedAt IS NULL AND (LOWER(u.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY u.createdAt DESC")
+    Page<User> findForAdminUserSearchByRole(@Param("role") UserRole role, @Param("keyword") String keyword, Pageable pageable);
+
+    // 관리자: 아티스트/그룹 목록 (ARTIST, GROUP 역할, 탈퇴 제외, 페이징)
+    Page<User> findByRoleInAndDeletedAtIsNullOrderByCreatedAtDesc(java.util.List<UserRole> roles, Pageable pageable);
+
+    // 관리자: 아티스트/그룹 검색 (닉네임)
+    @Query("SELECT u FROM User u WHERE u.role IN :roles AND u.deletedAt IS NULL AND LOWER(u.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')) ORDER BY u.createdAt DESC")
+    Page<User> findForAdminArtistSearch(@Param("roles") java.util.List<UserRole> roles, @Param("keyword") String keyword, Pageable pageable);
 }

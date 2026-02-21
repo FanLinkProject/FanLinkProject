@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 
-const API_BASE = "http://localhost:8080/api/fan-profiles";
+import { BASE_URL } from "@/lib/api";
+const API_BASE = `${BASE_URL}/api/fan-profiles`;
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;

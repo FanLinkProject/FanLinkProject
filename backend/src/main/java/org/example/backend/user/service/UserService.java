@@ -17,6 +17,7 @@ import org.example.backend.comment.repository.CommentRepository;
 import org.example.backend.like.entity.Like;
 import org.example.backend.like.enums.LikeTarget;
 import org.example.backend.like.repository.LikeRepository;
+import org.example.backend.media_asset.service.MediaAssetService;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.GuestHomeResponse;
@@ -73,6 +74,7 @@ public class UserService {
     private final NotificationRepository notificationRepository;
     private final CommentRepository commentRepository;
     private final LikeRepository likeRepository;
+    private final MediaAssetService mediaAssetService;
 
     // 전화번호 수정
     public void updatePhoneNumber(User user, PhoneNumberUpdateRequest request) {
@@ -96,7 +98,17 @@ public class UserService {
     // 프로필 조회
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(User user) {
-        return UserProfileResponse.from(user);
+        Long groupId = null;
+        if (user.getRole() == UserRole.GROUP) {
+            // GROUP 계정: 자신이 곧 그룹
+            groupId = user.getId();
+        } else if (user.getRole() == UserRole.ARTIST) {
+            // ARTIST 계정: 소속 그룹 ID 조회
+            groupId = groupMemberRepository.findByMember(user)
+                    .map(gm -> gm.getGroup().getId())
+                    .orElse(null);
+        }
+        return UserProfileResponse.from(user, groupId);
     }
 
     // 프로필 수정
@@ -112,8 +124,12 @@ public class UserService {
             currentUser.setNickname(request.nickname());
         }
 
-        // 프로필 이미지 URL 업데이트
-        if (request.profileImageUrl() != null) {
+        // 프로필 이미지: MediaAsset ID가 있으면 CDN URL로 반영, 없으면 기존 profileImageUrl 처리
+        if (request.profileImageMediaAssetId() != null) {
+            String profileUrl = mediaAssetService.getPublicUrlForProfileImage(
+                    request.profileImageMediaAssetId(), currentUser.getId());
+            currentUser.setProfileImageUrl(profileUrl);
+        } else if (request.profileImageUrl() != null) {
             currentUser.setProfileImageUrl(request.profileImageUrl());
         }
 

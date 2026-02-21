@@ -16,7 +16,7 @@ export default function ArtistAccountPage() {
           <SectionTitle className="text-2xl font-bold">계정 설정</SectionTitle>
           <p className="text-sm text-white/55 font-medium mt-1">스튜디오 및 결제 계정 정보를 관리하세요.</p>
         </div>
-        <Button variant="ghost" href="/artist-console" className="text-xs uppercase tracking-widest">
+        <Button variant="ghost" href="/home" className="text-xs uppercase tracking-widest">
           뒤로
         </Button>
       </header>

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, Suspense } from "react";
 import axios from "axios";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
+import { BASE_URL } from "@/lib/api";
 
 /* JWT UTIL */
 function parseJwtPayload(token) {
@@ -67,7 +68,7 @@ function FanMessageContent({ roomId }) {
         if (roomId == null) return;
 
         axios
-            .get(`http://localhost:8080/api/chat/DM/artist/rooms/${roomId}/messages`, {
+            .get(`${BASE_URL}/api/chat/DM/artist/rooms/${roomId}/messages`, {
                 headers: authHeaders,
             })
             .then((res) => {

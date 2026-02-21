@@ -3,6 +3,7 @@ package org.example.backend.live_session.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 
 import org.example.backend.live_session.enums.LiveSessionStatus;
@@ -69,10 +70,10 @@ public class LiveSession {
 	 * 방송 시작/종료 시각 (옵션)
 	 */
 	@Column(name = "started_at")
-	private OffsetDateTime startedAt;
+	private Instant startedAt;
 
 	@Column(name = "ended_at")
-	private OffsetDateTime endedAt;
+	private Instant endedAt;
 
 	/**
 	 * 녹화본 위치 (recording-end 이후 세팅)
@@ -87,7 +88,7 @@ public class LiveSession {
 	 * 후보에서 제외(만료) 처리용 (옵션)
 	 */
 	@Column(name = "expires_at")
-	private OffsetDateTime expiresAt;
+	private Instant expiresAt;
 
 	/**
 	 * createdAt / updatedAt
@@ -98,11 +99,11 @@ public class LiveSession {
 	 */
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
-	private OffsetDateTime createdAt;
+	private Instant createdAt;
 
 	@UpdateTimestamp
 	@Column(name = "updated_at", nullable = false)
-	private OffsetDateTime updatedAt;
+	private Instant updatedAt;
 
 	// ==========================
 	// Domain helpers (선택)
@@ -113,7 +114,7 @@ public class LiveSession {
 			this.status = LiveSessionStatus.LIVE;
 		}
 		if (this.startedAt == null) {
-			this.startedAt = OffsetDateTime.now();
+			this.startedAt = Instant.now();
 		}
 	}
 
@@ -126,20 +127,20 @@ public class LiveSession {
 			|| this.status == LiveSessionStatus.EXPIRED) {
 
 			if (this.endedAt == null) {
-				this.endedAt = OffsetDateTime.now();
+				this.endedAt = Instant.now();
 			}
 			return;
 		}
 
 		this.status = LiveSessionStatus.ENDED;
-		this.endedAt = OffsetDateTime.now();
+		this.endedAt = Instant.now();
 	}
 
 	// 녹화 완료 시점을 기록하고 RECORDED로 전이한다.
 	public void markRecorded(String recordingS3Bucket, String recordingS3Prefix) {
 		this.status = LiveSessionStatus.RECORDED;
 		if (this.endedAt == null) {
-			this.endedAt = OffsetDateTime.now();
+			this.endedAt = Instant.now();
 		}
 		if (recordingS3Bucket != null && !recordingS3Bucket.isBlank()) {
 			this.recordingS3Bucket = recordingS3Bucket;

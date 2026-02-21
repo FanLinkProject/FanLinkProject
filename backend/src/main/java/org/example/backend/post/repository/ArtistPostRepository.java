@@ -44,4 +44,16 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long> {
             "ORDER BY a.id DESC")
     List<ArtistPost> findArtistPosts(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId,
             Pageable pageable);
+
+    // 특정 아티스트가 직접 작성한 그룹 포스트 조회 (내가 쓴 글 관리용)
+    @Query("SELECT a FROM ArtistPost a " +
+            "JOIN FETCH a.user u " +
+            "LEFT JOIN FETCH a.group g " +
+            "WHERE a.status = false " +
+            "AND a.group IS NOT NULL " +
+            "AND a.user.id = :writerId " +
+            "AND (:lastPostId IS NULL OR a.id < :lastPostId) " +
+            "ORDER BY a.id DESC")
+    List<ArtistPost> findMyArtistPosts(@Param("writerId") Long writerId,
+            @Param("lastPostId") Long lastPostId, Pageable pageable);
 }

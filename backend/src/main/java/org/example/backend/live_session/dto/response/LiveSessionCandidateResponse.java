@@ -1,6 +1,6 @@
 package org.example.backend.live_session.dto.response;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -36,11 +36,12 @@ public class LiveSessionCandidateResponse {
 
 	private Long id;
 	private Long artistId;
+	private String artistNickname;
 	private String title;
 	private Boolean isPaid;
 
-	private OffsetDateTime endedAt;
-	private OffsetDateTime expiresAt;
+	private Instant endedAt;
+	private Instant expiresAt;
 
 	private String recordingS3Bucket;
 	private String recordingS3Prefix;

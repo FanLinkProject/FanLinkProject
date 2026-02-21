@@ -1,20 +1,44 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { MOCK_ARTISTS } from "@/lib/mockData";
+import { useRouter, useParams } from "next/navigation";
+import axios from "axios";
+import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-export default function NewPostPage() {
+import { BASE_URL } from "@/lib/api";
+
+function getAuthHeaders() {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("accessToken");
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
+  return pure ? { Authorization: `Bearer ${pure}` } : {};
+}
+
+export default function EditPostPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = typeof params?.id === "string" ? params.id : null;
   const artist = MOCK_ARTISTS[0];
+  const [artistId, setArtistId] = useState(null);
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [initialImage, setInitialImage] = useState(null);
   const fileInputRef = useRef(null);
+
+  const post = id ? MOCK_POSTS.find((p) => p.id === id && p.artistId === artist.id && p.type === "ARTIST") : null;
+
+  useEffect(() => {
+    if (post) {
+      setContent(post.content || "");
+      setInitialImage(post.image || null);
+      setImagePreview(post.image || null);
+    }
+  }, [post]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -25,28 +49,54 @@ export default function NewPostPage() {
   };
 
   const removeImage = () => {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    if (imagePreview && imageFile) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
-    setImagePreview(null);
+    setImagePreview(initialImage ?? null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!content.trim()) return;
-    // Mock: 실제로는 API 호출. 완료 후 목록으로 이동.
-    router.push("/artist-console/posts");
+    if (artistId) {
+      router.push("/posts");
+    } else {
+      router.push("/home");
+    }
   };
+
+  useEffect(() => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) return;
+    axios
+      .get(`${BASE_URL}/api/artist/mypage`, { headers })
+      .then((res) => {
+        const idFromApi = res.data?.profile?.id;
+        if (idFromApi != null) setArtistId(idFromApi);
+      })
+      .catch(() => setArtistId(null));
+  }, []);
+
+  if (id && !post) {
+    return (
+      <div className="p-8 lg:p-12 max-w-3xl mx-auto">
+        <p className="text-white/55">게시물을 찾을 수 없습니다.</p>
+        <Button variant="ghost" href="/posts" className="mt-4">
+          목록으로
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-8">
       <header className="flex items-center gap-4">
-        <Button variant="ghost" href="/artist-console/posts" className="size-10 rounded-full">
+        <Button variant="ghost" href="/posts" className="size-10 rounded-full">
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
         <div>
-          <SectionTitle className="text-2xl font-bold">새 글 작성</SectionTitle>
-          <p className="text-white/55 text-sm font-medium mt-1">아티스트 소식을 팬들과 공유하세요.</p>
+          <SectionTitle className="text-2xl font-bold">글 수정</SectionTitle>
+          <p className="text-white/55 text-sm font-medium mt-1">게시물 내용을 수정하세요.</p>
         </div>
       </header>
 
@@ -105,11 +155,11 @@ export default function NewPostPage() {
         </Surface>
 
         <div className="flex gap-3 justify-end">
-          <Button variant="ghost" href="/artist-console/posts">
+          <Button variant="ghost" href="/posts">
             취소
           </Button>
           <Button type="submit" variant="primary" className="px-8 py-3">
-            게시하기
+            수정 완료
           </Button>
         </div>
       </form>

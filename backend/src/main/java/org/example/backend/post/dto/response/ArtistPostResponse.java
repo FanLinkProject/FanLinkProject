@@ -14,6 +14,7 @@ public class ArtistPostResponse {
     private Long id;
     private Long writerId;
     private String writerNickname;
+    private String writerProfileImageUrl;
     private String title;
     private String content;
     private Boolean isMembershipOnly;
@@ -27,6 +28,7 @@ public class ArtistPostResponse {
                 .id(post.getId())
                 .writerId(post.getUser().getId())
                 .writerNickname(post.getUser().getNickname())
+                .writerProfileImageUrl(post.getUser().getProfileImageUrl())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .isMembershipOnly(post.getIsMembershipOnly())
@@ -42,6 +44,7 @@ public class ArtistPostResponse {
                 .id(post.getId())
                 .writerId(post.getUser().getId())
                 .writerNickname(post.getUser().getNickname())
+                .writerProfileImageUrl(post.getUser().getProfileImageUrl())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .isMembershipOnly(post.getIsMembershipOnly())
