@@ -26,7 +26,7 @@ function ProductCard({ product }) {
   return (
     <Link
       href={`/market/products/${product.id}`}
-      onClick={() => typeof window !== "undefined" && sessionStorage.setItem("productDetailReturnPath", "/market")}
+      onClick={() => typeof window !== "undefined" && sessionStorage.setItem("productDetailReturnPath", "/admin/market")}
       className="flex flex-col group h-full"
     >
       <Surface variant="card" className="p-5 flex flex-col h-full">
@@ -63,19 +63,7 @@ function ProductCard({ product }) {
   );
 }
 
-function MarketTabButton({ icon, label, href }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.06] border border-white/[0.08] rounded-2xl text-xs font-bold text-white/80 hover:bg-white/[0.1] hover:text-violet-300 transition-all"
-    >
-      <span className="material-symbols-outlined text-lg">{icon}</span>
-      {label}
-    </Link>
-  );
-}
-
-export default function MarketPage() {
+export default function AdminMarketPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,10 +98,6 @@ export default function MarketPage() {
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
-      <div className="flex justify-end gap-3 mb-6">
-        <MarketTabButton icon="shopping_cart" label="장바구니" href="/cart" />
-      </div>
-
       <header className="relative h-64 rounded-2xl overflow-hidden border border-white/[0.06] shadow-[0_6px_20px_rgba(0,0,0,0.45),0_0_12px_rgba(140,90,255,0.12)] group mb-12">
         <img
           src="https://picsum.photos/seed/market-hero/1200/400"
@@ -182,7 +166,7 @@ export default function MarketPage() {
       {!searchTerm && groupStores.length > 0 && (
         <div className="space-y-16 pt-12 border-t border-white/10">
           <div className="space-y-10">
-              <SectionTitle className="px-2 mb-8">그룹별 스토어</SectionTitle>
+              <SectionTitle className="px-2 mb-8">그룹계정 스토어</SectionTitle>
               {groupStores.map((store) => {
                 const preview = store.products.slice(0, 4);
                 if (preview.length === 0) return null;
@@ -193,7 +177,7 @@ export default function MarketPage() {
                         href={`/artists/${store.id}/market`}
                         onClick={() => {
                           if (typeof window !== "undefined") {
-                            sessionStorage.setItem("artistMarketReturnPath", window.location.pathname);
+                            sessionStorage.setItem("artistMarketReturnPath", "/admin/market");
                           }
                         }}
                         className="flex items-center gap-4 group"
@@ -217,7 +201,7 @@ export default function MarketPage() {
                         href={`/artists/${store.id}/market`}
                         onClick={() => {
                           if (typeof window !== "undefined") {
-                            sessionStorage.setItem("artistMarketReturnPath", window.location.pathname);
+                            sessionStorage.setItem("artistMarketReturnPath", "/admin/market");
                           }
                         }}
                         className="text-xs font-bold text-violet-300 hover:text-violet-200"
