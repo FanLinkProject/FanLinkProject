@@ -14,6 +14,7 @@ import org.example.backend.music_video.util.YoutubeUrlParser;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class ArtistMusicVideoService {
     private final YoutubeUrlParser youtubeUrlParser;
     private final UserRepository userRepository;
     private final SecurityContextUtil securityContextUtil;
+    private final ArtistPermissionService artistPermissionService;
 
     // MV 등록을 처리한다.
     @Transactional
@@ -116,7 +118,7 @@ public class ArtistMusicVideoService {
         );
     }
 
-    // ARTIST 본인 또는 ADMIN 권한인지 확인한다.
+    // 솔로=본인만, 그룹=그룹계정+소속멤버. ADMIN은 통과.
     private void validateArtistPermission(UserContext userContext, Long artistId) {
         if (userContext == null) {
             throw new MusicVideoException(MusicVideoErrorCode.FORBIDDEN_OPERATION);
@@ -124,7 +126,7 @@ public class ArtistMusicVideoService {
         if (userContext.role == UserRole.ADMIN) {
             return;
         }
-        if (userContext.role != UserRole.ARTIST || !artistId.equals(userContext.userId)) {
+        if (!artistPermissionService.canManagePage(artistId, userContext.userId, userContext.role, true)) {
             throw new MusicVideoException(MusicVideoErrorCode.FORBIDDEN_OPERATION);
         }
     }

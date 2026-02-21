@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.ArtistCreateRequest;
 import org.example.backend.user.dto.request.PenaltyCreateRequest;
+import org.example.backend.user.dto.response.AdminArtistRowResponse;
 import org.example.backend.user.dto.response.AdminHomeResponse;
 import org.example.backend.user.dto.response.AdminPenaltyResponse;
+import org.example.backend.user.dto.response.AdminUserRowResponse;
 import org.example.backend.user.dto.response.ReportResponse;
 import org.example.backend.user.dto.response.SignupResponse;
 import org.example.backend.user.service.AdminService;
@@ -32,6 +34,26 @@ public class AdminController {
             @AuthenticationPrincipal PrincipalDetails principalDetails
     ) {
         AdminHomeResponse response = adminService.getHome();
+        return ResponseEntity.ok(response);
+    }
+
+    // 회원 목록 (페이징, 검색)
+    @GetMapping("/users")
+    public ResponseEntity<Page<AdminUserRowResponse>> getUsers(
+            @RequestParam(required = false) String keyword,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        Page<AdminUserRowResponse> response = adminService.getUsers(keyword, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    // 아티스트/그룹 목록 (페이징, 검색)
+    @GetMapping("/artists")
+    public ResponseEntity<Page<AdminArtistRowResponse>> getArtists(
+            @RequestParam(required = false) String keyword,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        Page<AdminArtistRowResponse> response = adminService.getArtists(keyword, pageable);
         return ResponseEntity.ok(response);
     }
 

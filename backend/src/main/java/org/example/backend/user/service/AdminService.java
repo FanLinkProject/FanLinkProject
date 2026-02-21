@@ -6,8 +6,10 @@ import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.jwt.RefreshTokenStore;
 import org.example.backend.user.dto.request.ArtistCreateRequest;
 import org.example.backend.user.dto.request.PenaltyCreateRequest;
+import org.example.backend.user.dto.response.AdminArtistRowResponse;
 import org.example.backend.user.dto.response.AdminHomeResponse;
 import org.example.backend.user.dto.response.AdminPenaltyResponse;
+import org.example.backend.user.dto.response.AdminUserRowResponse;
 import org.example.backend.user.dto.response.ReportResponse;
 import org.example.backend.user.dto.response.SignupResponse;
 import org.example.backend.user.entity.GroupMember;
@@ -28,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.time.LocalDateTime;
 
 @Service
@@ -214,5 +217,31 @@ public class AdminService {
         );
 
         return new AdminHomeResponse(userStats, artistStats, reportStats);
+    }
+
+    /** 관리자: 회원 목록 (페이징, 선택 검색) */
+    @Transactional(readOnly = true)
+    public Page<AdminUserRowResponse> getUsers(String keyword, Pageable pageable) {
+        UserRole targetRole = UserRole.USER;
+        Page<User> users;
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            users = userRepository.findForAdminUserSearchByRole(targetRole, keyword.trim(), pageable);
+        } else {
+            users = userRepository.findByRoleAndDeletedAtIsNullOrderByCreatedAtDesc(targetRole, pageable);
+        }
+        return users.map(AdminUserRowResponse::from);
+    }
+
+    /** 관리자: 아티스트/그룹 목록 (페이징, 선택 검색) */
+    @Transactional(readOnly = true)
+    public Page<AdminArtistRowResponse> getArtists(String keyword, Pageable pageable) {
+        List<UserRole> roles = List.of(UserRole.ARTIST, UserRole.GROUP);
+        Page<User> artists;
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            artists = userRepository.findForAdminArtistSearch(roles, keyword.trim(), pageable);
+        } else {
+            artists = userRepository.findByRoleInAndDeletedAtIsNullOrderByCreatedAtDesc(roles, pageable);
+        }
+        return artists.map(AdminArtistRowResponse::from);
     }
 }

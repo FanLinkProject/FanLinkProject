@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.repository.ArtistPostRepository;
+import org.example.backend.user.dto.request.ArtistProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistHomeResponse;
 import org.example.backend.user.dto.response.ArtistMyPageResponse;
 import org.example.backend.user.entity.GroupMember;
@@ -12,6 +13,7 @@ import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
+import org.example.backend.user.repository.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class ArtistService {
     private final FollowRepository followRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ArtistPostRepository artistPostRepository;
+    private final UserRepository userRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -39,6 +42,16 @@ public class ArtistService {
     public ArtistMyPageResponse getMyPage(User artistOrGroup) {
         if (artistOrGroup.getRole() != UserRole.ARTIST && artistOrGroup.getRole() != UserRole.GROUP) {
             throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
+        }
+
+        GroupMember membership = null;
+        User followerStatsTarget = artistOrGroup;
+        if (artistOrGroup.getRole() == UserRole.ARTIST) {
+            membership = groupMemberRepository.findByMember(artistOrGroup).orElse(null);
+            if (membership != null && membership.getGroup() != null) {
+                // 그룹 소속 개인 아티스트는 그룹 기준으로 팬 지표를 보여준다.
+                followerStatsTarget = membership.getGroup();
+            }
         }
 
         // 1) 프로필
@@ -52,12 +65,12 @@ public class ArtistService {
         );
 
         // 2) 팬 수 변화 그래프 (최근 7일 daily 신규 팔로워 수)
-        long totalFollowers = followRepository.countByArtist(artistOrGroup);
+        long totalFollowers = followRepository.countByArtist(followerStatsTarget);
 
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(6);
 
-        List<Object[]> rows = followRepository.countDailyNewFollowers(artistOrGroup.getId(), from, to);
+        List<Object[]> rows = followRepository.countDailyNewFollowers(followerStatsTarget.getId(), from, to);
         Map<String, Long> dateToCount = new HashMap<>();
         for (Object[] row : rows) {
             // row[0] = date (java.sql.Date or String), row[1] = count (Number)
@@ -99,9 +112,7 @@ public class ArtistService {
             );
         } else {
             // 개인 아티스트: 소속 그룹이 있으면 그 그룹의 멤버 정보까지 조회 (단, 권한 변경은 불가)
-            var groupMembershipOpt = groupMemberRepository.findByMember(artistOrGroup);
-            if (groupMembershipOpt.isPresent()) {
-                GroupMember membership = groupMembershipOpt.get();
+            if (membership != null) {
                 String groupName = membership.getGroupName();
                 User group = membership.getGroup();
 
@@ -144,6 +155,36 @@ public class ArtistService {
                 teamInfo,
                 security,
                 settlementSummary
+        );
+    }
+
+    /** 아티스트(그룹 포함) 프로필 수정 - 소개, 프로필 이미지, 배너, 공식 링크 */
+    public ArtistMyPageResponse.Profile updateArtistProfile(User artistOrGroup, ArtistProfileUpdateRequest request) {
+        if (artistOrGroup.getRole() != UserRole.ARTIST && artistOrGroup.getRole() != UserRole.GROUP) {
+            throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
+        }
+        User user = userRepository.findById(artistOrGroup.getId())
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+        if (request.bio() != null) {
+            user.setBio(request.bio());
+        }
+        if (request.profileImageUrl() != null) {
+            user.setProfileImageUrl(request.profileImageUrl());
+        }
+        if (request.bannerImageUrl() != null) {
+            user.setBannerImageUrl(request.bannerImageUrl());
+        }
+        if (request.officialLinks() != null) {
+            user.setOfficialLinks(request.officialLinks());
+        }
+        User saved = userRepository.save(user);
+        return new ArtistMyPageResponse.Profile(
+                saved.getId(),
+                saved.getNickname(),
+                saved.getProfileImageUrl(),
+                saved.getBannerImageUrl(),
+                saved.getBio(),
+                saved.getOfficialLinks()
         );
     }
 

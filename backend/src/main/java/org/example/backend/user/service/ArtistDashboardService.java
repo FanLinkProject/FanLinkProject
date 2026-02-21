@@ -16,6 +16,7 @@ import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.repository.FollowRepository;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class ArtistDashboardService {
 
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final ArtistPostRepository artistPostRepository;
     private final NotificationRepository notificationRepository;
@@ -65,7 +67,19 @@ public class ArtistDashboardService {
                 isFollowing ? "팔로우 취소" : "팔로우"
         );
 
-        // 3) 멤버십 정보 (팬 유저만 대상, 아티스트/관리자는 멤버십 가입 안 함)
+        // 3) 그룹 소속 여부 (GROUP 계정 자신이거나, 해당 그룹의 소속 ARTIST인 경우)
+        boolean isGroupMember = false;
+        if (viewer != null) {
+            if (viewer.getId().equals(artistId)) {
+                // GROUP 계정이 자신의 페이지를 볼 때
+                isGroupMember = true;
+            } else if (viewer.getRole() == UserRole.ARTIST) {
+                // ARTIST 계정이 자신이 속한 그룹 페이지를 볼 때
+                isGroupMember = groupMemberRepository.existsByGroupAndMember(artist, viewer);
+            }
+        }
+
+        // 5) 멤버십 정보 (팬 유저만 대상, 아티스트/관리자는 멤버십 가입 안 함)
         boolean canSubscribeMembership = viewer != null && viewer.getRole() == UserRole.USER;
         boolean hasActiveMembership = false;
         if (canSubscribeMembership) {
@@ -89,7 +103,7 @@ public class ArtistDashboardService {
                 membershipButtonUrl
         );
 
-        // 4) 게시글 목록 (최대 20개)
+        // 6) 게시글 목록 (최대 20개)
         List<ArtistPost> posts = artistPostRepository
                 .findByUserAndStatusOrderByCreatedAtDesc(artist, false, PageRequest.of(0, 20))
                 .getContent();
@@ -123,7 +137,7 @@ public class ArtistDashboardService {
                 })
                 .collect(Collectors.toList());
 
-        // 5) 라이브 알림 (LIVE_STARTED 타입, 최대 5개)
+        // 7) 라이브 알림 (LIVE_STARTED 타입, 최대 5개)
         List<Notification> liveNotifications = viewer != null
                 ? notificationRepository.findByReceiver_IdOrderByCreatedAtDesc(viewer.getId())
                         .stream()
@@ -143,7 +157,7 @@ public class ArtistDashboardService {
                 ))
                 .collect(Collectors.toList());
 
-        // 6) 샵 아이템 (해당 아티스트의 상품, 최대 20개)
+        // 8) 샵 아이템 (해당 아티스트의 상품, 최대 20개)
         List<Product> products = productRepository.findAll()
                 .stream()
                 .filter(p -> p.getArtistId() != null && p.getArtistId().equals(artistId))
@@ -166,6 +180,7 @@ public class ArtistDashboardService {
                 artistInfo,
                 followStatus,
                 membershipInfo,
+                isGroupMember,
                 postItems,
                 liveNotificationItems,
                 shopItems

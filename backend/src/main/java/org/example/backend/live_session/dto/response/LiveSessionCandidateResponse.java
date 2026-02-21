@@ -36,6 +36,7 @@ public class LiveSessionCandidateResponse {
 
 	private Long id;
 	private Long artistId;
+	private String artistNickname;
 	private String title;
 	private Boolean isPaid;
 

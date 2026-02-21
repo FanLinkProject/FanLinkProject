@@ -1,6 +1,7 @@
 export const MOCK_ARTISTS = [
   {
     id: "luna-ray",
+    backendId: 1,
     name: "루나 레이",
     handle: "@lunaray",
     avatar: "https://picsum.photos/seed/luna/200/200",
@@ -33,6 +34,7 @@ export const MOCK_ARTISTS = [
   },
   {
     id: "solaris",
+    backendId: 2,
     name: "솔라리스",
     handle: "@solaris_music",
     avatar: "https://picsum.photos/seed/sun/200/200",
@@ -64,6 +66,7 @@ export const MOCK_ARTISTS = [
   },
   {
     id: "neon-dreams",
+    backendId: 3,
     name: "네온 드림즈",
     handle: "@neondreams",
     avatar: "https://picsum.photos/seed/neon/200/200",

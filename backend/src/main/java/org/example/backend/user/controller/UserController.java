@@ -14,14 +14,18 @@ import org.example.backend.user.dto.response.UserHomeResponse;
 import org.example.backend.user.dto.response.UserMyPageResponse;
 import org.example.backend.user.dto.response.UserProfileResponse;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.service.ArtistDashboardService;
 import org.example.backend.user.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user")
@@ -160,6 +164,23 @@ public class UserController {
                 pageable
         );
         return ResponseEntity.ok(response);
+    }
+
+    // 관리자 여부 조회 (항상 200 반환, 403/500 방지)
+    @GetMapping("/is-admin")
+    public ResponseEntity<Map<String, Boolean>> getIsAdmin(Authentication authentication) {
+        try {
+            if (authentication == null || !(authentication.getPrincipal() instanceof PrincipalDetails principal)) {
+                return ResponseEntity.ok(Map.of("admin", false));
+            }
+            if (principal.getUser() == null) {
+                return ResponseEntity.ok(Map.of("admin", false));
+            }
+            UserRole role = principal.getUser().getRole();
+            return ResponseEntity.ok(Map.of("admin", role == UserRole.ADMIN));
+        } catch (Throwable t) {
+            return ResponseEntity.ok(Map.of("admin", false));
+        }
     }
 
     // 유저 메인 홈 화면 조회

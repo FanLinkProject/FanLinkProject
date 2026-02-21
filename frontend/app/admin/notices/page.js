@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { MOCK_NOTICES } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 export default function AdminNoticesPage() {
-  const notices = MOCK_NOTICES;
+  const notices = [];
   return (
     <div className="p-8 lg:p-12 max-w-5xl mx-auto space-y-10">
       <header className="flex items-center justify-between">
@@ -26,29 +25,11 @@ export default function AdminNoticesPage() {
       </header>
 
       <div className="space-y-4">
-        {notices.map((notice) => (
-          <Surface
-            key={notice.id}
-            variant="primary"
-            className="p-8 flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,0,0,0.5),0_0_12px_rgba(150,100,255,0.08)] transition-shadow"
-          >
-            <div>
-              <h3 className="text-lg font-bold text-white">{notice.title}</h3>
-              <p className="text-[10px] text-white/55 font-black uppercase tracking-widest mt-1">{notice.date}</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" className="px-4 py-2 text-[10px] uppercase tracking-widest">
-                수정
-              </Button>
-              <button
-                type="button"
-                className="px-4 py-2 bg-red-500/15 text-red-400/90 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/25 transition-colors"
-              >
-                삭제
-              </button>
-            </div>
+        {notices.length === 0 ? (
+          <Surface variant="primary" className="p-8">
+            <p className="text-sm text-white/55">등록된 공지가 없습니다.</p>
           </Surface>
-        ))}
+        ) : null}
       </div>
     </div>
   );

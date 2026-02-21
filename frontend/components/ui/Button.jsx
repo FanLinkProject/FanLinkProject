@@ -23,6 +23,12 @@ const variantStyles = {
     "active:bg-white/[0.08]",
     "disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed",
   ].join(" "),
+  danger: [
+    "bg-red-500/15 text-red-400/90 border border-red-500/20",
+    "hover:bg-red-500/25 hover:border-red-500/30",
+    "active:bg-red-500/20",
+    "disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed",
+  ].join(" "),
 };
 
 export default function Button({
@@ -33,8 +39,12 @@ export default function Button({
   disabled,
   ...props
 }) {
-  const styles = [base, variantStyles[variant], className].filter(Boolean).join(" ");
-  const disabledClass = disabled ? "opacity-60 pointer-events-none cursor-not-allowed" : "";
+  const styles = [base, variantStyles[variant], className]
+    .filter(Boolean)
+    .join(" ");
+  const disabledClass = disabled
+    ? "opacity-60 pointer-events-none cursor-not-allowed"
+    : "";
   const finalClass = `${styles} ${disabledClass}`.trim();
 
   if (href) {
@@ -44,19 +54,13 @@ export default function Button({
         aria-disabled={disabled}
         className={finalClass}
         onClick={(e) => disabled && e.preventDefault()}
-        {...props}
-      >
+        {...props}>
         {children}
       </Link>
     );
   }
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      className={finalClass}
-      {...props}
-    >
+    <button type="button" disabled={disabled} className={finalClass} {...props}>
       {children}
     </button>
   );

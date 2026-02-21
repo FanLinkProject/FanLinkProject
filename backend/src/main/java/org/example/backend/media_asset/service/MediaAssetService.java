@@ -215,6 +215,26 @@ public class MediaAssetService {
         return new CompleteResponse(responses);
     }
 
+    /**
+     * 프로필 이미지용 MediaAsset의 공개 CDN URL을 반환한다.
+     * 소유자 일치 및 카테고리 PROFILE_IMAGE 검증 후 URL을 생성한다.
+     */
+    @Transactional(readOnly = true)
+    public String getPublicUrlForProfileImage(Long mediaAssetId, Long userId) {
+        MediaAsset mediaAsset = mediaAssetRepository.findById(mediaAssetId)
+                .orElseThrow(() -> new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_NOT_FOUND));
+        if (!mediaAsset.getOwnerUserId().equals(userId)) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        }
+        if (mediaAsset.getCategory() != MediaAssetCategory.PROFILE_IMAGE) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED, "프로필 이미지가 아닌 미디어입니다.");
+        }
+        if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
+            throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 프로필 이미지만 사용할 수 있습니다.");
+        }
+        return buildCdnUrl(mediaAsset.getObjectKey());
+    }
+
     // presign 요청의 owner/userRole이 로그인 사용자와 일치하는지 확인한다.
     // HEAD 결과가 정책/요청값과 일치하는지 검사하고 거부 사유를 리턴한다.
     private MediaAssetRejectedReason validateHead(MediaAsset mediaAsset, String actualContentType, long actualSizeBytes) {

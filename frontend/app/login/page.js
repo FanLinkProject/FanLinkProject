@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { login } from "@/lib/authApi";
+import axios from "axios";
 
 function SocialLoginButton({ provider, onClick }) {
   const configs = {
@@ -44,7 +44,10 @@ export default function LoginPage() {
     }
     setError("");
     try {
-      const data = await login({ email, password });
+      const { data } = await axios.post("http://localhost:8080/api/auth/login", {
+        email,
+        password,
+      });
       const token = data.accessToken?.startsWith("Bearer")
         ? data.accessToken
         : `Bearer ${data.accessToken}`;
@@ -52,19 +55,22 @@ export default function LoginPage() {
       if (data.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
-      const role = (data.role || (email.startsWith("artist") ? "ARTIST" : email.startsWith("group") ? "GROUP" : email.startsWith("admin") ? "ADMIN" : "USER")).toUpperCase();
-      if (role === "ARTIST" || role === "ROLE_ARTIST" || role === "GROUP" || role === "ROLE_GROUP") {
-        router.push("/artist-console");
-      } else if (role === "ADMIN" || role === "ROLE_ADMIN") {
-        router.push("/admin");
-      } else {
-        router.push("/home");
-      }
+      // 현재 로그인한 계정 이메일을 저장해 메인 홈 등에서 식별에 사용
+      localStorage.setItem("userEmail", email);
+      let role = "FAN";
+      if (email.startsWith("artist")) role = "ARTIST";
+      if (email.startsWith("group")) role = "GROUP";
+      if (email.startsWith("admin")) role = "ADMIN";
+      if (role === "ARTIST") router.push("/home");
+      else if (role === "GROUP") router.push("/home");
+      else if (role === "ADMIN") router.push("/admin");
+      else router.push("/home");
     } catch (err) {
-      const res = err.response;
       const msg =
-        res?.data?.message ||
-        (res?.status === 401 ? "이메일 또는 비밀번호가 올바르지 않습니다." : "로그인에 실패했습니다. 다시 시도해주세요.");
+        err.response?.data?.message ||
+        err.response?.status === 401
+          ? "이메일 또는 비밀번호가 올바르지 않습니다."
+          : "로그인에 실패했습니다. 다시 시도해주세요.";
       setError(msg);
     }
   };
