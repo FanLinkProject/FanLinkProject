@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,7 +23,7 @@ public interface LiveSessionRepository extends JpaRepository<LiveSession, Long> 
 	List<LiveSession> findByArtistIdAndStatusInAndNotExpired(
 		@Param("artistId") Long artistId,
 		@Param("statuses") List<LiveSessionStatus> statuses,
-		@Param("now") OffsetDateTime now);
+		@Param("now") Instant now);
 
 	// channelArn으로 LiveSession을 조회한다.
 	Optional<LiveSession> findByChannelArn(String channelArn);

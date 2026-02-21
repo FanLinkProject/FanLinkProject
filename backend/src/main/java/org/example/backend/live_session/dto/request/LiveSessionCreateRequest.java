@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.example.backend.user.enums.UserRole;
 
 /**
  * 라이브 시작(세션 생성) 요청.

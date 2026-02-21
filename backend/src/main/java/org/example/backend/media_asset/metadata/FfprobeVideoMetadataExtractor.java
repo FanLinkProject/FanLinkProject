@@ -2,7 +2,6 @@ package org.example.backend.media_asset.metadata;
 
 import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.config.MediaProperties;
-import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -17,7 +16,6 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-@Component
 public class FfprobeVideoMetadataExtractor implements VideoMetadataExtractor {
 
     private final S3Client s3Client;
