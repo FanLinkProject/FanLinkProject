@@ -1,14 +1,142 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import axios from "axios";
+import { request } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
+import PostCard from "@/components/PostCard";
 import ArtistConsolePage from "../artist-console/page";
 
+const FEED_POSTS_LIMIT_PER_GROUP = 15;
+
+function formatTimestamp(instant) {
+  if (!instant) return "";
+  try {
+    const date = new Date(instant);
+    const now = new Date();
+    const diffSec = Math.floor((now - date) / 1000);
+    if (diffSec < 60) return "방금 전";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}분 전`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}시간 전`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 7) return `${diffDay}일 전`;
+    return date.toLocaleDateString("ko-KR");
+  } catch {
+    return "";
+  }
+}
+
+function transformArtistPost(p, groupId, groupAvatar = "") {
+  return {
+    id: p.id,
+    groupId,
+    authorName: p.writerNickname || "",
+    authorMemberName: null,
+    authorAvatar: p.writerProfileImageUrl || groupAvatar,
+    content: p.content || "",
+    image: p.attachments?.[0]?.url || null,
+    timestamp: formatTimestamp(p.createdAt),
+    createdAt: p.createdAt,
+    isMembershipOnly: p.isMembershipOnly ?? false,
+    isLockedByServer: !!(p.isMembershipOnly && p.content === null),
+    type: "ARTIST",
+  };
+}
+
 const BASE_URL = "http://localhost:8080";
+
+/** 드래그로 스크롤 가능한 가로 목록 (스크롤바 숨김) */
+function DragScrollContainer({ children, className = "" }) {
+  const ref = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef(0);
+  const scrollLeftStart = useRef(0);
+  const didDrag = useRef(false);
+
+  const handlePointerDown = useCallback((e) => {
+    if (!ref.current) return;
+    setIsDragging(true);
+    didDrag.current = false;
+    startX.current = e.pageX ?? e.touches?.[0]?.pageX ?? 0;
+    scrollLeftStart.current = ref.current.scrollLeft;
+  }, []);
+
+  const handlePointerMove = useCallback((e) => {
+    if (!ref.current) return;
+    const pageX = e.pageX ?? e.touches?.[0]?.pageX ?? 0;
+    const walk = pageX - startX.current;
+    if (Math.abs(walk) > 5) didDrag.current = true;
+    ref.current.scrollLeft = scrollLeftStart.current - walk;
+    if (e.touches) e.preventDefault();
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e) => handlePointerMove(e);
+    const onUp = () => handlePointerUp();
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    };
+  }, [isDragging, handlePointerMove, handlePointerUp]);
+
+  const handleClickCapture = useCallback((e) => {
+    if (didDrag.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      didDrag.current = false;
+    }
+  }, []);
+
+  /** 마우스 휠/트랙패드로 가로 스크롤 (스크롤바 없이 스크롤 가능) */
+  const handleWheel = useCallback((e) => {
+    const el = ref.current;
+    if (!el) return;
+    const canScrollLeft = el.scrollLeft > 0;
+    const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth - 1;
+    if ((e.deltaY > 0 && canScrollRight) || (e.deltaY < 0 && canScrollLeft)) {
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
+
+  return (
+    <div
+      ref={ref}
+      className={`flex gap-6 overflow-x-auto pb-4 -mx-1 px-1 no-scrollbar select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"} ${className}`}
+      onMouseDownCapture={handlePointerDown}
+      onMouseLeave={handlePointerUp}
+      onTouchStartCapture={handlePointerDown}
+      onTouchMove={handlePointerMove}
+      onTouchEnd={handlePointerUp}
+      onClickCapture={handleClickCapture}
+    >
+      {children}
+    </div>
+  );
+}
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};
@@ -32,6 +160,9 @@ export default function UserHomePage() {
 
   const [isGuestHome, setIsGuestHome] = useState(false);
   const [guestData, setGuestData] = useState(null);
+
+  const [feedPosts, setFeedPosts] = useState([]);
+  const [feedPostsLoading, setFeedPostsLoading] = useState(false);
 
   // 홈 데이터: 비로그인 → GuestHomeResponse / 로그인 → UserHome 또는 ArtistHome
   useEffect(() => {
@@ -151,6 +282,43 @@ export default function UserHomePage() {
     return () => clearTimeout(t);
   }, [showAllArtistsModal, allArtistsSearch, fetchAllArtists]);
 
+  // 팔로우한 아티스트 그룹들의 게시글 통합 피드 (팬 홈)
+  useEffect(() => {
+    const followed = data?.followedArtists ?? [];
+    if (followed.length === 0) {
+      setFeedPosts([]);
+      return;
+    }
+    setFeedPostsLoading(true);
+    const artistIds = followed.map((a) => a.artistId);
+    const avatarByGroupId = Object.fromEntries(
+      followed.map((a) => [a.artistId, a.profileImageUrl || ""])
+    );
+    Promise.all(
+      artistIds.map((groupId) =>
+        request("/api/artist-posts/artist-only", {
+          query: { groupId, limit: FEED_POSTS_LIMIT_PER_GROUP },
+        }).then((list) => {
+          const raw = Array.isArray(list) ? list : list?.content ?? list?.posts ?? [];
+          return raw.map((p) =>
+            transformArtistPost(p, groupId, avatarByGroupId[groupId] || "")
+          );
+        }).catch(() => [])
+      )
+    )
+      .then((arrays) => {
+        const merged = arrays.flat();
+        merged.sort((a, b) => {
+          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return tb - ta;
+        });
+        setFeedPosts(merged);
+      })
+      .catch(() => setFeedPosts([]))
+      .finally(() => setFeedPostsLoading(false));
+  }, [data?.followedArtists]);
+
   if (loading) {
     return (
       <div className="p-8 lg:p-12 max-w-6xl mx-auto">
@@ -203,7 +371,7 @@ export default function UserHomePage() {
               <p className="text-sm text-white/55">추천 아티스트가 없습니다.</p>
             </Surface>
           ) : (
-            <div className="flex gap-6 overflow-x-auto pb-4 -mx-1 px-1">
+            <DragScrollContainer>
               {recommended.map((artist) => (
                 <Link key={artist.id} href={`/artists/${artist.id}`} className="w-40 shrink-0">
                   <Surface variant="card" className="p-5 flex flex-col items-center text-center group h-full">
@@ -221,7 +389,7 @@ export default function UserHomePage() {
                   </Surface>
                 </Link>
               ))}
-            </div>
+            </DragScrollContainer>
           )}
         </section>
 
@@ -232,7 +400,7 @@ export default function UserHomePage() {
               <p className="text-sm text-white/55">새로운 아티스트가 없습니다.</p>
             </Surface>
           ) : (
-            <div className="flex gap-6 overflow-x-auto pb-4 -mx-1 px-1">
+            <DragScrollContainer>
               {newArtists.map((artist) => (
                 <Link key={artist.id} href={`/artists/${artist.id}`} className="w-40 shrink-0">
                   <Surface variant="card" className="p-5 flex flex-col items-center text-center group h-full">
@@ -250,7 +418,7 @@ export default function UserHomePage() {
                   </Surface>
                 </Link>
               ))}
-            </div>
+            </DragScrollContainer>
           )}
         </section>
       </div>
@@ -396,6 +564,34 @@ export default function UserHomePage() {
           ))}
         </div>
       </section>
+
+      {/* 팔로우한 아티스트 그룹 게시글 피드 */}
+      {followedArtists.length > 0 && (
+        <section>
+          <SectionTitle className="mb-6">내 아티스트의 최신 게시글</SectionTitle>
+          {feedPostsLoading ? (
+            <Surface variant="primary" className="py-12 text-center">
+              <p className="text-white/55">게시글을 불러오는 중...</p>
+            </Surface>
+          ) : feedPosts.length === 0 ? (
+            <Surface variant="primary" className="py-12 text-center">
+              <p className="text-white/55">아직 게시글이 없습니다.</p>
+            </Surface>
+          ) : (
+            <div className="space-y-6">
+              {feedPosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  href={`/posts/${post.id}?type=ARTIST&groupId=${post.groupId}`}
+                  showVerified={true}
+                  isLocked={post.isLockedByServer ?? false}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 전체 아티스트 조회 모달 */}
       {showAllArtistsModal && (
