@@ -14,6 +14,7 @@ import PostFeed from "@/components/PostFeed";
 import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
 import { apiGet } from "@/lib/api";
+import { isUpcoming, concertIncludesArtist, formatArtists, getArtistNamesArray, formatDateShort } from "@/lib/concertUtils";
 
 const CANDY_COST = 500;
 const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
@@ -56,6 +57,10 @@ export default function ArtistDetailPage({ params }) {
     // --- MV (dev 기능) ---
     const [musicVideos, setMusicVideos] = useState([]);
     const [musicVideosLoading, setMusicVideosLoading] = useState(false);
+
+    // --- 참여 공연 (GET /api/concerts 후 아티스트명/다가오는 공연 필터) ---
+    const [artistConcerts, setArtistConcerts] = useState([]);
+    const [artistConcertsLoading, setArtistConcertsLoading] = useState(false);
 
     useEffect(() => {
         const a = MOCK_ARTISTS.find((x) => x.id === id);
@@ -151,6 +156,28 @@ export default function ArtistDetailPage({ params }) {
             cancelled = true;
         };
     }, [activeTab, artistIdForApi]);
+
+    useEffect(() => {
+        if (!artist?.name) return;
+        let cancelled = false;
+        setArtistConcertsLoading(true);
+        apiGet("/api/concerts")
+            .then((data) => {
+                const list = Array.isArray(data) ? data : [];
+                const now = new Date();
+                const filtered = list.filter(
+                    (c) => isUpcoming(c) && concertIncludesArtist(c, artist.name)
+                );
+                if (!cancelled) setArtistConcerts(filtered);
+            })
+            .catch(() => {
+                if (!cancelled) setArtistConcerts([]);
+            })
+            .finally(() => {
+                if (!cancelled) setArtistConcertsLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [artist?.name]);
 
     if (!artist) return null;
 
@@ -336,6 +363,50 @@ export default function ArtistDetailPage({ params }) {
                     </div>
                 </Surface>
             </div>
+
+            {/* 참여 공연 (해당 아티스트가 참여하는 다가오는 공연만) */}
+            {artistConcerts.length > 0 && (
+                <div className="max-w-6xl w-full mx-auto px-8 mt-8">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4 px-1">
+                        참여 공연
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {artistConcerts.map((c) => {
+                            const concertId = c.concertId ?? c.id;
+                            const placeName = c.placeName ?? c.venueName;
+                            const imageUrl = c.concertImageUrl ?? c.posterImageUrl;
+                            return (
+                                <Link
+                                    key={concertId}
+                                    href={`/concerts/${concertId}`}
+                                    className="block rounded-2xl border border-white/10 bg-white/5 hover:border-violet-500/40 hover:bg-white/[0.06] transition-all overflow-hidden"
+                                >
+                                    {imageUrl && (
+                                        <div className="aspect-[4/3] bg-white/5">
+                                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                                        </div>
+                                    )}
+                                    <div className="p-5 text-left">
+                                        <h4 className="font-semibold text-white truncate">{c.title}</h4>
+                                        {getArtistNamesArray(c).length > 0 && (
+                                            <p className="text-white/85 text-sm mt-1 truncate">
+                                                {formatArtists(getArtistNamesArray(c))}
+                                            </p>
+                                        )}
+                                        <p className="text-white/55 text-xs mt-1">{formatDateShort(c.startDateTime)}</p>
+                                        {placeName && <p className="text-white/55 text-xs mt-0.5 truncate">{placeName}</p>}
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+            {artistConcertsLoading && artistConcerts.length === 0 && (
+                <div className="max-w-6xl w-full mx-auto px-8 mt-8">
+                    <p className="text-white/45 text-sm">참여 공연 불러오는 중...</p>
+                </div>
+            )}
 
             {/* 탭 */}
             <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 border-b border-white/[0.06] mt-8 shrink-0">

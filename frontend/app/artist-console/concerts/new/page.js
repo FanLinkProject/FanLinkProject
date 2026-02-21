@@ -1,22 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { apiPost } from "@/lib/api";
+import { useMediaUpload } from "@/lib/useMediaUpload";
+import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
-
-const CONCERTS_API = "http://localhost:8080/api/concerts";
-
-function getAuthHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-  const bearer = token && (token.startsWith("Bearer ") ? token : `Bearer ${token.trim()}`);
-  return {
-    "Content-Type": "application/json",
-    ...(bearer && { Authorization: bearer }),
-  };
-}
+import { KakaoPlacePicker } from "@/components/concert/KakaoPlacePicker";
 
 function parseJwt(token) {
   try {
@@ -54,10 +46,26 @@ export default function NewConcertPage() {
   const [startDateTime, setStartDateTime] = useState("");
   const [endDateTime, setEndDateTime] = useState("");
   const [timezone, setTimezone] = useState("Asia/Seoul");
-  const [venueName, setVenueName] = useState("");
-  const [locationId, setLocationId] = useState("");
-  const [posterMediaAssetId, setPosterMediaAssetId] = useState("");
+  const [selectedPlaceFromPicker, setSelectedPlaceFromPicker] = useState(null);
+  const [posterMediaAssetId, setPosterMediaAssetId] = useState(null);
+  const [posterPreviewUrl, setPosterPreviewUrl] = useState(null);
   const [selectedArtists, setSelectedArtists] = useState([]);
+  const posterFileInputRef = useRef(null);
+
+  const effectiveArtistId = selectedArtists[0]?.id ?? userId;
+  const presignItem = useMemo(
+    () =>
+      effectiveArtistId != null && Number.isInteger(Number(effectiveArtistId))
+        ? {
+            category: MediaAssetCategory.CONCERT_POSTER,
+            scope: MediaAssetScope.PUBLIC,
+            artistId: Number(effectiveArtistId),
+            concertIdOrTemp: "tmp_concert_poster",
+          }
+        : null,
+    [effectiveArtistId]
+  );
+  const { upload: uploadPoster, loading: posterUploading, error: posterUploadError } = useMediaUpload(presignItem);
 
   // select-artists에서 돌아온 뒤: 저장해 둔 폼 초안 복원 + 추가 아티스트 병합
   useEffect(() => {
@@ -72,9 +80,9 @@ export default function NewConcertPage() {
           if (draft.startDateTime != null) setStartDateTime(String(draft.startDateTime));
           if (draft.endDateTime != null) setEndDateTime(String(draft.endDateTime));
           if (draft.timezone != null) setTimezone(String(draft.timezone));
-          if (draft.venueName != null) setVenueName(String(draft.venueName));
-          if (draft.locationId != null) setLocationId(String(draft.locationId));
-          if (draft.posterMediaAssetId != null) setPosterMediaAssetId(String(draft.posterMediaAssetId));
+          if (draft.selectedPlaceFromPicker != null && typeof draft.selectedPlaceFromPicker === "object") setSelectedPlaceFromPicker(draft.selectedPlaceFromPicker);
+          if (draft.posterMediaAssetId != null) setPosterMediaAssetId(draft.posterMediaAssetId);
+          if (draft.posterPreviewUrl != null) setPosterPreviewUrl(draft.posterPreviewUrl);
           if (draft.presaleTicketCount != null) setPresaleTicketCount(String(draft.presaleTicketCount));
           if (draft.saleTicketCount != null) setSaleTicketCount(String(draft.saleTicketCount));
           if (draft.presaleStartDateTime != null) setPresaleStartDateTime(String(draft.presaleStartDateTime));
@@ -134,47 +142,64 @@ export default function NewConcertPage() {
       setError("공연 종료 시간을 입력해주세요.");
       return;
     }
-    if (!venueName.trim()) {
-      setError("장소명을 입력해주세요.");
+    if (!selectedPlaceFromPicker?.placeName?.trim()) {
+      setError("장소를 검색하여 선택해주세요.");
       return;
     }
 
     setLoading(true);
     try {
-      const posterId = toNum(posterMediaAssetId);
+      let locationId = null;
+      if (selectedPlaceFromPicker) {
+        const res = await apiPost("/api/locations", {
+          provider: selectedPlaceFromPicker.provider ?? "KAKAO",
+          placeId: selectedPlaceFromPicker.placeId ?? null,
+          placeName: selectedPlaceFromPicker.placeName ?? null,
+          fullAddress: selectedPlaceFromPicker.fullAddress?.trim() || " ",
+          latitude: selectedPlaceFromPicker.latitude,
+          longitude: selectedPlaceFromPicker.longitude,
+        });
+        locationId = res?.locationId ?? res?.id ?? null;
+        if (locationId == null) {
+          setError("위치 저장 후 ID를 받지 못했습니다.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const posterId =
+        posterMediaAssetId != null && Number.isInteger(posterMediaAssetId) && posterMediaAssetId > 0
+          ? posterMediaAssetId
+          : null;
       const rawIds = [
         ...(userId != null && Number.isInteger(Number(userId)) ? [Number(userId)] : []),
         ...selectedArtists.map((a) => Number(a.id)),
       ].filter((id) => id > 0 && Number.isInteger(id));
       const artistIds = rawIds.length > 0 ? [...new Set(rawIds)] : undefined;
 
-      await axios.post(
-        CONCERTS_API,
-        {
-          title: title.trim(),
-          description: description.trim() || null,
-          startDateTime: toInstant(startDateTime),
-          endDateTime: toInstant(endDateTime),
-          timezone: timezone || "Asia/Seoul",
-          venueName: venueName.trim(),
-          locationId: toNum(locationId) || null,
-          posterMediaAssetId: posterId != null && posterId > 0 ? posterId : null,
-          presaleTicketCount: toNum(presaleTicketCount) ?? 0,
-          saleTicketCount: toNum(saleTicketCount) ?? 0,
-          presaleStartDateTime: toInstant(presaleStartDateTime),
-          presaleEndDateTime: toInstant(presaleEndDateTime),
-          saleStartDateTime: toInstant(saleStartDateTime),
-          saleEndDateTime: toInstant(saleEndDateTime),
-          artistIds,
-        },
-        { headers: getAuthHeaders() }
-      );
+      await apiPost("/api/concerts", {
+        title: title.trim(),
+        description: description.trim() || null,
+        startDateTime: toInstant(startDateTime),
+        endDateTime: toInstant(endDateTime),
+        timezone: timezone || "Asia/Seoul",
+        venueName: (selectedPlaceFromPicker?.placeName ?? "").trim(),
+        locationId,
+        posterMediaAssetId: posterId != null && posterId > 0 ? posterId : null,
+        presaleTicketCount: toNum(presaleTicketCount) ?? 0,
+        saleTicketCount: toNum(saleTicketCount) ?? 0,
+        presaleStartDateTime: toInstant(presaleStartDateTime),
+        presaleEndDateTime: toInstant(presaleEndDateTime),
+        saleStartDateTime: toInstant(saleStartDateTime),
+        saleEndDateTime: toInstant(saleEndDateTime),
+        artistIds,
+      });
       try {
         sessionStorage.removeItem("concertNewDraft");
       } catch (_) {}
       router.push("/artist-console/concerts");
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.errorCode || err.message || "저장에 실패했습니다.");
+      setError(err?.data?.message || err?.message || "저장에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -223,83 +248,6 @@ export default function NewConcertPage() {
               className="w-full min-h-[100px] bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20 resize-y"
             />
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-                시작 일시 <span className="text-red-400">*</span>
-              </span>
-              <input
-                type="datetime-local"
-                value={startDateTime}
-                onChange={(e) => setStartDateTime(e.target.value)}
-                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-violet-500/20"
-                required
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-                종료 일시 <span className="text-red-400">*</span>
-              </span>
-              <input
-                type="datetime-local"
-                value={endDateTime}
-                onChange={(e) => setEndDateTime(e.target.value)}
-                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-violet-500/20"
-                required
-              />
-            </label>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">타임존</span>
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-violet-500/20"
-              >
-                <option value="Asia/Seoul">Asia/Seoul (한국)</option>
-                <option value="America/New_York">America/New_York</option>
-                <option value="America/Los_Angeles">America/Los_Angeles</option>
-                <option value="Europe/London">Europe/London</option>
-                <option value="Asia/Tokyo">Asia/Tokyo</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-                장소명 <span className="text-red-400">*</span>
-              </span>
-              <input
-                type="text"
-                value={venueName}
-                onChange={(e) => setVenueName(e.target.value)}
-                placeholder="예: 올림픽공원 올림픽홀"
-                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
-                required
-              />
-            </label>
-          </div>
-          <label className="block">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">위치 ID (선택)</span>
-            <input
-              type="number"
-              value={locationId}
-              onChange={(e) => setLocationId(e.target.value)}
-              placeholder="위치 ID"
-              min="0"
-              className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">포스터 미디어 에셋 ID (선택)</span>
-            <input
-              type="number"
-              value={posterMediaAssetId}
-              onChange={(e) => setPosterMediaAssetId(e.target.value)}
-              placeholder="없으면 비워두세요"
-              min="0"
-              className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
-            />
-          </label>
           <div className="pt-4 border-t border-white/[0.08]">
             <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">참여 아티스트</span>
             {selectedArtists.length > 0 && (
@@ -337,9 +285,9 @@ export default function NewConcertPage() {
                       startDateTime,
                       endDateTime,
                       timezone,
-                      venueName,
-                      locationId,
-                      posterMediaAssetId,
+                      selectedPlaceFromPicker,
+                      posterMediaAssetId: posterMediaAssetId ?? undefined,
+                      posterPreviewUrl: posterPreviewUrl ?? undefined,
                       presaleTicketCount,
                       saleTicketCount,
                       presaleStartDateTime,
@@ -357,6 +305,147 @@ export default function NewConcertPage() {
               아티스트 검색하여 추가
             </Button>
           </div>
+          <div className="block">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+              장소 <span className="text-red-400">*</span> (검색 후 선택)
+            </span>
+            <KakaoPlacePicker
+              onPicked={(picked) => setSelectedPlaceFromPicker(picked ?? null)}
+              disabled={loading}
+            />
+          </div>
+          <div className="block">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+              포스터 이미지 (선택)
+            </span>
+            <input
+              ref={posterFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file || !file.type.startsWith("image/")) return;
+                if (!presignItem) return;
+                const result = await uploadPoster(file);
+                if (result) {
+                  setPosterMediaAssetId(result.mediaAssetId);
+                  setPosterPreviewUrl(result.url ?? null);
+                }
+                e.target.value = "";
+              }}
+            />
+            {!presignItem ? (
+              <p className="text-white/55 text-sm py-2">
+                포스터를 올리려면 먼저 &quot;아티스트 검색하여 추가&quot;를 하거나 로그인해 주세요.
+              </p>
+            ) : !posterPreviewUrl ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => posterFileInputRef.current?.click()}
+                  disabled={posterUploading}
+                  className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50"
+                >
+                  {posterUploading ? (
+                    <>
+                      <span className="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+                      <span className="text-sm font-bold">업로드 중…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-4xl">add_photo_alternate</span>
+                      <span className="text-sm font-bold">클릭하여 포스터 이미지 추가</span>
+                    </>
+                  )}
+                </button>
+                {posterUploadError && (
+                  <p className="text-red-400/90 text-sm flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">error</span>
+                    {posterUploadError}
+                    <button
+                      type="button"
+                      onClick={() => posterFileInputRef.current?.click()}
+                      className="text-violet-400 hover:text-violet-300 text-sm underline"
+                    >
+                      재시도
+                    </button>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] bg-black/20">
+                <img
+                  src={posterPreviewUrl}
+                  alt="포스터 미리보기"
+                  className="w-full max-h-80 object-contain"
+                />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => posterFileInputRef.current?.click()}
+                    disabled={posterUploading}
+                    className="size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 disabled:opacity-50"
+                    title="변경"
+                  >
+                    <span className="material-symbols-outlined text-lg">edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPosterMediaAssetId(null);
+                      setPosterPreviewUrl(null);
+                      if (posterFileInputRef.current) posterFileInputRef.current.value = "";
+                    }}
+                    className="size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
+                    title="삭제"
+                  >
+                    <span className="material-symbols-outlined text-lg">close</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+                시작 일시 <span className="text-red-400">*</span>
+              </span>
+              <input
+                type="datetime-local"
+                value={startDateTime}
+                onChange={(e) => setStartDateTime(e.target.value)}
+                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-violet-500/20"
+                required
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+                종료 일시 <span className="text-red-400">*</span>
+              </span>
+              <input
+                type="datetime-local"
+                value={endDateTime}
+                onChange={(e) => setEndDateTime(e.target.value)}
+                className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-violet-500/20"
+                required
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">타임존</span>
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full max-w-xs bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-violet-500/20"
+            >
+              <option value="Asia/Seoul">Asia/Seoul (한국)</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Asia/Tokyo">Asia/Tokyo</option>
+            </select>
+          </label>
         </Surface>
 
         <Surface variant="primary" className="p-8 space-y-6">
