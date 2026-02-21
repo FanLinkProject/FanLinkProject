@@ -182,7 +182,7 @@ export default function MarketPage() {
       {!searchTerm && groupStores.length > 0 && (
         <div className="space-y-16 pt-12 border-t border-white/10">
           <div className="space-y-10">
-              <SectionTitle className="px-2 mb-8">그룹계정 스토어</SectionTitle>
+              <SectionTitle className="px-2 mb-8">그룹별 스토어</SectionTitle>
               {groupStores.map((store) => {
                 const preview = store.products.slice(0, 4);
                 if (preview.length === 0) return null;
