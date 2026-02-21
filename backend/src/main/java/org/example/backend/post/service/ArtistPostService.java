@@ -19,7 +19,9 @@ import org.example.backend.post.repository.PostMediaAssetRepository;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,8 @@ public class ArtistPostService {
     private final MediaAssetRepository mediaAssetRepository;
     private final AwsProperties awsProperties;
     private final SubscriptionRepository subscriptionRepository;
+    private final ArtistPermissionService artistPermissionService;
+    private final GroupMemberRepository groupMemberRepository;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -91,6 +95,14 @@ public class ArtistPostService {
 
         if (user.getRole() == UserRole.USER) {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        }
+        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
+            // 그룹 소속 ARTIST: 자신의 소속 그룹에 대해서만 포스트 작성 허용
+            if (user.getRole() != UserRole.ARTIST
+                    || request.getGroupId() == null
+                    || !groupMemberRepository.existsByGroupIdAndMemberId(request.getGroupId(), userId)) {
+                throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+            }
         }
 
         validateRepresentativeMediaAssetId(request.getMediaAssetIds(), request.getRepresentativeMediaAssetId());
@@ -159,6 +171,25 @@ public class ArtistPostService {
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
                         userId, role, true))
+                .collect(Collectors.toList());
+    }
+
+    public List<ArtistPostResponse> getMyArtistPosts(Long writerId, Long lastPostId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return artistPostRepository.findMyArtistPosts(writerId, lastPostId, pageable).stream()
+                .map(post -> ArtistPostResponse.from(post,
+                        buildAttachmentResponses(
+                                postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()))))
+                .collect(Collectors.toList());
+    }
+
+    /** 본인이 작성한 게시글 목록 (관리용, 삭제되지 않은 것만) */
+    public List<ArtistPostResponse> getMyPosts(User user, Pageable pageable) {
+        return artistPostRepository.findByUserAndStatusOrderByCreatedAtDesc(user, false, pageable)
+                .getContent()
+                .stream()
+                .map(post -> ArtistPostResponse.from(post,
+                        buildAttachmentResponses(postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()))))
                 .collect(Collectors.toList());
     }
 
@@ -270,9 +301,18 @@ public class ArtistPostService {
         if (role == UserRole.ADMIN) {
             return true;
         }
+        // GROUP 계정: 자신의 그룹 포스트에 항상 접근 가능
+        if (role == UserRole.GROUP) {
+            return post.getGroup() != null && post.getGroup().getId().equals(userId);
+        }
         if (role == UserRole.ARTIST) {
-            return post.getUser().getId().equals(userId)
-                    || (post.getGroup() != null && post.getGroup().getId().equals(userId));
+            // 작성자 본인
+            if (post.getUser().getId().equals(userId)) return true;
+            // 해당 포스트의 그룹에 소속된 멤버
+            if (post.getGroup() != null) {
+                return groupMemberRepository.existsByGroupIdAndMemberId(post.getGroup().getId(), userId);
+            }
+            return false;
         }
         Long artistId = post.getGroup() != null ? post.getGroup().getId() : post.getUser().getId();
         return subscriptionRepository.existsActiveSubscriptionForArtist(userId, artistId, Instant.now());

@@ -1,15 +1,15 @@
 package org.example.backend.user.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
+import org.example.backend.user.dto.request.ArtistProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistHomeResponse;
 import org.example.backend.user.dto.response.ArtistMyPageResponse;
 import org.example.backend.user.service.ArtistService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/artist")
@@ -34,6 +34,16 @@ public class ArtistController {
     ) {
         ArtistMyPageResponse response = artistService.getMyPage(principalDetails.getUser());
         return ResponseEntity.ok(response);
+    }
+
+    // 아티스트 프로필 수정 (소개, 프로필 이미지, 배너, 공식 링크)
+    @PatchMapping("/profile")
+    public ResponseEntity<ArtistMyPageResponse.Profile> updateProfile(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @Valid @RequestBody ArtistProfileUpdateRequest request
+    ) {
+        ArtistMyPageResponse.Profile profile = artistService.updateArtistProfile(principalDetails.getUser(), request);
+        return ResponseEntity.ok(profile);
     }
 }
 

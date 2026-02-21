@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { MOCK_ARTISTS } from "@/lib/mockData";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
+
+const BASE_URL = "http://localhost:8080";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};
@@ -15,14 +17,35 @@ function getAuthHeaders() {
 
 export default function FanSidebar() {
   const pathname = usePathname();
-  const followingArtists = MOCK_ARTISTS.filter((a) => a.isSubscribed);
+  const router = useRouter();
+  const [followingArtists, setFollowingArtists] = useState([]);
   const [dmRooms, setDmRooms] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(!!getAuthHeaders().Authorization);
+  }, [pathname]);
+
+  useEffect(() => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) {
+      setFollowingArtists([]);
+      return;
+    }
+    axios
+      .get(`${BASE_URL}/api/home`, { headers })
+      .then((res) => {
+        const list = res.data?.followedArtists ?? [];
+        setFollowingArtists(Array.isArray(list) ? list : []);
+      })
+      .catch(() => setFollowingArtists([]));
+  }, [pathname]);
 
   useEffect(() => {
     const headers = getAuthHeaders();
     if (!headers.Authorization) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/rooms", { headers })
+      .get(`${BASE_URL}/api/chat/DM/rooms`, { headers })
       .then((res) => setDmRooms(res.data || []))
       .catch(() => setDmRooms([]));
   }, [pathname]);
@@ -30,9 +53,17 @@ export default function FanSidebar() {
   const getRoomAvatar = (room) =>
     `https://picsum.photos/seed/${room?.roomId || room?.hostName || "dm"}/100/100`;
 
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+    }
+    router.push("/login");
+  };
+
   return (
-    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#16102a] backdrop-blur-sm border-r border-white/[0.05] hidden lg:flex flex-col p-6 z-40 overflow-y-auto no-scrollbar">
-      <div className="flex flex-col gap-8">
+    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-[#16102a] backdrop-blur-sm border-r border-white/[0.05] hidden md:flex flex-col pt-16 px-6 pb-6 z-40 overflow-y-auto no-scrollbar">
+      <div className="flex flex-col gap-8 flex-1 pt-6">
         <section>
           <div className="flex items-center justify-between mb-4 px-2">
             <h3 className="inline-flex items-center leading-none text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
@@ -43,21 +74,25 @@ export default function FanSidebar() {
             </span>
           </div>
           <div className="flex flex-col gap-1">
-            {followingArtists.map((a) => (
-              <Link
-                key={a.id}
-                href={`/artists/${a.id}`}
-                className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 transition-all text-left group">
-                <img
-                  src={a.avatar}
-                  className="size-9 rounded-full border border-white/10 group-hover:border-violet-400/30 shadow-sm"
-                  alt=""
-                />
-                <span className="text-[13px] font-medium text-white/80 truncate group-hover:text-violet-300 transition-colors leading-tight">
-                  {a.name}
-                </span>
-              </Link>
-            ))}
+            {followingArtists.length === 0 ? (
+              <p className="px-2 py-2 text-[13px] text-white/55">팔로우한 아티스트가 없습니다</p>
+            ) : (
+              followingArtists.map((a) => (
+                <Link
+                  key={a.artistId}
+                  href={`/artists/${a.artistId}`}
+                  className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 transition-all text-left group">
+                  <img
+                    src={a.profileImageUrl || getDefaultAvatarUrl(a.nickname)}
+                    className="size-9 rounded-full border border-white/10 group-hover:border-violet-400/30 shadow-sm object-cover"
+                    alt=""
+                  />
+                  <span className="text-[13px] font-medium text-white/80 truncate group-hover:text-violet-300 transition-colors leading-tight">
+                    {a.nickname}
+                  </span>
+                </Link>
+              ))
+            )}
           </div>
         </section>
         <section>
@@ -97,7 +132,35 @@ export default function FanSidebar() {
             )}
           </div>
         </section>
+        <section className="flex flex-col gap-2">
+          <Link
+            href="/market"
+            className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-white/10 transition-all text-left group"
+          >
+            <span className="material-symbols-outlined text-xl text-white/80 group-hover:text-violet-300">storefront</span>
+            <span className="text-[13px] font-medium text-white/80 group-hover:text-violet-300 transition-colors">마켓</span>
+          </Link>
+          <Link
+            href="/candy/recharge"
+            className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-white/10 transition-all text-left group"
+          >
+            <span className="material-symbols-outlined text-xl text-white/80 group-hover:text-violet-300">redeem</span>
+            <span className="text-[13px] font-medium text-white/80 group-hover:text-violet-300 transition-colors">캔디샵</span>
+          </Link>
+        </section>
       </div>
+      {isLoggedIn && (
+        <div className="mt-4 pt-3 border-t border-white/[0.06]">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full text-left text-[11px] text-white/55 hover:text-white/80 hover:bg-white/[0.06] px-3 py-2 rounded-xl flex items-center gap-2 transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">logout</span>
+            <span className="font-medium">로그아웃</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

@@ -8,6 +8,7 @@ public record ArtistDashboardResponse(
         ArtistInfo artistInfo,
         FollowStatus followStatus,
         MembershipInfo membershipInfo,
+        boolean isGroupMember,
         List<PostItem> posts,
         List<LiveNotification> liveNotifications,
         List<ShopItem> shopItems
