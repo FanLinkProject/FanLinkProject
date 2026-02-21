@@ -1,38 +1,54 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
+import { request } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-export default function EditPostPage() {
+function EditPostContent() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : null;
-  const artist = MOCK_ARTISTS[0];
+  const numericId = Number(id);
+
   const [content, setContent] = useState("");
-  const [imageFile, setImageFile] = useState(null);
+  const [isMembershipOnly, setIsMembershipOnly] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
-  const [initialImage, setInitialImage] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [initialImageUrl, setInitialImageUrl] = useState(null);
+  const [writerNickname, setWriterNickname] = useState("");
+  const [writerAvatar, setWriterAvatar] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const post = id ? MOCK_POSTS.find((p) => p.id === id && p.artistId === artist.id && p.type === "ARTIST") : null;
-
+  // 기존 게시물 로드
   useEffect(() => {
-    if (post) {
-      setContent(post.content || "");
-      setInitialImage(post.image || null);
-      setImagePreview(post.image || null);
+    if (!numericId || isNaN(numericId)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
     }
-  }, [post]);
+    request(`/api/artist-posts/${numericId}`)
+      .then((data) => {
+        setContent(data.content || "");
+        setIsMembershipOnly(data.isMembershipOnly ?? false);
+        setWriterNickname(data.writerNickname || "");
+        setWriterAvatar(data.writerProfileImageUrl || "");
+        const imgUrl = data.attachments?.[0]?.url || null;
+        setInitialImageUrl(imgUrl);
+        setImagePreview(imgUrl);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [numericId]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
+    if (!file || !file.type.startsWith("image/")) return;
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -40,18 +56,41 @@ export default function EditPostPage() {
   const removeImage = () => {
     if (imagePreview && imageFile) URL.revokeObjectURL(imagePreview);
     setImageFile(null);
-    setImagePreview(initialImage ?? null);
+    setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim()) return;
-    // Mock: 실제로는 API 호출. 완료 후 목록으로 이동.
-    router.push("/artist-console/posts");
+    if (!content.trim() || submitLoading) return;
+    setSubmitLoading(true);
+    try {
+      await request(`/api/artist-posts/${numericId}`, {
+        method: "PUT",
+        body: {
+          title: "",
+          content: content.trim(),
+          isMembershipOnly,
+          mediaAssetIds: [],
+        },
+      });
+      router.push("/artist-console/posts");
+    } catch (err) {
+      console.error("수정 실패", err);
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
-  if (id && !post) {
+  if (loading) {
+    return (
+      <div className="p-8 lg:p-12 max-w-3xl mx-auto">
+        <p className="text-white/55">로딩 중...</p>
+      </div>
+    );
+  }
+
+  if (notFound) {
     return (
       <div className="p-8 lg:p-12 max-w-3xl mx-auto">
         <p className="text-white/55">게시물을 찾을 수 없습니다.</p>
@@ -65,27 +104,45 @@ export default function EditPostPage() {
   return (
     <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-8">
       <header className="flex items-center gap-4">
-        <Button variant="ghost" href="/artist-console/posts" className="size-10 rounded-full">
+        <Button
+          variant="ghost"
+          href="/artist-console/posts"
+          className="size-10 rounded-full"
+        >
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
         <div>
           <SectionTitle className="text-2xl font-bold">글 수정</SectionTitle>
-          <p className="text-white/55 text-sm font-medium mt-1">게시물 내용을 수정하세요.</p>
+          <p className="text-white/55 text-sm font-medium mt-1">
+            게시물 내용을 수정하세요.
+          </p>
         </div>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Surface variant="primary" className="p-8">
-          <div className="flex items-center gap-4 mb-6">
-            <img src={artist.avatar} className="size-12 rounded-full border border-white/[0.08]" alt="" />
-            <div>
-              <p className="font-bold text-white">{artist.name}</p>
-              <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Official Artist</p>
+          {/* 작성자 정보 */}
+          {writerAvatar && (
+            <div className="flex items-center gap-4 mb-6">
+              <img
+                src={writerAvatar}
+                className="size-12 rounded-full border border-white/[0.08]"
+                alt=""
+              />
+              <div>
+                <p className="font-bold text-white">{writerNickname}</p>
+                <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">
+                  Official Artist
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
+          {/* 내용 */}
           <label className="block">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">내용</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+              내용
+            </span>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -95,8 +152,33 @@ export default function EditPostPage() {
             />
           </label>
 
+          {/* 멤버십 전용 토글 */}
+          <label className="flex items-center gap-3 mt-5 cursor-pointer w-fit">
+            <div
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                isMembershipOnly ? "bg-violet-500" : "bg-white/[0.12]"
+              }`}
+              onClick={() => setIsMembershipOnly((v) => !v)}
+            >
+              <span
+                className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+                  isMembershipOnly ? "translate-x-5" : "translate-x-0.5"
+                }`}
+              />
+            </div>
+            <span className="text-sm font-bold text-white/70">멤버십 전용</span>
+            {isMembershipOnly && (
+              <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest">
+                멤버 한정
+              </span>
+            )}
+          </label>
+
+          {/* 사진 첨부 */}
           <div className="mt-6">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">사진 첨부</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+              사진 첨부
+            </span>
             <input
               ref={fileInputRef}
               type="file"
@@ -110,12 +192,18 @@ export default function EditPostPage() {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
               >
-                <span className="material-symbols-outlined text-4xl">add_photo_alternate</span>
+                <span className="material-symbols-outlined text-4xl">
+                  add_photo_alternate
+                </span>
                 <span className="text-sm font-bold">클릭하여 사진 추가</span>
               </button>
             ) : (
               <div className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                <img src={imagePreview} alt="미리보기" className="w-full max-h-80 object-contain bg-black/20" />
+                <img
+                  src={imagePreview}
+                  alt="미리보기"
+                  className="w-full max-h-80 object-contain bg-black/20"
+                />
                 <button
                   type="button"
                   onClick={removeImage}
@@ -132,11 +220,24 @@ export default function EditPostPage() {
           <Button variant="ghost" href="/artist-console/posts">
             취소
           </Button>
-          <Button type="submit" variant="primary" className="px-8 py-3">
-            수정 완료
+          <Button
+            type="submit"
+            variant="primary"
+            className="px-8 py-3"
+            disabled={submitLoading || !content.trim()}
+          >
+            {submitLoading ? "저장 중..." : "수정 완료"}
           </Button>
         </div>
       </form>
     </div>
+  );
+}
+
+export default function EditPostPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-white/55">로딩 중...</div>}>
+      <EditPostContent />
+    </Suspense>
   );
 }

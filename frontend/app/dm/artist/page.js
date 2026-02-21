@@ -238,7 +238,7 @@ export default function ArtistChatRoomPage() {
             <div className="mx-auto flex h-full max-w-4xl items-center justify-between px-6">
               <div className="flex items-center gap-4">
                 <Link
-                  href="/artist-console"
+                  href="/home"
                   className="mr-2 p-1 text-white/55 transition-colors hover:text-white lg:hidden"
                   aria-label="뒤로"
                 >

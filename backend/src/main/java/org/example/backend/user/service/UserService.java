@@ -98,7 +98,17 @@ public class UserService {
     // 프로필 조회
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(User user) {
-        return UserProfileResponse.from(user);
+        Long groupId = null;
+        if (user.getRole() == UserRole.GROUP) {
+            // GROUP 계정: 자신이 곧 그룹
+            groupId = user.getId();
+        } else if (user.getRole() == UserRole.ARTIST) {
+            // ARTIST 계정: 소속 그룹 ID 조회
+            groupId = groupMemberRepository.findByMember(user)
+                    .map(gm -> gm.getGroup().getId())
+                    .orElse(null);
+        }
+        return UserProfileResponse.from(user, groupId);
     }
 
     // 프로필 수정

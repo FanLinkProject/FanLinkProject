@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const adminMenuItems = [
   {
@@ -15,6 +15,18 @@ const adminMenuItems = [
     label: "회원 관리",
     icon: "group",
     href: "/admin/users",
+  },
+  {
+    id: "ADMIN_REPORTS",
+    label: "신고 내역 조회",
+    icon: "report",
+    href: "/admin/reports",
+  },
+  {
+    id: "ADMIN_PENALTIES",
+    label: "패널티 내역 조회",
+    icon: "gavel",
+    href: "/admin/penalties",
   },
   {
     id: "ADMIN_ARTISTS",
@@ -34,16 +46,37 @@ const adminMenuItems = [
     icon: "campaign",
     href: "/admin/notices",
   },
+  {
+    id: "ADMIN_CANDYSHOP",
+    label: "캔디샵",
+    icon: "store",
+    href: "/admin/candyshop",
+  },
+  {
+    id: "ADMIN_MARKET",
+    label: "마켓",
+    icon: "shopping_bag",
+    href: "/admin/market",
+  },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const isActive = (href) =>
     pathname === href || (href !== "/admin" && pathname?.startsWith(href));
 
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+    }
+    router.push("/login");
+  };
+
   return (
-    <aside className="fixed left-0 top-16 bottom-0 w-64 bg-[#16102a] backdrop-blur-sm border-r border-white/[0.05] hidden lg:flex flex-col p-6 z-40 overflow-y-auto no-scrollbar">
-      <div className="flex flex-col gap-8">
+    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-[#16102a] backdrop-blur-sm border-r border-white/[0.05] hidden md:flex flex-col pt-16 px-6 pb-6 z-40 overflow-y-auto no-scrollbar">
+      <div className="flex flex-col gap-8 flex-1">
         <section>
           <div className="flex items-center justify-between mb-4 px-2">
             <h3 className="inline-flex items-center leading-none text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55">
@@ -68,6 +101,16 @@ export default function AdminSidebar() {
             ))}
           </div>
         </section>
+      </div>
+      <div className="mt-4 pt-3 border-t border-white/[0.06]">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full text-left text-[11px] text-white/55 hover:text-white/80 hover:bg-white/[0.06] px-3 py-2 rounded-xl flex items-center gap-2 transition-colors"
+        >
+          <span className="material-symbols-outlined text-sm">logout</span>
+          <span className="font-medium">로그아웃</span>
+        </button>
       </div>
     </aside>
   );

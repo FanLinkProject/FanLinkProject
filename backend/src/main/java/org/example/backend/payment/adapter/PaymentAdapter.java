@@ -1,12 +1,16 @@
 package org.example.backend.payment.adapter;
 
-import org.example.backend.payment.dto.TossPaymentDto;
+import org.example.backend.payment.dto.PaymentConfirmResult;
 
+/**
+ * PG사에 종속되지 않는 결제 어댑터 인터페이스.
+ * 구현체(TossPaymentAdapter 등)가 각 PG API를 호출하고 도메인 모델로 변환하여 반환한다.
+ */
 public interface PaymentAdapter {
-    TossPaymentDto.PaymentConfirmResponse confirmPayment(String paymentKey, String orderId, Long amount);
+    PaymentConfirmResult confirmPayment(String paymentKey, String orderId, Long amount);
 
-    TossPaymentDto.BillingKeyResponse issueBillingKey(String authKey, String customerKey);
+    String issueBillingKey(String authKey, String customerKey);
 
-    TossPaymentDto.PaymentConfirmResponse billingPayment(String billingKey, String customerKey, Long amount,
+    PaymentConfirmResult billingPayment(String billingKey, String customerKey, Long amount,
             String orderId, String orderName);
 }

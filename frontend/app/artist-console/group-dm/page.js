@@ -157,7 +157,7 @@ export default function ArtistGroupDMPage() {
       <section className="flex-1 flex flex-col bg-[#201a33] overflow-hidden">
         <header className="h-16 border-b border-white/[0.06] shrink-0 z-10 px-8 flex items-center justify-between bg-[#16102a]/80">
           <div className="flex items-center gap-4">
-            <Link href="/artist-console" className="p-2 text-white/60 hover:text-violet-300 transition-colors">
+            <Link href="/home" className="p-2 text-white/60 hover:text-violet-300 transition-colors">
               <span className="material-symbols-outlined">arrow_back</span>
             </Link>
             <div className="flex flex-col">

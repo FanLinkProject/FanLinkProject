@@ -17,8 +17,12 @@ import org.springframework.stereotype.Service;
 import org.example.backend.user.entity.User;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.order.dto.request.CandyOrderRequestDto;
 import org.example.backend.order.exception.OrderErrorCode;
 import org.example.backend.order.exception.OrderException;
+import org.example.backend.payment.service.PaymentService;
+import org.example.backend.product.enums.ProductPaymentMethod;
+import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
 @Service
@@ -26,9 +30,13 @@ import org.example.backend.order.exception.OrderException;
 @Transactional(readOnly = true)
 public class OrderService {
 
+        @Value("${payment.shipping-fee:3000}")
+        private long shippingFee;
+
         private final OrderRepository orderRepository;
         private final ProductRepository productRepository;
         private final UserRepository userRepository;
+        private final PaymentService paymentService;
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
@@ -88,6 +96,17 @@ public class OrderService {
                         orderItems.add(orderItem);
                 }
 
+                // 배송비: 현금 결제 상품 중 배송이 필요한 상품(플랫폼·멤버십·티켓 제외)이 있을 때만 추가
+                boolean hasShippableItem = orderItems.stream().anyMatch(item -> {
+                        Product p = item.getProduct();
+                        return p.getArtistId() != null
+                                        && !Boolean.TRUE.equals(p.getIsMembership())
+                                        && p.getConcertId() == null;
+                });
+                if (calculatedTotalAmount.compareTo(BigDecimal.ZERO) > 0 && hasShippableItem) {
+                        calculatedTotalAmount = calculatedTotalAmount.add(BigDecimal.valueOf(shippingFee));
+                }
+
                 // 3. Order 생성
                 Order order = Order.builder()
                                 .userId(user.getId())
@@ -106,6 +125,59 @@ public class OrderService {
                 // 5. 저장
                 orderRepository.save(order);
                 return order.getOrderNo();
+        }
+
+        /**
+         * 캔디 전용 상품을 캔디로 즉시 구매합니다.
+         * 1. 유저 캔디 잔액 확인 및 차감
+         * 2. Order 생성 (COMPLETED)
+         * 3. Payment 기록 생성
+         */
+        @Transactional
+        public String createCandyOrder(String email, CandyOrderRequestDto request) {
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new OrderException(OrderErrorCode.USER_NOT_FOUND));
+
+                int qty = request.quantity() != null && request.quantity() > 0 ? request.quantity() : 1;
+                Product product = productRepository.findByIdForUpdate(request.productId())
+                                .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
+
+                if (product.getPaymentMethod() != ProductPaymentMethod.CANDY_ONLY) {
+                        throw new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND);
+                }
+                Long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
+                if (candyPrice <= 0) {
+                        throw new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND);
+                }
+
+                long totalCandy = candyPrice * qty;
+                user.useCandy(totalCandy);
+
+                product.decreaseStock((long) qty);
+
+                OrderItem orderItem = OrderItem.builder()
+                                .product(product)
+                                .quantity(qty)
+                                .price(java.math.BigDecimal.ZERO)
+                                .candyPrice(candyPrice)
+                                .build();
+
+                Order order = Order.builder()
+                                .userId(user.getId())
+                                .name(qty > 1 ? product.getName() + " 외 " + (qty - 1) + "건" : product.getName())
+                                .totalAmount(java.math.BigDecimal.ZERO)
+                                .totalCandyAmount(totalCandy)
+                                .status(OrderStatus.COMPLETED)
+                                .orderNo("CANDY_" + java.util.UUID.randomUUID().toString())
+                                .build();
+
+                order.addOrderItem(orderItem);
+                Order savedOrder = orderRepository.save(order);
+
+                paymentService.createCandyPayment(savedOrder);
+
+                log.info("캔디 상품 구매 완료: userId={}, productId={}, quantity={}", user.getId(), product.getId(), qty);
+                return savedOrder.getOrderNo();
         }
 
         @Transactional
