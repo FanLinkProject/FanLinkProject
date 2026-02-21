@@ -7,7 +7,7 @@ import axios from "axios";
 
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
-import { request, apiGet } from "@/lib/api";
+import { request, apiGet, BASE_URL } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
@@ -15,7 +15,7 @@ import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 
 const CANDY_COST = 500;
-const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
+const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
 
 function getAuthHeaders() {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useMemo, Suspense } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { WS_CHAT_URL } from "@/lib/api";
 
 function parseJwtPayload(token) {
   try {
@@ -68,7 +69,7 @@ const ChatDMDetailContent = () => {
     if (!roomId || !pureToken || myRole !== "ARTIST") return;
     if (clientRef.current) clientRef.current.deactivate();
 
-    const socket = new SockJS("http://localhost:8080/ws-chat");
+    const socket = new SockJS(WS_CHAT_URL);
     const client = new Client({
       webSocketFactory: () => socket,
       connectHeaders: { Authorization: `Bearer ${pureToken}` },

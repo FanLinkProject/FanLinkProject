@@ -1,5 +1,6 @@
 "use client";
 
+import { BASE_URL } from "@/lib/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -44,7 +45,7 @@ export default function LoginPage() {
     }
     setError("");
     try {
-      const { data } = await axios.post("http://localhost:8080/api/auth/login", {
+      const { data } = await axios.post(`${BASE_URL}/api/auth/login`, {
         email,
         password,
       });
@@ -77,7 +78,7 @@ export default function LoginPage() {
 
   const handleOAuth = (provider) => {
     const registrationId = provider === "kakao" ? "kakao" : "google";
-    window.location.href = `http://localhost:8080/oauth2/authorization/${registrationId}`;
+    window.location.href = `${BASE_URL}/oauth2/authorization/${registrationId}`;
   };
 
   return (

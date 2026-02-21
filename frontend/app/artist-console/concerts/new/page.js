@@ -7,7 +7,8 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-const CONCERTS_API = "http://localhost:8080/api/concerts";
+import { BASE_URL } from "@/lib/api";
+const CONCERTS_API = `${BASE_URL}/api/concerts`;
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;

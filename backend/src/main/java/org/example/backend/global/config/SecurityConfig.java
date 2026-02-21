@@ -158,7 +158,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        // 패턴 사용 시 setAllowedOrigins 대신 setAllowedOriginPatterns 사용 (credentials=true 호환)
+        // http://localhost:3000 = 로컬 개발, https://*.vercel.app = Vercel 배포(프로덕션/프리뷰)
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:3000",
+                "https://*.vercel.app"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

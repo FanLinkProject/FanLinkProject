@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import axios from "axios";
+import { BASE_URL, WS_CHAT_URL } from "@/lib/api";
 
 function parseJwtPayload(token) {
   try {
@@ -104,7 +105,7 @@ function FanChatRoomContent() {
   useEffect(() => {
     if (!pureToken) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/role", {
+      .get(`${BASE_URL}/api/chat/DM/role`, {
         headers: authHeaders,
       })
       .then((res) => setMyRole(res.data.role))
@@ -114,7 +115,7 @@ function FanChatRoomContent() {
   useEffect(() => {
     if (!pureToken) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/nickname", {
+      .get(`${BASE_URL}/api/chat/DM/nickname`, {
         headers: authHeaders,
       })
       .then((res) => setMyNickname(res.data.nickname || myEmail))
@@ -125,7 +126,7 @@ function FanChatRoomContent() {
     if (!pureToken || !myEmail) return;
     axios
       .post(
-        "http://localhost:8080/api/chat/DM/userId",
+        `${BASE_URL}/api/chat/DM/userId`,
         { email: myEmail },
         { headers: authHeaders }
       )
@@ -140,7 +141,7 @@ function FanChatRoomContent() {
       setMessages([]);
       try {
         const res = await axios.get(
-          `http://localhost:8080/api/chat/DM/fan/rooms/${room.roomId}/messages`,
+          `${BASE_URL}/api/chat/DM/fan/rooms/${room.roomId}/messages`,
           { headers: authHeaders }
         );
         setMessages(res.data);
@@ -154,7 +155,7 @@ function FanChatRoomContent() {
   useEffect(() => {
     if (!pureToken) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/rooms", {
+      .get(`${BASE_URL}/api/chat/DM/rooms`, {
         headers: authHeaders,
       })
       .then((res) => {
@@ -176,7 +177,7 @@ function FanChatRoomContent() {
 
     if (clientRef.current) clientRef.current.deactivate();
 
-    const socket = new SockJS("http://localhost:8080/ws-chat");
+    const socket = new SockJS(WS_CHAT_URL);
     const client = new Client({
       webSocketFactory: () => socket,
       connectHeaders: authHeaders,
