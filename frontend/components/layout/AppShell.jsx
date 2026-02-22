@@ -10,6 +10,7 @@ import AdminSidebar from "@/components/sidebar/AdminSidebar";
 import ArtistSidebar from "@/components/sidebar/ArtistSidebar";
 import FanSidebar from "@/components/sidebar/FanSidebar";
 import GroupSidebar from "@/components/sidebar/GroupSidebar";
+import { BASE_URL } from "@/lib/api";
 
 const AUTH_PATHS = ["/login", "/signup"];
 const AUTH_PREFIX = "/signup/";
@@ -101,7 +102,7 @@ export default function AppShell({ children }) {
     const pure = token?.replace(/^Bearer\s+/i, "").trim();
     if (!pure) return;
 
-    fetch("http://localhost:8080/api/home", {
+    fetch(`${BASE_URL}/api/home`, {
       headers: { Authorization: `Bearer ${pure}` },
     })
       .then((res) => (res.ok ? res.json() : null))

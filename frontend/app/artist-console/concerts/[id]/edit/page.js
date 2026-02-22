@@ -11,7 +11,9 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { KakaoPlacePicker } from "@/components/concert/KakaoPlacePicker";
 
-const USER_PROFILE_API = "http://localhost:8080/api/user/profile";
+import { BASE_URL } from "@/lib/api";
+const CONCERTS_API = `${BASE_URL}/api/concerts`;
+const USER_PROFILE_API = `${BASE_URL}/api/user/profile`;
 
 function getAuthHeaders() {
   const token =

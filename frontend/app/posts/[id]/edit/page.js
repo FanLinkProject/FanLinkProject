@@ -9,7 +9,7 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-const BASE_URL = "http://localhost:8080";
+import { BASE_URL } from "@/lib/api";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};

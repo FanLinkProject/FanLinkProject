@@ -105,11 +105,12 @@ public class SecurityConfig {
                             && req.getRequestURI().startsWith("/api/notifications/subscribe"))
                     .permitAll()
 
-				.requestMatchers(GET,"api/concerts/**").permitAll()
-                    // 관리자
-                    .requestMatchers("/api/admin/**")
+				.requestMatchers(GET, "/api/concerts/**").permitAll()
+
+                // 관리자
+                .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
-                
+
                 // 아티스트, 그룹, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -164,9 +165,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
+        config.setAllowedOriginPatterns(List.of(
                 "http://localhost:3000",
-                "https://fan-link-project.vercel.app"
+                "https://fan-link-project.vercel.app",
+                "https://*.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

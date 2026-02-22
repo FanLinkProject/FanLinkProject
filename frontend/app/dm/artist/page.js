@@ -6,6 +6,7 @@ import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { BASE_URL, WS_CHAT_URL } from "@/lib/api";
 
 /* JWT UTIL */
 function parseJwtPayload(token) {
@@ -105,7 +106,7 @@ export default function ArtistChatRoomPage() {
   useEffect(() => {
     if (!pureToken) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/role", { headers: authHeaders })
+      .get(`${BASE_URL}/api/chat/DM/role`, { headers: authHeaders })
       .then((res) => setMyRole(res.data.role))
       .catch((err) => console.log("[ROLE ERROR]", err));
   }, [pureToken, authHeaders]);
@@ -114,7 +115,7 @@ export default function ArtistChatRoomPage() {
     if (!pureToken || !myEmail) return;
     axios
       .post(
-        "http://localhost:8080/api/chat/DM/userId",
+        `${BASE_URL}/api/chat/DM/userId`,
         { email: myEmail },
         { headers: authHeaders }
       )
@@ -125,7 +126,7 @@ export default function ArtistChatRoomPage() {
   useEffect(() => {
     if (!pureToken) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/nickname", {
+      .get(`${BASE_URL}/api/chat/DM/nickname`, {
         headers: authHeaders,
       })
       .then((res) => setMyNickname(res.data.nickname || myEmail))
@@ -140,7 +141,7 @@ export default function ArtistChatRoomPage() {
       if (!pureToken) return;
       try {
         const res = await axios.get(
-          `http://localhost:8080/api/chat/DM/artist/rooms/${room.roomId}/messages`,
+          `${BASE_URL}/api/chat/DM/artist/rooms/${room.roomId}/messages`,
           { headers: authHeaders }
         );
         setMessages(res.data);
@@ -154,7 +155,7 @@ export default function ArtistChatRoomPage() {
   useEffect(() => {
     if (!pureToken) return;
     axios
-      .get("http://localhost:8080/api/chat/DM/rooms", {
+      .get(`${BASE_URL}/api/chat/DM/rooms`, {
         headers: authHeaders,
       })
       .then((res) => {
@@ -170,7 +171,7 @@ export default function ArtistChatRoomPage() {
     if (!selectedRoom || !pureToken || myRole !== "ARTIST") return;
     if (clientRef.current) clientRef.current.deactivate();
 
-    const socket = new SockJS("http://localhost:8080/ws-chat");
+    const socket = new SockJS(WS_CHAT_URL);
     const client = new Client({
       webSocketFactory: () => socket,
       connectHeaders: authHeaders,

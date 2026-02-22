@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { apiGet } from "@/lib/api";
 import { isUpcoming, getTicketStatus } from "@/lib/concertUtils";
@@ -35,7 +35,7 @@ function filterByChip(concerts, chip) {
   return list;
 }
 
-export default function ConcertsPage() {
+function ConcertsPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [concerts, setConcerts] = useState([]);
@@ -51,9 +51,8 @@ export default function ConcertsPage() {
     if (q) router.push(`/concerts/search?q=${encodeURIComponent(q)}`);
   };
 
-  useEffect(() => {
-    if (searchParams?.get("mode") === "map") setMode("map");
-  }, [searchParams]);
+  const urlMode = searchParams?.get("mode") ?? "";
+  const displayMode = urlMode === "map" ? "map" : mode;
 
   const mapCenter =
     searchParams?.get("lat") != null && searchParams?.get("lng") != null
@@ -113,15 +112,19 @@ export default function ConcertsPage() {
             </button>
             <button
               type="button"
-              onClick={() => setMode((m) => (m === "list" ? "map" : "list"))}
+              onClick={() => {
+                const next = displayMode === "list" ? "map" : "list";
+                setMode(next);
+                router.push(next === "map" ? "/concerts?mode=map" : "/concerts");
+              }}
               className="p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white shrink-0"
-              title={mode === "list" ? "지도 보기" : "목록 보기"}
+              title={displayMode === "list" ? "지도 보기" : "목록 보기"}
             >
-              <span className="material-symbols-outlined">{mode === "list" ? "map" : "list"}</span>
+              <span className="material-symbols-outlined">{displayMode === "list" ? "map" : "list"}</span>
             </button>
           </form>
           {/* 목록 뷰에서만 필터 칩 (다가오는/예매중/이번주/이번달) */}
-          {mode === "list" && (
+          {displayMode === "list" && (
             <div className="flex gap-2 flex-wrap">
               {[
                 { id: FILTER_UPCOMING, label: "다가오는 공연" },
@@ -154,7 +157,7 @@ export default function ConcertsPage() {
       )}
 
       <main className="max-w-5xl mx-auto px-4 py-6">
-        {mode === "list" ? (
+        {displayMode === "list" ? (
           <>
             <NearbyConcertCarousel concerts={filtered} />
             <TicketingSection concerts={filtered} status="OPEN" />
@@ -170,5 +173,17 @@ export default function ConcertsPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ConcertsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-[50vh] flex items-center justify-center text-white/55">
+        로딩 중...
+      </div>
+    }>
+      <ConcertsPageInner />
+    </Suspense>
   );
 }

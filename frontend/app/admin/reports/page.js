@@ -7,7 +7,7 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { redirectToGuestHome } from "@/lib/authRedirect";
 
-const BASE_URL = "http://localhost:8080";
+import { BASE_URL } from "@/lib/api";
 const PAGE_SIZE = 10;
 
 function getAuthHeaders() {

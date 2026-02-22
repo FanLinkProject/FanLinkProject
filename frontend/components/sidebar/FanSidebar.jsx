@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 
-const BASE_URL = "http://localhost:8080";
+import { BASE_URL } from "@/lib/api";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};

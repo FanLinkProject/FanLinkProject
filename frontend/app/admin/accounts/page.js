@@ -7,7 +7,7 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import { redirectToGuestHome } from "@/lib/authRedirect";
 
-const BASE_URL = "http://localhost:8080";
+import { BASE_URL } from "@/lib/api";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};

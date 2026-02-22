@@ -3,8 +3,10 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import axios from "axios";
 
+import { BASE_URL } from "@/lib/api";
+
 const NotificationContext = createContext(null);
-const API_BASE = "http://localhost:8080/api/notifications";
+const API_BASE = `${BASE_URL}/api/notifications`;
 
 export function NotificationProvider({ children }) {
     const [notifications, setNotifications] = useState([]);

@@ -8,7 +8,7 @@ import axios from "axios";
 // 데이터 및 유틸리티
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
-import { request, apiGet } from "@/lib/api";
+import { request, apiGet, BASE_URL } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
@@ -25,7 +25,7 @@ import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
 // --- 상수 및 헬퍼 함수 ---
 const CANDY_COST = 500;
-const FAN_PROFILES_API = "http://localhost:8080/api/fan-profiles";
+const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
 
 function getAuthHeaders() {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;

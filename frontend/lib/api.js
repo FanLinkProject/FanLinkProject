@@ -6,10 +6,11 @@
  * - (호환) request() 제공: 기존 dev 코드 그대로 사용할 수 있게 래핑
  */
 
+/** Vercel 등에서는 환경 변수 NEXT_PUBLIC_API_BASE_URL 로 API 서버 주소 지정 */
 export const BASE_URL =
     typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL
         ? process.env.NEXT_PUBLIC_API_BASE_URL
-        : "http://localhost:8080";
+        : "https://api.fanlink.site";
 
 /** STOMP/SockJS 엔드포인트 (라이브챗 등) */
 export const WS_CHAT_URL = `${BASE_URL.replace(/\/$/, "")}/ws-chat`;

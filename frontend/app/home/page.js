@@ -9,6 +9,7 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import PostCard from "@/components/PostCard";
 import ArtistConsolePage from "../artist-console/page";
+import { BASE_URL } from "@/lib/api";
 
 const FEED_POSTS_LIMIT_PER_GROUP = 15;
 
@@ -47,8 +48,6 @@ function transformArtistPost(p, groupId, groupAvatar = "") {
     type: "ARTIST",
   };
 }
-
-const BASE_URL = "http://localhost:8080";
 
 /** 드래그로 스크롤 가능한 가로 목록 (스크롤바 숨김) */
 function DragScrollContainer({ children, className = "" }) {

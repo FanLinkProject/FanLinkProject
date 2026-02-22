@@ -9,6 +9,7 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { KakaoPlacePicker } from "@/components/concert/KakaoPlacePicker";
+import { BASE_URL } from "@/lib/api";
 
 function parseJwt(token) {
   try {

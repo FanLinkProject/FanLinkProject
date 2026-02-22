@@ -6,7 +6,8 @@ import axios from "axios";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 
-const API_BASE = "http://localhost:8080/api/milestones";
+import { BASE_URL } from "@/lib/api";
+const API_BASE = `${BASE_URL}/api/milestones`;
 const CONDITION_FIELDS = [
   { type: "POST_COUNT", formKey: "postCount", label: "게시글", unit: "개" },
   { type: "COMMENT_COUNT", formKey: "commentCount", label: "댓글", unit: "개" },
@@ -65,7 +66,7 @@ export default function MilestonePage() {
       setAutoUpgrading(true);
       setError("");
       await axios.post(
-        "http://localhost:8080/api/milestone/fan-grade/auto-upgrade",
+        `${BASE_URL}/api/milestone/fan-grade/auto-upgrade`,
         {},
         { headers: getAuthHeaders() }
       );
