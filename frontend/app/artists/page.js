@@ -1,15 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { MOCK_ARTISTS } from "@/lib/mockData";
+import { BASE_URL } from "@/lib/api";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 import Surface from "@/components/ui/Surface";
+
+function getAuthHeaders() {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("accessToken");
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
+  return pure ? { Authorization: `Bearer ${pure}` } : {};
+}
 
 export default function ArtistsListPage() {
   const [search, setSearch] = useState("");
-  const filteredArtists = MOCK_ARTISTS.filter((a) =>
-    a.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const [artists, setArtists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchArtists = useCallback((keyword = "") => {
+    setLoading(true);
+    const params = keyword.trim() ? { nickname: keyword.trim(), page: 0, size: 100 } : { page: 0, size: 100 };
+    fetch(`${BASE_URL}/api/user/artists?${new URLSearchParams(params)}`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("목록을 불러올 수 없습니다."))))
+      .then((data) => {
+        const list = data?.content ?? data ?? [];
+        setArtists(Array.isArray(list) ? list : []);
+        setError("");
+      })
+      .catch(() => {
+        setArtists([]);
+        setError("아티스트 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => fetchArtists(search), search ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [search, fetchArtists]);
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
@@ -36,55 +68,45 @@ export default function ArtistsListPage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {filteredArtists.map((artist) => (
-          <Link
-            key={artist.id}
-            href={`/artists/${artist.id}`}
-            className="group flex flex-col"
-          >
-            <Surface
-              variant="card"
-              className="p-8 flex flex-col items-center text-center h-full overflow-hidden"
+      {loading ? (
+        <Surface variant="primary" className="p-12 text-center">
+          <p className="text-white/55">아티스트 목록을 불러오는 중...</p>
+        </Surface>
+      ) : error ? (
+        <Surface variant="primary" className="p-12 text-center">
+          <p className="text-red-400/90">{error}</p>
+        </Surface>
+      ) : artists.length === 0 ? (
+        <Surface variant="primary" className="p-12 text-center">
+          <p className="text-white/55">표시할 아티스트가 없습니다.</p>
+        </Surface>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {artists.map((artist) => (
+            <Link
+              key={artist.id}
+              href={`/artists/${artist.id}`}
+              className="group flex flex-col"
             >
-              <div className="relative mb-6">
-                <img
-                  src={artist.avatar}
-                  className="size-28 rounded-2xl border border-white/[0.08] shadow-[0_4px_16px_rgba(0,0,0,0.35)] group-hover:scale-[1.02] transition-transform duration-200 ease-out"
-                  alt={artist.name}
-                />
-                {artist.isLive && (
-                  <span className="absolute -bottom-1 -right-1 size-6 bg-red-500 rounded-full border-2 border-[#201a33] animate-pulse" />
-                )}
-              </div>
-              <h3 className="text-2xl font-black text-white mb-4">
-                {artist.name}
-              </h3>
-              <p className="text-sm text-white/80 leading-relaxed font-medium line-clamp-3 mb-8">
-                {artist.description}
-              </p>
-              <div className="flex gap-4 w-full pt-6 border-t border-white/10">
-                <div className="flex-1 text-center">
-                  <p className="text-xs font-black text-white">
-                    {artist.memberCount}
-                  </p>
-                  <p className="text-[9px] font-bold text-white/55 uppercase tracking-widest mt-1">
-                    Fans
-                  </p>
+              <Surface
+                variant="card"
+                className="p-8 flex flex-col items-center text-center h-full overflow-hidden"
+              >
+                <div className="relative mb-6">
+                  <img
+                    src={artist.profileImageUrl || getDefaultAvatarUrl(artist.nickname)}
+                    className="size-28 rounded-2xl border border-white/[0.08] shadow-[0_4px_16px_rgba(0,0,0,0.35)] group-hover:scale-[1.02] transition-transform duration-200 ease-out object-cover"
+                    alt={artist.nickname || ""}
+                  />
                 </div>
-                <div className="flex-1 text-center">
-                  <p className="text-xs font-black text-white">
-                    {artist.postCount}
-                  </p>
-                  <p className="text-[9px] font-bold text-white/55 uppercase tracking-widest mt-1">
-                    Posts
-                  </p>
-                </div>
-              </div>
-            </Surface>
-          </Link>
-        ))}
-      </div>
+                <h3 className="text-2xl font-black text-white mb-4">
+                  {artist.nickname || "아티스트"}
+                </h3>
+              </Surface>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -50,6 +50,24 @@ public interface UserRepository extends JpaRepository<User, Long> {
             Pageable pageable
     );
 
+    // 아티스트+그룹 통합 목록 (ACTIVE, 삭제 안 된 것만)
+    Page<User> findByRoleInAndStatusAndDeletedAtIsNull(
+            java.util.List<UserRole> roles,
+            UserStatus status,
+            Pageable pageable
+    );
+
+    /** 조회용 아티스트: GROUP 계정 + GroupMember에 속하지 않은 개인 ARTIST만 (페이징 정상 동작) */
+    @Query("SELECT u FROM User u " +
+           "WHERE u.role IN :roles AND u.status = :status AND u.deletedAt IS NULL " +
+           "AND (u.role = :groupRole OR NOT EXISTS (SELECT 1 FROM GroupMember gm WHERE gm.member = u))")
+    Page<User> findListableArtists(
+            @Param("roles") java.util.List<UserRole> roles,
+            @Param("status") UserStatus status,
+            @Param("groupRole") UserRole groupRole,
+            Pageable pageable
+    );
+
     // OAuth2 사용자 조회
     Optional<User> findByProviderAndProviderId(String provider, String providerId);
 

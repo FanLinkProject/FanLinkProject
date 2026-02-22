@@ -8,7 +8,7 @@ import axios from "axios";
 // 데이터 및 유틸리티
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
-import { request, apiGet, BASE_URL } from "@/lib/api";
+import { request, apiGet, apiPost, BASE_URL } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
@@ -319,7 +319,21 @@ function ArtistDetailPageInner({ paramsId }) {
                                 </Button>
                             </>
                         ) : (
-                            <Button variant="primary" className="px-10 py-4">구독하기</Button>
+                            <Button
+                                variant="primary"
+                                className="px-10 py-4"
+                                onClick={async () => {
+                                    const id = artist.backendId ?? artist.id;
+                                    if (!id || !isRealGroup) return;
+                                    try {
+                                        await apiPost(`/api/user/follow/${id}`);
+                                        setArtist((prev) => (prev ? { ...prev, isSubscribed: true, memberCount: (prev.memberCount || 0) + 1 } : prev));
+                                    } catch (e) {
+                                        console.error(e);
+                                    }
+                                }}>
+                                팔로우하기
+                            </Button>
                         )}
                     </div>
                 </Surface>

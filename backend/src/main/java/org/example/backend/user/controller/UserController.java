@@ -74,7 +74,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // 아티스트 목록 조회 및 검색
+    // 아티스트 목록 조회: GROUP 계정 + 그룹에 속하지 않은 개인 ARTIST만
     @GetMapping("/artists")
     public ResponseEntity<Page<ArtistSearchResponse>> getArtists(
             @RequestParam(value = "nickname", required = false) String nickname,
