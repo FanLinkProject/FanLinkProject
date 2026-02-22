@@ -454,7 +454,7 @@ function ArtistDetailPageInner({ id }) {
             await request(`/api/user/follow/${groupId}`, { method: "POST" });
             setArtist((prev) => ({ ...prev, isFollowing: true }));
         } catch (err) {
-            console.error("구독 실패", err);
+            console.error("팔로우 실패", err);
         } finally {
             setSubscribeLoading(false);
         }
@@ -686,7 +686,7 @@ function ArtistDetailPageInner({ id }) {
                         {!isGroupMember && (
                             artist.isFollowing ? (
                                 <>
-                                    <Button variant="ghost" className="px-8 py-3" disabled>구독 중</Button>
+                                    <Button variant="ghost" className="px-8 py-3" disabled>팔로우 중</Button>
                                     {fanProfileForArtist && (
                                         <Button
                                             variant="primary"
@@ -705,7 +705,7 @@ function ArtistDetailPageInner({ id }) {
                                     onClick={handleSubscribe}
                                     disabled={subscribeLoading}
                                 >
-                                    {subscribeLoading ? "처리 중…" : "구독하기"}
+                                    {subscribeLoading ? "처리 중…" : "팔로우"}
                                 </Button>
                             )
                         )}
@@ -826,7 +826,7 @@ function ArtistDetailPageInner({ id }) {
                             ) : (
                                 <Surface variant="primary" className="p-12 text-center">
                                     <p className="text-white/55 italic font-medium">
-                                        팬 포스트는 구독 중인 회원만 작성하고 볼 수 있습니다.
+                                        팬 포스트는 팔로우 중인 회원만 작성하고 볼 수 있습니다.
                                     </p>
                                 </Surface>
                             )}

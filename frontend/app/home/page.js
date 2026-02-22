@@ -325,7 +325,7 @@ export default function UserHomePage() {
         <section className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <div>
             <h2 className="text-2xl font-bold text-white mb-1">FanLink에 오신 것을 환영합니다</h2>
-            <p className="text-sm text-white/60">로그인하고 아티스트를 구독해 보세요.</p>
+            <p className="text-sm text-white/60">로그인하고 아티스트와 Link를 연결해보세요.</p>
           </div>
           <div className="flex gap-3">
             <Button href="/login" variant="primary" className="px-8 py-3 text-sm">
@@ -456,7 +456,7 @@ export default function UserHomePage() {
         {followedArtists.length === 0 ? (
           <Surface variant="primary" className="p-8 text-center">
             <p className="text-sm text-white/60 mb-4">
-              아직 팔로우 또는 구독한 아티스트가 없습니다.
+              아직 팔로우한 아티스트가 없습니다.
             </p>
             <Button href="/artists" variant="primary" className="text-xs">
               아티스트 둘러보기
