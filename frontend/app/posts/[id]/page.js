@@ -442,12 +442,16 @@ function PostDetailContent({ id }) {
         });
         const newReply = {
           id: typeof createdId === "number" ? createdId : Date.now(),
+          userId: myUserId,
           nickname: myNickname || "나",
           profileImageUrl: myProfileImageUrl || null,
           content: replyContent.trim(),
           createdAt: new Date().toISOString(),
-          status: 1,
+          status: false,
           isArtist: false,
+          likeCount: 0,
+          isLiked: false,
+          isEdited: false,
         };
         setComments((prev) =>
           prev.map((c) =>
@@ -465,12 +469,16 @@ function PostDetailContent({ id }) {
       } else {
         const newReply = {
           id: Date.now(),
+          userId: myUserId,
           nickname: myNickname || "팬",
           profileImageUrl: myProfileImageUrl || null,
           content: replyContent.trim(),
           createdAt: new Date().toISOString(),
-          status: 1,
+          status: false,
           isArtist: false,
+          likeCount: 0,
+          isLiked: false,
+          isEdited: false,
         };
         setComments((prev) =>
           prev.map((c) =>
@@ -503,7 +511,7 @@ function PostDetailContent({ id }) {
       }
       setComments((prev) =>
         prev.map((c) =>
-          c.id === commentId ? { ...c, status: 0, content: "삭제된 댓글입니다." } : c
+          c.id === commentId ? { ...c, status: true, content: "삭제된 댓글입니다." } : c
         )
       );
     } catch (err) {
@@ -523,7 +531,7 @@ function PostDetailContent({ id }) {
             ? {
                 ...c,
                 replies: c.replies.map((r) =>
-                  r.id === replyId ? { ...r, status: 0, content: "삭제된 댓글입니다." } : r
+                  r.id === replyId ? { ...r, status: true, content: "삭제된 댓글입니다." } : r
                 ),
               }
             : c
@@ -638,11 +646,12 @@ function PostDetailContent({ id }) {
         setComments((prev) => [
           enhanceComment({
             id: typeof createdId === "number" ? createdId : Date.now(),
+            userId: myUserId,
             nickname: myNickname || "나",
             profileImageUrl: myProfileImageUrl || null,
             content: newComment.trim(),
             createdAt: new Date().toISOString(),
-            status: 1,
+            status: false,
             replyCount: 0,
             hasReplies: false,
           }),
@@ -652,11 +661,12 @@ function PostDetailContent({ id }) {
         setComments((prev) => [
           enhanceComment({
             id: Date.now(),
+            userId: myUserId,
             nickname: myNickname || "팬",
             profileImageUrl: myProfileImageUrl || null,
             content: newComment,
             createdAt: new Date().toISOString(),
-            status: 1,
+            status: false,
             replyCount: 0,
             hasReplies: false,
           }),
@@ -782,7 +792,7 @@ function PostDetailContent({ id }) {
             ) : (
               <>
                 {comments.map((c) => {
-                  const isDeleted = c.status === 0;
+                  const isDeleted = c.status === true || c.status === 1;
                   return (
                     <div key={c.id}>
                       {/* 부모 댓글 */}
@@ -961,7 +971,7 @@ function PostDetailContent({ id }) {
                       {c.repliesExpanded && (
                         <div className="ml-12 mt-3 space-y-4 border-l border-white/[0.06] pl-4">
                           {c.replies.map((r) => {
-                            const rDeleted = r.status === 0;
+                            const rDeleted = r.status === true || r.status === 1;
                             return (
                               <div key={r.id} className="flex gap-3">
                                 <img
