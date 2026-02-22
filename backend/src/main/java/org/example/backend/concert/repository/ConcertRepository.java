@@ -2,10 +2,13 @@ package org.example.backend.concert.repository;
 
 import org.example.backend.concert.entity.Concert;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ConcertRepository extends JpaRepository<Concert, Long> {
@@ -26,4 +29,25 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
     List<Concert> findByStartDateTimeBeforeAndEndDateTimeAfterOrderByStartDateTimeAsc(
             Instant now, Instant now2
     );
+
+    @Query("select c from Concert c left join fetch c.location where c.id = :id")
+    Optional<Concert> findByIdWithLocation(@Param("id") Long id);
+
+    @Query("select distinct c from Concert c left join fetch c.location")
+    List<Concert> findAllWithLocation();
+
+    /** 다가오는 공연만 (endDateTime > now), startDateTime 오름차순 */
+    @Query("select c from Concert c left join fetch c.location where c.endDateTime > :now order by c.startDateTime asc")
+    List<Concert> findUpcomingConcerts(@Param("now") Instant now);
+
+    /** bounds 내 다가오는 공연, location fetch */
+    @Query("select c from Concert c join fetch c.location l where l.latitude between :swLat and :neLat and l.longitude between :swLng and :neLng and c.endDateTime > :now")
+    List<Concert> findUpcomingConcertsInBounds(
+            @Param("swLat") Double swLat,
+            @Param("swLng") Double swLng,
+            @Param("neLat") Double neLat,
+            @Param("neLng") Double neLng,
+            @Param("now") Instant now
+    );
+
 }

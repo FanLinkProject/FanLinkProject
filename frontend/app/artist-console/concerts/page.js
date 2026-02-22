@@ -54,7 +54,7 @@ export default function ArtistConcertsPage() {
         headers: getAuthHeaders(),
       });
       setConcerts((prev) =>
-        prev.filter((c) => String(c.id) !== String(concertId)),
+        prev.filter((c) => String(c.concertId ?? c.id) !== String(concertId)),
       );
     } catch (err) {
       const message = err.response?.data?.message || "삭제에 실패했습니다.";
@@ -123,79 +123,90 @@ export default function ArtistConcertsPage() {
             </Button>
           </Surface>
         ) : (
-          concerts.map((concert) => (
-            <Surface
-              key={concert.id}
-              variant="primary"
-              className="p-8 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-shadow">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-4">
-                    {(concert.posterImageUrl || concert.concertImageUrl) && (
-                      <img
-                        src={concert.posterImageUrl || concert.concertImageUrl}
-                        className="size-24 rounded-xl object-cover border border-white/[0.08]"
-                        alt=""
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white mb-2">
-                        {concert.title}
-                      </h3>
-                      <p className="text-sm text-white/70 mb-3 line-clamp-2">
-                        {concert.description}
-                      </p>
-                      <div className="flex flex-wrap gap-4 text-xs text-white/55">
-                        <span>
-                          <span className="font-bold">장소:</span>{" "}
-                          {concert.venueName}
-                        </span>
-                        <span>
-                          <span className="font-bold">시작:</span>{" "}
-                          {formatDateTime(concert.startDateTime)}
-                        </span>
-                        <span>
-                          <span className="font-bold">종료:</span>{" "}
-                          {formatDateTime(concert.endDateTime)}
-                        </span>
+          concerts.map((concert) => {
+            const id = concert.concertId ?? concert.id;
+            const placeName = concert.placeName ?? concert.venueName;
+            const imageUrl = concert.concertImageUrl ?? concert.posterImageUrl;
+            return (
+              <Surface
+                key={id}
+                variant="primary"
+                className="p-8 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-shadow">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-4 mb-4">
+                      {imageUrl && (
+                        <img
+                          src={imageUrl}
+                          className="size-24 rounded-xl object-cover border border-white/[0.08]"
+                          alt=""
+                        />
+                      )}
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-2">
+                          {concert.title}
+                        </h3>
+                        {concert.artistNames?.length > 0 && (
+                          <p className="text-sm text-white/60 mb-2">
+                            {concert.artistNames.join(" · ")}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-4 text-xs text-white/55">
+                          <span>
+                            <span className="font-bold">장소:</span>{" "}
+                            {placeName}
+                          </span>
+                          <span>
+                            <span className="font-bold">시작:</span>{" "}
+                            {formatDateTime(concert.startDateTime)}
+                          </span>
+                          <span>
+                            <span className="font-bold">종료:</span>{" "}
+                            {formatDateTime(concert.endDateTime)}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    {(concert.presaleStartDateTime != null || concert.saleStartDateTime != null) && (
+                      <div className="flex flex-wrap gap-4 text-xs text-white/55 mt-4">
+                        {concert.presaleStartDateTime != null && (
+                          <span>
+                            선예매: {formatDateTime(concert.presaleStartDateTime)} ~{" "}
+                            {formatDateTime(concert.presaleEndDateTime)}
+                          </span>
+                        )}
+                        {concert.saleStartDateTime != null && (
+                          <span>
+                            일반 예매: {formatDateTime(concert.saleStartDateTime)} ~{" "}
+                            {formatDateTime(concert.saleEndDateTime)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-wrap gap-4 text-xs text-white/55 mt-4">
-                    <span>
-                      선예매: {concert.presaleTicketCount}장 (
-                      {formatDateTime(concert.presaleStartDateTime)} ~{" "}
-                      {formatDateTime(concert.presaleEndDateTime)})
-                    </span>
-                    <span>
-                      일반 예매: {concert.saleTicketCount}장 (
-                      {formatDateTime(concert.saleStartDateTime)} ~{" "}
-                      {formatDateTime(concert.saleEndDateTime)})
-                    </span>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      href={`/artist-console/concerts/${id}/edit`}
+                      className="px-4 py-2 text-xs uppercase tracking-widest">
+                      수정
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDelete(id);
+                      }}
+                      disabled={deletingId === id}
+                      className="px-4 py-2 text-xs uppercase tracking-widest">
+                      {deletingId === id ? "삭제 중..." : "삭제"}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    variant="ghost"
-                    href={`/artist-console/concerts/${concert.id}/edit`}
-                    className="px-4 py-2 text-xs uppercase tracking-widest">
-                    수정
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDelete(concert.id);
-                    }}
-                    disabled={deletingId === concert.id}
-                    className="px-4 py-2 text-xs uppercase tracking-widest">
-                    {deletingId === concert.id ? "삭제 중..." : "삭제"}
-                  </Button>
-                </div>
-              </div>
-            </Surface>
-          ))
+              </Surface>
+            );
+          })
         )}
       </div>
     </div>

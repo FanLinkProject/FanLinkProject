@@ -105,6 +105,7 @@ public class SecurityConfig {
                             && req.getRequestURI().startsWith("/api/notifications/subscribe"))
                     .permitAll()
 
+				.requestMatchers(GET,"api/concerts/**").permitAll()
                     // 관리자
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
