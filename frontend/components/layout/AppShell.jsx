@@ -86,7 +86,7 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [role, setRole] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
