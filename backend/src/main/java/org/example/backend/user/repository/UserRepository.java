@@ -93,6 +93,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
             Pageable pageable
     );
 
+    // 비로그인 홈용: 추천 그룹만 (GROUP 역할만 랜덤 조회)
+    @Query(value = "SELECT * FROM users u " +
+           "WHERE u.role = :groupRole " +
+           "AND u.status = :status " +
+           "AND u.deleted_at IS NULL " +
+           "ORDER BY RAND()",
+           nativeQuery = true)
+    Page<User> findRecommendedGroups(
+            @Param("groupRole") String groupRole,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
     // 관리자: 회원 목록 (탈퇴 제외, 페이징)
     Page<User> findByDeletedAtIsNullOrderByCreatedAtDesc(Pageable pageable);
     Page<User> findByRoleAndDeletedAtIsNullOrderByCreatedAtDesc(UserRole role, Pageable pageable);

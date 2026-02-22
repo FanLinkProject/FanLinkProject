@@ -454,16 +454,15 @@ public class UserService {
                 "/api/auth/signup"
         );
 
-        // 2) 추천 아티스트 (랜덤, 최대 10개)
+        // 2) 추천 아티스트 그룹 (랜덤, 최대 10개, 비로그인 홈은 그룹만 노출)
         Pageable recommendedPageable = PageRequest.of(0, 10);
-        List<User> recommendedArtists = userRepository.findRecommendedArtists(
-                UserRole.ARTIST.name(),
+        List<User> recommendedGroups = userRepository.findRecommendedGroups(
                 UserRole.GROUP.name(),
                 UserStatus.ACTIVE.name(),
                 recommendedPageable
         ).getContent();
 
-        List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedArtists.stream()
+        List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedGroups.stream()
                 .map(artist -> {
                     long followerCount = followRepository.countByArtist(artist);
                     return new GuestHomeResponse.ArtistCard(
@@ -475,28 +474,15 @@ public class UserService {
                 })
                 .toList();
 
-        // 3) 새로운 아티스트 (최근 가입한 순서, 최대 10개)
+        // 3) 새로운 아티스트 그룹 (최근 가입한 순서, 최대 10개, 비로그인 홈은 그룹만 노출)
         Pageable newArtistsPageable = PageRequest.of(0, 10);
-        List<User> newArtists = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
-                UserRole.ARTIST,
-                UserStatus.ACTIVE,
-                newArtistsPageable
-        ).getContent();
-
         List<User> newGroups = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                 UserRole.GROUP,
                 UserStatus.ACTIVE,
                 newArtistsPageable
         ).getContent();
 
-        // ARTIST와 GROUP을 합쳐서 최신순으로 정렬 (createdAt 기준, 최대 10개)
-        List<User> allNewArtists = new java.util.ArrayList<>();
-        allNewArtists.addAll(newArtists);
-        allNewArtists.addAll(newGroups);
-        allNewArtists.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
-        allNewArtists = allNewArtists.stream().limit(10).toList();
-
-        List<GuestHomeResponse.ArtistCard> newArtistsCards = allNewArtists.stream()
+        List<GuestHomeResponse.ArtistCard> newArtistsCards = newGroups.stream()
                 .map(artist -> {
                     long followerCount = followRepository.countByArtist(artist);
                     return new GuestHomeResponse.ArtistCard(
