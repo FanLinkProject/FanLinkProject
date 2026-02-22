@@ -41,6 +41,14 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [returnPath, setReturnPath] = useState("/cart");
+  const [shippingInfo, setShippingInfo] = useState({
+    recipientName: "",
+    recipientPhone: "",
+    zipCode: "",
+    address: "",
+    detailAddress: "",
+    countryCode: "KR",
+  });
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -118,12 +126,45 @@ function CheckoutContent() {
         productId: i.productId,
         quantity: i.quantity || 1,
       }));
+      const payloadShipping = {
+        recipientName: shippingInfo.recipientName.trim(),
+        recipientPhone: shippingInfo.recipientPhone.trim(),
+        zipCode: shippingInfo.zipCode.trim(),
+        address: shippingInfo.address.trim(),
+        detailAddress: shippingInfo.detailAddress.trim(),
+        countryCode: shippingInfo.countryCode.trim().toUpperCase(),
+      };
+
+      if (hasShippableItem) {
+        if (
+          !payloadShipping.recipientName ||
+          !payloadShipping.recipientPhone ||
+          !payloadShipping.zipCode ||
+          !payloadShipping.address ||
+          !payloadShipping.detailAddress
+        ) {
+          alert("배송지 정보를 모두 입력해 주세요.");
+          setPaying(false);
+          return;
+        }
+        if (!/^[A-Z]{2}$/.test(payloadShipping.countryCode)) {
+          alert("국가 코드는 ISO 2자리 형식(KR, US 등)으로 입력해 주세요.");
+          setPaying(false);
+          return;
+        }
+      }
 
       const { orderNo } = await createOrder({
         name: orderName,
         totalAmount: totalAmount,
         totalCandyAmount: 0,
         orderItems,
+        recipientName: hasShippableItem ? payloadShipping.recipientName : null,
+        recipientPhone: hasShippableItem ? payloadShipping.recipientPhone : null,
+        zipCode: hasShippableItem ? payloadShipping.zipCode : null,
+        address: hasShippableItem ? payloadShipping.address : null,
+        detailAddress: hasShippableItem ? payloadShipping.detailAddress : null,
+        countryCode: hasShippableItem ? payloadShipping.countryCode : null,
       });
 
       if (typeof window !== "undefined") {
@@ -217,21 +258,69 @@ function CheckoutContent() {
                 <input
                   placeholder="수령인"
                   className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-                  defaultValue=""
+                  value={shippingInfo.recipientName}
+                  onChange={(e) =>
+                    setShippingInfo((prev) => ({
+                      ...prev,
+                      recipientName: e.target.value,
+                    }))
+                  }
                 />
                 <input
                   placeholder="연락처"
                   className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-                  defaultValue=""
+                  value={shippingInfo.recipientPhone}
+                  onChange={(e) =>
+                    setShippingInfo((prev) => ({
+                      ...prev,
+                      recipientPhone: e.target.value,
+                    }))
+                  }
+                />
+                <input
+                  placeholder="우편번호"
+                  className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
+                  value={shippingInfo.zipCode}
+                  onChange={(e) =>
+                    setShippingInfo((prev) => ({
+                      ...prev,
+                      zipCode: e.target.value,
+                    }))
+                  }
+                />
+                <input
+                  placeholder="국가코드 (예: KR, US)"
+                  className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20 uppercase"
+                  value={shippingInfo.countryCode}
+                  onChange={(e) =>
+                    setShippingInfo((prev) => ({
+                      ...prev,
+                      countryCode: e.target.value.toUpperCase(),
+                    }))
+                  }
+                  maxLength={2}
                 />
                 <input
                   placeholder="주소"
                   className="col-span-full px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-                  defaultValue=""
+                  value={shippingInfo.address}
+                  onChange={(e) =>
+                    setShippingInfo((prev) => ({
+                      ...prev,
+                      address: e.target.value,
+                    }))
+                  }
                 />
                 <input
                   placeholder="상세주소"
                   className="col-span-full px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
+                  value={shippingInfo.detailAddress}
+                  onChange={(e) =>
+                    setShippingInfo((prev) => ({
+                      ...prev,
+                      detailAddress: e.target.value,
+                    }))
+                  }
                 />
               </div>
             </Surface>
