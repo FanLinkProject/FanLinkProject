@@ -35,7 +35,7 @@ spring:
   # redis 디폴트(기본기능)-슬레이브(읽기만가능)모드 전환시 별도 작업필요
   data:
     redis:
-      host: ${REDIS_HOST:redis}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
@@ -244,7 +244,7 @@ media:
     replay-video-max-duration-seconds: ${MEDIA_LIMITS_REPLAY_VIDEO_MAX_DURATION_SECONDS}
   attachments:
     max-per-post: ${MEDIA_ATTACHMENTS_MAX_PER_POST}
-    max-per-product-images: ${MEDIA_ATTACHMENTS_MAX_PER_PRODUCT_IMAGES}
+    max-per-product-images: ${MEDIA_ATTACHMENTS_MAX_PER_PRODUCT_IMAGES:5}
 
 # 정산 관련 설정
 settlement:
@@ -271,9 +271,12 @@ payment:
 # 환경 변수 OAUTH2_REDIRECT_URI로 설정 가능
 #oauth2:
 #  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000}
-#oauth2:
-#    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/login/success}
+oauth2:
+    redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/login/success}
 #테스트용 코드
+#oauth2:
+#  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
+
 jwt:
   secret: ${JWT_SECRET}
 
@@ -284,8 +287,6 @@ ticket:
   private-key-path: ${TICKET_PRIVATE_KEY_PATH:}
   public-key-path: ${TICKET_PUBLIC_KEY_PATH:}
   qr-expire-hours: ${TICKET_QR_EXPIRE_HOURS:48}
-oauth2:
-  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/callback.html}
 
 #배송시스템 api-실제서비스 연동시 키 입력
 delivery:
@@ -306,7 +307,16 @@ external:
     base-url: ${SWEETTRACKER_BASE_URL:http://info.sweettracker.co.kr/api/v1/trackingInfo}
     # API 키가 유효한지 여부 (자동 설정됨)
     enabled: ${SWEETTRACKER_ENABLED:false}
+# CORS: 프론트 origin (IP 변경 시 여기만 수정, dev/prod는 application-{profile}.yml로 분리 가능)
 app:
+  cors:
+    allowed-origin-patterns:
+      - http://localhost:3000
+      - http://127.0.0.1:3000
+      - http://localhost:3001
+      - http://127.0.0.1:3001
+      - http://192.168.0.19:3000
+      - https://*.vercel.app
   kafka:
     trusted-packages: org.example.backend.chat.dto
     live-group-id: live-chat-group
