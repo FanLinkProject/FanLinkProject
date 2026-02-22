@@ -14,6 +14,8 @@ import org.example.backend.post.entity.PostMediaAsset;
 import org.example.backend.post.entity.PostMediaAssetType;
 import org.example.backend.post.exception.PostErrorCode;
 import org.example.backend.post.exception.PostException;
+import org.example.backend.comment.enums.TargetType;
+import org.example.backend.comment.service.CommentService;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.PostMediaAssetRepository;
 import org.example.backend.subscription.repository.SubscriptionRepository;
@@ -47,6 +49,7 @@ public class ArtistPostService {
     private final SubscriptionRepository subscriptionRepository;
     private final ArtistPermissionService artistPermissionService;
     private final GroupMemberRepository groupMemberRepository;
+    private final CommentService commentService;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -241,6 +244,7 @@ public class ArtistPostService {
         }
 
         artistPost.delete();
+        commentService.deleteAllByTarget(TargetType.ARTIST, postId);
     }
 
     private ArtistPostResponse buildPostResponseWithAccess(ArtistPost post, List<PostMediaAsset> attachments,

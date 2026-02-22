@@ -137,6 +137,14 @@ public class CommentService {
     }
 
     /**
+     * 게시글 삭제 시 해당 게시글의 모든 댓글 일괄 삭제 처리
+     */
+    @Transactional
+    public void deleteAllByTarget(TargetType targetType, Long targetId) {
+        commentRepository.updateStatusByTarget(targetType, targetId, true);
+    }
+
+    /**
      * 댓글 삭제 — 작성자 본인 / 관리자 / 게시판 주체(그룹) / 소속 아티스트 가능
      */
     @Transactional
@@ -234,8 +242,10 @@ public class CommentService {
     private void validateTargetExists(TargetType targetType, Long targetId) {
         switch (targetType) {
             case FAN -> fanPostRepository.findById(targetId)
+                    .filter(post -> Boolean.FALSE.equals(post.getStatus()))
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case ARTIST -> artistPostRepository.findById(targetId)
+                    .filter(post -> Boolean.FALSE.equals(post.getStatus()))
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case MEDIA -> artistMusicVideoRepository.findById(targetId)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
