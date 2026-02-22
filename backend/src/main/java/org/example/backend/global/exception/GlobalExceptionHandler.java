@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -33,6 +34,24 @@ public class GlobalExceptionHandler {
         }
         String accept = request.getHeader("Accept");
         return accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<?> handleUsernameNotFound(
+            UsernameNotFoundException e, HttpServletRequest request, HttpServletResponse response
+    ) {
+        if (shouldSkipJsonErrorBody(request, response)) {
+            return ResponseEntity.status(401).build();
+        }
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(401)
+                .error("Unauthorized")
+                .code("USER_NOT_FOUND")
+                .message("이메일 또는 비밀번호를 확인해 주세요.")
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(401).body(body);
     }
 
     @ExceptionHandler(BusinessException.class)
