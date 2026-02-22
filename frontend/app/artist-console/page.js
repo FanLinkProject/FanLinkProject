@@ -57,6 +57,7 @@ function transformArtistPost(p, groupAvatar = "") {
         image: p.attachments?.[0]?.url || null,
         timestamp: formatTimestamp(p.createdAt),
         isMembershipOnly: p.isMembershipOnly ?? false,
+        isNotice: !!p.isNotice,
         type: "ARTIST",
     };
 }

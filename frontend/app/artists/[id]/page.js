@@ -73,6 +73,7 @@ function transformArtistPost(p, groupAvatar = "") {
         timestamp: formatTimestamp(p.createdAt),
         isMembershipOnly: p.isMembershipOnly ?? false,
         isLockedByServer: !!(p.isMembershipOnly && p.content === null),
+        isNotice: !!p.isNotice,
         type: "ARTIST",
     };
 }

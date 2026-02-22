@@ -279,6 +279,7 @@ public class ArtistPostService {
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .attachments(Collections.emptyList())
+                .isNotice(ArtistPostResponse.isNotice(post))
                 .build();
     }
 

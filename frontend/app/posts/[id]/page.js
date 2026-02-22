@@ -162,6 +162,7 @@ function PostDetailContent({ id }) {
           postType: type,
           // 서버가 content를 null로 반환 = 멤버십 전용 + 접근 권한 없음
           isLocked: !!(postData.isMembershipOnly && postData.content === null),
+          isNotice: !!postData.isNotice,
         });
         const countVal = countRes?.[numericId] ?? countRes?.[String(numericId)] ?? 0;
         const isLikedVal = Array.isArray(checkRes)
@@ -770,6 +771,7 @@ function PostDetailContent({ id }) {
         </article>
       </div>
 
+      {post != null && !post.isNotice && (
       <aside className="w-full lg:w-96 flex flex-col gap-6 shrink-0">
         <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-[calc(100vh-160px)] sticky top-24">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
@@ -1122,6 +1124,7 @@ function PostDetailContent({ id }) {
           </div>
         </div>
       </aside>
+      )}
     </div>
   );
 }
