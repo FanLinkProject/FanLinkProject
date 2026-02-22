@@ -295,6 +295,11 @@ delivery:
   # 개발/테스트 모드: true일 때 FakeDeliveryTracker 우선 사용 (API 키 없어도 동작)
   # 프로덕션: false로 설정하고 실제 API 키 입력
   mock-enabled: ${DELIVERY_MOCK_ENABLED:true}
+  webhook:
+    # 운영 권장: true + AFTERSHIP_WEBHOOK_SECRET 설정
+    signature-enabled: ${DELIVERY_WEBHOOK_SIGNATURE_ENABLED:true}
+    signature-header: ${DELIVERY_WEBHOOK_SIGNATURE_HEADER:as-signature-hmac-sha256}
+    aftership-secret: ${AFTERSHIP_WEBHOOK_SECRET:}
 
 external:
   aftership:
