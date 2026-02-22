@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BASE_URL } from "@/lib/api";
 import {
-  sendEmailCode,
-  verifyEmailCode,
   sendPhoneCode,
   verifyPhoneCode,
   signup as signupApi,
@@ -126,66 +124,14 @@ export default function SignupForm({ role }) {
     privacyPolicyAgreed: false,
     marketingAgreed: false,
   });
-  const [emailCode, setEmailCode] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
-  const [timer, setTimer] = useState(180);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isPhoneCodeSent, setIsPhoneCodeSent] = useState(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
   const [error, setError] = useState("");
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setError("");
-  };
-
-  const handleOAuthSignup = (provider) => {
-    window.location.href = `${BASE_URL}/oauth2/authorization/${provider}`;
-  };
-
-  const handleInfoSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!formData.email || !formData.nickname || !formData.password || !formData.birth) {
-      setError("모든 필수 정보를 입력해주세요.");
-      return;
-    }
-    if (formData.password !== formData.passwordConfirm) {
-      setError("비밀번호가 일치하지 않습니다.");
-      return;
-    }
-
-    setError("");
-    try {
-      await sendEmailCode(formData.email);
-      setStep("EMAIL_VERIFY");
-    } catch (err) {
-      setError(err?.data?.message || err?.message || "이메일 인증코드 발송에 실패했습니다.");
-    }
-  };
-
-  const handleEmailVerify = async () => {
-    if (!emailCode || emailCode.length !== 6) {
-      setError("인증코드 6자리를 입력해주세요.");
-      return;
-    }
-
-    setError("");
-    try {
-      await verifyEmailCode(formData.email, emailCode);
-      setStep("PHONE_VERIFY");
-    } catch (err) {
-      setError(err?.data?.message || err?.message || "인증코드가 올바르지 않습니다.");
-    }
-  };
-
-  const resendEmailCode = async () => {
-    setError("");
-    try {
-      await sendEmailCode(formData.email);
-      setTimer(180);
-      setIsTimerRunning(true);
-    } catch (err) {
-      setError(err?.data?.message || err?.message || "인증코드 재발송에 실패했습니다.");
-    }
   };
 
   const phoneNumberCombined = [
@@ -196,7 +142,11 @@ export default function SignupForm({ role }) {
     .filter(Boolean)
     .join("-");
 
-  const sendSmsCode = async () => {
+  const handleOAuthSignup = (provider) => {
+    window.location.href = `${BASE_URL}/oauth2/authorization/${provider}`;
+  };
+
+  const handleSendPhoneCode = async () => {
     if (!formData.phonePart1 || !formData.phonePart2 || !formData.phonePart3) {
       setError("휴대폰 번호를 모두 입력해주세요.");
       return;
@@ -208,32 +158,61 @@ export default function SignupForm({ role }) {
 
     try {
       await sendPhoneCode(targetPhoneNumber);
-      setIsTimerRunning(true);
-      setTimer(180);
+      setIsPhoneCodeSent(true);
+      setIsPhoneVerified(false);
     } catch (err) {
       setError(err?.data?.message || err?.message || "인증번호 발송에 실패했습니다.");
     }
   };
 
-  const handlePhoneVerify = async () => {
+  const handleVerifyPhoneCode = async () => {
+    const targetPhoneNumber = formData.phoneNumber || phoneNumberCombined;
+    if (!targetPhoneNumber) {
+      setError("휴대폰 번호를 먼저 입력해주세요.");
+      return;
+    }
     if (!phoneCode || phoneCode.length !== 6) {
       setError("인증번호 6자리를 입력해주세요.");
       return;
     }
 
-    const targetPhoneNumber = formData.phoneNumber || phoneNumberCombined;
     setError("");
     try {
       await verifyPhoneCode(targetPhoneNumber, phoneCode);
-      setStep("AGREEMENT");
+      setIsPhoneVerified(true);
     } catch (err) {
-      setError(err?.data?.message || err?.message || "인증번호가 올바르지 않습니다.");
+      setIsPhoneVerified(false);
+      window.alert("인증번호가 올바르지 않습니다. 다시 시도해주세요.");
     }
+  };
+
+  const handleInfoSubmit = (e) => {
+    e.preventDefault();
+
+    if (!formData.email || !formData.nickname || !formData.password || !formData.birth) {
+      setError("모든 필수 정보를 입력해주세요.");
+      return;
+    }
+    if (formData.password !== formData.passwordConfirm) {
+      setError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    if (!isPhoneVerified) {
+      setError("휴대폰 본인인증을 완료해주세요.");
+      return;
+    }
+
+    setStep("AGREEMENT");
+    setError("");
   };
 
   const handleFinalSubmit = async () => {
     if (!formData.privacyPolicyAgreed) {
       setError("필수 약관에 동의해주세요.");
+      return;
+    }
+    if (!isPhoneVerified) {
+      setError("휴대폰 본인인증을 완료해주세요.");
       return;
     }
 
@@ -247,8 +226,8 @@ export default function SignupForm({ role }) {
         gender: formData.gender,
         birth: formData.birth,
         privacyPolicyAgreed: formData.privacyPolicyAgreed ?? true,
-        phoneNumber: formData.phoneNumber,
-        emailVerificationCode: emailCode,
+        phoneNumber: formData.phoneNumber || phoneNumberCombined,
+        phoneVerificationCode: phoneCode,
         role: role === "ARTIST" ? "ARTIST" : "USER",
       });
 
@@ -267,30 +246,7 @@ export default function SignupForm({ role }) {
     }
   };
 
-  useEffect(() => {
-    if (!isTimerRunning) return undefined;
-
-    const intervalId = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(intervalId);
-          setIsTimerRunning(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, [isTimerRunning]);
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const steps = ["INFO", "EMAIL_VERIFY", "PHONE_VERIFY", "AGREEMENT"];
+  const steps = ["INFO", "AGREEMENT"];
   const stepIndex = steps.indexOf(step);
 
   return (
@@ -304,7 +260,7 @@ export default function SignupForm({ role }) {
             <h2 className="text-2xl font-black text-white tracking-tight">회원가입</h2>
           </div>
 
-          <div className="flex justify-between items-center mb-10 px-4 relative">
+          <div className="flex justify-center items-center mb-10 px-4 relative">
             <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-white/[0.08] -translate-y-1/2 z-0" />
             {steps.map((s, idx) => (
               <div
@@ -383,6 +339,92 @@ export default function SignupForm({ role }) {
                 />
               </div>
 
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">
+                  휴대폰 번호 본인인증 <span className="text-violet-400">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={3}
+                    value={formData.phonePart1}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+                      updateField("phonePart1", v);
+                      setIsPhoneVerified(false);
+                    }}
+                    placeholder="010"
+                    className="w-20 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                  />
+                  <span className="text-white/40 font-bold">-</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={formData.phonePart2}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      updateField("phonePart2", v);
+                      setIsPhoneVerified(false);
+                    }}
+                    placeholder="1234"
+                    className="flex-1 min-w-0 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                  />
+                  <span className="text-white/40 font-bold">-</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={formData.phonePart3}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      updateField("phonePart3", v);
+                      setIsPhoneVerified(false);
+                    }}
+                    placeholder="5678"
+                    className="flex-1 min-w-0 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendPhoneCode}
+                    className="px-4 py-3.5 bg-[#16102a] border border-white/[0.08] text-white rounded-2xl text-[11px] font-black whitespace-nowrap hover:bg-white/[0.06] transition-all"
+                  >
+                    인증코드 발송
+                  </button>
+                </div>
+
+                {isPhoneCodeSent && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={phoneCode}
+                      onChange={(e) => {
+                        setPhoneCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                        setIsPhoneVerified(false);
+                      }}
+                      placeholder="인증번호 6자리"
+                      className="flex-1 px-4 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVerifyPhoneCode}
+                      className="px-5 py-3.5 bg-violet-500/90 text-white rounded-2xl text-[12px] font-black whitespace-nowrap hover:brightness-110 transition-all"
+                    >
+                      확인
+                    </button>
+                  </div>
+                )}
+
+                {isPhoneVerified && (
+                  <p className="text-[11px] font-bold text-emerald-300 px-1">
+                    휴대폰 본인인증이 완료되었습니다.
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">
                   성별
@@ -409,7 +451,7 @@ export default function SignupForm({ role }) {
                 type="submit"
                 className="w-full py-4 bg-violet-500/90 text-white rounded-2xl font-black text-sm hover:brightness-110 transition-all"
               >
-                이메일 인증코드 발송
+                다음 단계로
               </button>
 
               <div className="relative flex items-center justify-center">
@@ -428,160 +470,6 @@ export default function SignupForm({ role }) {
                 <SocialSignupButton provider="instagram" onClick={() => handleOAuthSignup("instagram")} />
               </div>
             </form>
-          )}
-
-          {step === "EMAIL_VERIFY" && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-6xl text-violet-500/50 mb-4 font-light block">
-                  mail
-                </span>
-                <p className="text-white/75 font-medium leading-relaxed">
-                  <span className="font-black text-white">{formData.email}</span> 로
-                  <br />
-                  인증코드를 발송했습니다.
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">
-                  인증코드 6자리
-                </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={emailCode}
-                  onChange={(e) => setEmailCode(e.target.value)}
-                  placeholder="123456"
-                  className="w-full px-5 py-4 bg-[#16102a] border border-white/[0.08] rounded-2xl text-2xl font-black text-center tracking-[1rem] text-white outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/30 transition-all"
-                />
-              </div>
-
-              <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={() => setStep("INFO")}
-                  className="flex-1 py-4 bg-white/[0.06] text-white/70 rounded-2xl font-black text-sm border border-white/[0.06] hover:bg-white/[0.08] transition-all"
-                >
-                  이전으로
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEmailVerify}
-                  className="flex-[2] py-4 bg-violet-500/90 text-white rounded-2xl font-black text-sm hover:brightness-110 transition-all"
-                >
-                  인증 확인
-                </button>
-              </div>
-
-              <p className="text-center text-[11px] font-bold text-white/55">
-                메일을 받지 못하셨나요?{" "}
-                <button
-                  type="button"
-                  onClick={resendEmailCode}
-                  className="text-violet-300 hover:underline"
-                >
-                  인증코드 재발송
-                </button>
-              </p>
-            </div>
-          )}
-
-          {step === "PHONE_VERIFY" && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-6xl text-violet-500/50 mb-4 font-light block">
-                  smartphone
-                </span>
-                <p className="text-white/75 font-medium">
-                  안전한 이용을 위해 휴대폰 인증을 진행해주세요.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">
-                    휴대폰 번호
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={3}
-                      value={formData.phonePart1}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/\D/g, "").slice(0, 3);
-                        updateField("phonePart1", v);
-                      }}
-                      placeholder="010"
-                      className="w-20 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
-                    />
-                    <span className="text-white/40 font-bold">-</span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={4}
-                      value={formData.phonePart2}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                        updateField("phonePart2", v);
-                      }}
-                      placeholder="1234"
-                      className="flex-1 min-w-0 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
-                    />
-                    <span className="text-white/40 font-bold">-</span>
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={4}
-                      value={formData.phonePart3}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                        updateField("phonePart3", v);
-                      }}
-                      placeholder="5678"
-                      className="flex-1 min-w-0 px-3 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white text-center outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={sendSmsCode}
-                      className="px-6 bg-[#16102a] border border-white/[0.08] text-white rounded-2xl text-[11px] font-black uppercase tracking-widest whitespace-nowrap hover:bg-white/[0.06] transition-all"
-                    >
-                      {isTimerRunning ? "재전송" : "인증번호 발송"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">
-                    인증번호
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={phoneCode}
-                      onChange={(e) => setPhoneCode(e.target.value)}
-                      placeholder="000000"
-                      className="w-full px-5 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
-                    />
-                    {isTimerRunning && (
-                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-violet-400 font-black text-xs">
-                        {formatTime(timer)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handlePhoneVerify}
-                className="w-full py-4 bg-violet-500/90 text-white rounded-2xl font-black text-sm hover:brightness-110 transition-all"
-              >
-                인증 및 완료
-              </button>
-            </div>
           )}
 
           {step === "AGREEMENT" && (

@@ -1,14 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { exchangeOAuthCode } from "@/lib/authApi";
 import { getProfile } from "@/lib/userApi";
 
-/**
- * OAuth 로그인 후 백엔드가 ?accessToken=...&refreshToken=... 로 리다이렉트할 때
- * URL에서 토큰을 읽어 localStorage에 저장한 뒤,
- * 프로필 조회하여 needsProfileComplete 이면 추가정보 입력 페이지로, 아니면 홈으로 이동
- */
 export default function AuthCallbackHandler() {
   const router = useRouter();
   const pathname = usePathname();
@@ -23,34 +19,63 @@ export default function AuthCallbackHandler() {
       return;
     }
 
-    const accessToken = params.get("accessToken");
-    const refreshToken = params.get("refreshToken");
+    const routeAfterProfile = async () => {
+      try {
+        const profile = await getProfile();
+        if (profile?.needsProfileComplete) {
+          router.replace("/signup/oauth-complete");
+          return;
+        }
+      } catch (_) {
+        // If profile fetch fails, force login to avoid hidden broken session states.
+        router.replace("/login?error=oauth2_failed");
+        return;
+      }
+      router.replace("/home");
+    };
 
-    if (accessToken) {
-      const token = accessToken.startsWith("Bearer")
+    const persistTokens = (accessToken, refreshToken) => {
+      const token = accessToken?.startsWith("Bearer")
         ? accessToken
-        : `Bearer ${accessToken}`;
-      localStorage.setItem("accessToken", token);
+        : `Bearer ${accessToken || ""}`;
+      if (token.trim()) {
+        localStorage.setItem("accessToken", token);
+      }
       if (refreshToken) {
         localStorage.setItem("refreshToken", refreshToken);
       }
+    };
+
+    const clearAuthParams = () => {
       const url = new URL(window.location.href);
+      url.searchParams.delete("code");
       url.searchParams.delete("accessToken");
       url.searchParams.delete("refreshToken");
       url.searchParams.delete("tokenType");
       window.history.replaceState({}, "", url.pathname || "/");
+    };
 
-      getProfile()
-        .then((profile) => {
-          if (profile.needsProfileComplete) {
-            router.replace("/signup/oauth-complete");
-          } else {
-            router.replace("/home");
-          }
+    const code = params.get("code");
+    if (code) {
+      clearAuthParams();
+      exchangeOAuthCode(code)
+        .then((tokenResponse) => {
+          persistTokens(tokenResponse?.accessToken, tokenResponse?.refreshToken);
+          return routeAfterProfile();
         })
         .catch(() => {
-          router.replace("/home");
+          router.replace("/login?error=oauth2_failed");
         });
+      return;
+    }
+
+    // Legacy fallback for old redirect format (?accessToken=...&refreshToken=...)
+    const accessToken = params.get("accessToken");
+    const refreshToken = params.get("refreshToken");
+    if (accessToken) {
+      clearAuthParams();
+      persistTokens(accessToken, refreshToken);
+      routeAfterProfile();
     }
   }, [router, pathname]);
 

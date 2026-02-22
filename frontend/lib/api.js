@@ -7,10 +7,15 @@
  */
 
 /** Vercel 등에서는 환경 변수 NEXT_PUBLIC_API_BASE_URL 로 API 서버 주소 지정 */
-export const BASE_URL =
-    typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL
-        ? process.env.NEXT_PUBLIC_API_BASE_URL
+const ENV_BASE_URL =
+    typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_API_BASE_URL : "";
+
+const DEFAULT_BASE_URL =
+    typeof process !== "undefined" && process.env?.NODE_ENV === "development"
+        ? "http://localhost:8080"
         : "https://api.fanlink.site";
+
+export const BASE_URL = ENV_BASE_URL || DEFAULT_BASE_URL;
 
 /** STOMP/SockJS 엔드포인트 (라이브챗 등) */
 export const WS_CHAT_URL = `${BASE_URL.replace(/\/$/, "")}/ws-chat`;
