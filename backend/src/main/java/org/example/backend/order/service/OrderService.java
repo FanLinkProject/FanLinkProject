@@ -96,23 +96,26 @@ public class OrderService {
 
                         orderItems.add(orderItem);
                 }
-                // 3. 배송 정보(Delivery) 생성(변경/추가)
-                // 변경추가 이유: 주문 시 입력받은 주소 정보로 배송 엔티티를 먼저 만듭니다. (아직 송장번호 없음)
-                // 주의: OrderRequestDto에 recipientName, address, detailAddress 등의 필드가 추가되어야 합니다.
-                Delivery delivery = Delivery.createPendingDelivery(
-                        request.recipientName(),  // DTO에 추가 필요
-                        request.recipientPhone(), // DTO에 추가 필요
-                        request.address(),        // DTO에 추가 필요
-                        request.detailAddress()   // DTO에 추가 필요
-                );
-
-                // 배송비: 현금 결제 상품 중 배송이 필요한 상품(플랫폼·멤버십·티켓 제외)이 있을 때만 추가
+                // 배송비/배송지 검증: 배송이 필요한 상품(플랫폼·멤버십·티켓 제외)이 있을 때만 적용
                 boolean hasShippableItem = orderItems.stream().anyMatch(item -> {
                         Product p = item.getProduct();
                         return p.getArtistId() != null
                                         && !Boolean.TRUE.equals(p.getIsMembership())
                                         && p.getConcertId() == null;
                 });
+                if (hasShippableItem) {
+                        validateShippingRequest(request);
+                }
+
+                // 3. 배송 정보(Delivery) 생성(아직 송장번호 없음)
+                Delivery delivery = Delivery.createPendingDelivery(
+                        request.recipientName(),
+                        request.recipientPhone(),
+                        request.address(),
+                        request.detailAddress(),
+                        request.countryCode(),
+                        request.zipCode()
+                );
                 if (calculatedTotalAmount.compareTo(BigDecimal.ZERO) > 0 && hasShippableItem) {
                         calculatedTotalAmount = calculatedTotalAmount.add(BigDecimal.valueOf(shippingFee));
                 }
@@ -204,5 +207,28 @@ public class OrderService {
                 }
 
                 order.updateStatus(OrderStatus.CANCELED);
+        }
+
+        private void validateShippingRequest(OrderRequestDto request) {
+                if (isBlank(request.recipientName())
+                                || isBlank(request.recipientPhone())
+                                || isBlank(request.address())
+                                || isBlank(request.detailAddress())
+                                || isBlank(request.zipCode())) {
+                        throw new OrderException(OrderErrorCode.INVALID_SHIPPING_ADDRESS);
+                }
+
+                String countryCode = request.countryCode();
+                if (isBlank(countryCode) || countryCode.length() != 2
+                                || !Character.isUpperCase(countryCode.charAt(0))
+                                || !Character.isUpperCase(countryCode.charAt(1))
+                                || !Character.isLetter(countryCode.charAt(0))
+                                || !Character.isLetter(countryCode.charAt(1))) {
+                        throw new OrderException(OrderErrorCode.INVALID_COUNTRY_CODE);
+                }
+        }
+
+        private boolean isBlank(String value) {
+                return value == null || value.isBlank();
         }
 }

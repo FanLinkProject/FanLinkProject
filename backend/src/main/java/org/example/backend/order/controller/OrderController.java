@@ -27,7 +27,7 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<Map<String, String>> createOrder(
             @AuthenticationPrincipal PrincipalDetails principal,
-            @RequestBody OrderRequestDto request) {
+            @Valid @RequestBody OrderRequestDto request) {
 
         String orderNo = orderService.createOrder(principal.getUsername(), request);
         return ResponseEntity.ok(Map.of("orderNo", orderNo));
