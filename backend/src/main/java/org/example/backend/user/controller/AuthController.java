@@ -2,15 +2,23 @@ package org.example.backend.user.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.exception.BusinessException;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.LoginRequest;
-import org.example.backend.user.service.AuthService;
+import org.example.backend.user.dto.request.LogoutRequest;
+import org.example.backend.user.dto.request.OAuthCodeExchangeRequest;
 import org.example.backend.user.dto.request.SignupRequest;
 import org.example.backend.user.dto.response.SignupResponse;
 import org.example.backend.user.dto.response.TokenResponse;
+import org.example.backend.user.exception.UserErrorCode;
+import org.example.backend.user.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -32,21 +40,27 @@ public class AuthController {
         return ResponseEntity.ok(token);
     }
 
+    @PostMapping("/oauth/exchange")
+    public ResponseEntity<TokenResponse> exchangeOAuthCode(@Valid @RequestBody OAuthCodeExchangeRequest request) {
+        TokenResponse token = authService.exchangeOAuthCode(request.code());
+        return ResponseEntity.ok(token);
+    }
+
     // 로그아웃
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestParam("refreshToken") String refreshToken) {
-        authService.logout(refreshToken);
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request.refreshToken());
         return ResponseEntity.noContent().build();
     }
 
-    // 회원 탈퇴
+    // 회원탈퇴
     @DeleteMapping
-    public ResponseEntity<?> signout(
-            @AuthenticationPrincipal PrincipalDetails principalDetails
-            ) {
-        authService.signout(principalDetails.getUserId());
+    public ResponseEntity<Void> signout(@AuthenticationPrincipal PrincipalDetails principalDetails) {
+        if (principalDetails == null) {
+            throw new BusinessException(UserErrorCode.UNAUTHENTICATED);
+        }
 
+        authService.signout(principalDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
 }
-
