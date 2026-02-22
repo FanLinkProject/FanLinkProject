@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.concert.dto.request.ConcertCreateRequest;
 import org.example.backend.concert.dto.request.ConcertUpdateRequest;
+import org.example.backend.concert.dto.response.ConcertListItemResponse;
 import org.example.backend.concert.dto.response.ConcertResponse;
 import org.example.backend.concert.service.ConcertService;
 import org.example.backend.global.security.details.PrincipalDetails;
@@ -43,11 +44,26 @@ public class ConcertController {
     }
 
     /**
-     * 공연 목록 조회
+     * 공연 목록 조회 (다가오는 공연만, 목록 전용 DTO)
      */
     @GetMapping
-    public ResponseEntity<List<ConcertResponse>> getAllConcerts() {
-        List<ConcertResponse> response = concertService.getAllConcerts();
+    public ResponseEntity<List<ConcertListItemResponse>> getAllConcerts() {
+        List<ConcertListItemResponse> response = concertService.getAllConcerts();
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 지도 bounds 내 공연 목록 조회 (다가오는 공연만, 목록 DTO 동일)
+     * 쿼리: swLat, swLng, neLat, neLng
+     */
+    @GetMapping("/in-bounds")
+    public ResponseEntity<List<ConcertListItemResponse>> getConcertsInBounds(
+            @RequestParam Double swLat,
+            @RequestParam Double swLng,
+            @RequestParam Double neLat,
+            @RequestParam Double neLng
+    ) {
+        List<ConcertListItemResponse> response = concertService.getConcertsInBounds(swLat, swLng, neLat, neLng);
         return ResponseEntity.ok(response);
     }
 

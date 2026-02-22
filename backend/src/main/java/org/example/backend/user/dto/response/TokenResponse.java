@@ -8,7 +8,8 @@ public record TokenResponse(
     String grantType,// Bearer 설정
     String accessToken,
     String refreshToken,
-    Long accessTokenExpiresIn
+    Long accessTokenExpiresIn,
+    String role  // USER, ARTIST, GROUP, ADMIN - 프론트 리다이렉트용
     ) {
 }
 

@@ -8,7 +8,7 @@ import { uploadFile } from "@/lib/mediaAssetApi";
 
 /**
  * @param {object} presignItem - presign 요청 시 넘길 item (category, scope, artistId, postIdOrTemp 등)
- *   - category: PROFILE_IMAGE | ARTIST_COVER_IMAGE | POST_IMAGE | POST_VIDEO | REPLAY_VIDEO | REPLAY_THUMBNAIL | PRODUCT_IMAGE | PRODUCT_DESCRIBE_IMAGE
+ *   - category: PROFILE_IMAGE | ARTIST_COVER_IMAGE | POST_IMAGE | POST_VIDEO | REPLAY_VIDEO | REPLAY_THUMBNAIL | PRODUCT_IMAGE | PRODUCT_DESCRIBE_IMAGE | CONCERT_POSTER
  *   - scope: PUBLIC | RESTRICTED
  *   - artistId (temp 사용 시 필수), postIdOrTemp, replayIdOrTemp, productIdOrTemp
  *   - attachmentCountInPost, attachmentCountInProduct (해당 시 필수)

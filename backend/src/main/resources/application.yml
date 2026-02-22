@@ -257,6 +257,9 @@ settlement:
 
 # 결제 관련 설정
 payment:
+  # 배송비 (원) - 현금 결제 시 상품 금액에 추가됨
+  shipping-fee: ${PAYMENT_SHIPPING_FEE:3000}
+
   toss:
     base-url: https://api.tosspayments.com/v1
     client-key: ${PAYMENTS_CLIENT_KEY}

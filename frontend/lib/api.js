@@ -116,6 +116,7 @@ export async function apiFetch(method, path, body, opts = {}) {
         method,
         headers,
         ...(body != null && method !== "GET" ? { body: JSON.stringify(body) } : {}),
+        ...(opts.signal != null ? { signal: opts.signal } : {}),
     });
 
     const data = await parseBody(res);
@@ -133,6 +134,10 @@ export function apiPost(path, body, opts) {
 
 export function apiPatch(path, body, opts) {
     return apiFetch("PATCH", path, body, opts);
+}
+
+export function apiPut(path, body, opts) {
+    return apiFetch("PUT", path, body, opts);
 }
 
 /**

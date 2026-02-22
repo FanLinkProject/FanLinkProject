@@ -1,33 +1,172 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { loadTossPayments } from "@tosspayments/payment-sdk";
+import { createOrder } from "@/lib/orderApi";
+import { getPaymentConfig } from "@/lib/paymentApi";
+import { getProduct } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-export default function CheckoutPage() {
-  const router = useRouter();
-  const [method, setMethod] = useState("card");
+const SHIPPING_FEE = 3000;
 
-  const handleComplete = () => {
-    router.push("/mypage/history");
+function getProductImageUrl(product) {
+  const rep = product?.attachments?.find(
+    (a) => a.mediaAssetId === product.representativeMediaAssetId
+  );
+  if (rep?.url) return rep.url;
+  return product?.attachments?.[0]?.url || null;
+}
+
+function formatPrice(product) {
+  if (!product) return "0원";
+  if (product.paymentMethod === "CANDY_ONLY" && product.candyPrice > 0) {
+    return `${product.candyPrice?.toLocaleString()} 캔디`;
+  }
+  return `${product.price?.toLocaleString()}원`;
+}
+
+function CheckoutContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const productIdParam = searchParams.get("productId");
+  const quantityParam = parseInt(searchParams.get("quantity") || "1", 10);
+  const isCandyRecharge = searchParams.get("candyRecharge") === "1";
+
+  const [items, setItems] = useState([]);
+  const [productDetails, setProductDetails] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [returnPath, setReturnPath] = useState("/cart");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("checkoutReturnPath");
+      setReturnPath(saved && saved.startsWith("/") ? saved : "/cart");
+    }
+  }, []);
+
+  useEffect(() => {
+    let rawItems = [];
+    if (productIdParam) {
+      rawItems = [{ productId: parseInt(productIdParam, 10), quantity: Math.max(1, quantityParam) }];
+    } else {
+      rawItems = JSON.parse(localStorage.getItem("cart") || "[]");
+    }
+    const list = Array.isArray(rawItems) ? rawItems : [];
+    setItems(list);
+
+    const ids = [...new Set(list.map((i) => i.productId))];
+    Promise.all(ids.map((id) => getProduct(id).catch(() => null)))
+      .then((products) => {
+        const map = {};
+        products.forEach((p, i) => {
+          if (p && ids[i]) map[ids[i]] = p;
+        });
+        setProductDetails(map);
+      })
+      .finally(() => setLoading(false));
+  }, [productIdParam, quantityParam]);
+
+  const cashItems = items.filter((i) => {
+    const p = productDetails[i.productId];
+    return p && p.paymentMethod !== "CANDY_ONLY" && (p.price || 0) > 0;
+  });
+  const totalCash = cashItems.reduce((acc, item) => {
+    const p = productDetails[item.productId];
+    const price = p?.price || 0;
+    return acc + price * (item.quantity || 1);
+  }, 0);
+  // 배송비: 플랫폼·멤버십·티켓 제외한 배송 필요 상품이 있을 때만 (캔디 충전 등 artistId=null 제외)
+  const hasShippableItem = cashItems.some((i) => {
+    const p = productDetails[i.productId];
+    return p && p.artistId != null && !p.isMembership && !p.concertId;
+  });
+  const totalAmount = totalCash + (hasShippableItem ? SHIPPING_FEE : 0);
+
+  const orderName =
+    cashItems.length === 0
+      ? "주문"
+      : cashItems.length === 1
+        ? productDetails[cashItems[0].productId]?.name || "상품"
+        : `${productDetails[cashItems[0].productId]?.name || "상품"} 외 ${cashItems.length - 1}건`;
+
+  const handlePayment = async () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) {
+      alert("로그인이 필요합니다.");
+      router.push("/login");
+      return;
+    }
+
+    if (cashItems.length === 0) {
+      alert("결제할 현금 상품이 없습니다.");
+      return;
+    }
+
+    setPaying(true);
+    try {
+      const config = await getPaymentConfig();
+      if (!config?.clientKey) {
+        throw new Error("결제 설정을 불러올 수 없습니다.");
+      }
+
+      const orderItems = cashItems.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity || 1,
+      }));
+
+      const { orderNo } = await createOrder({
+        name: orderName,
+        totalAmount: totalAmount,
+        totalCandyAmount: 0,
+        orderItems,
+      });
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "checkoutPendingIds",
+          JSON.stringify(cashItems.map((i) => i.productId))
+        );
+      }
+
+      const tossPayments = await loadTossPayments(config.clientKey);
+      await tossPayments.requestPayment("카드", {
+        amount: totalAmount,
+        orderId: orderNo,
+        orderName,
+        customerName: "구매자",
+        successUrl: config.successUrl,
+        failUrl: config.failUrl,
+      });
+    } catch (err) {
+      console.error("Payment failed:", err);
+      alert("결제 요청 실패: " + (err.message || "알 수 없는 오류"));
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
     <div className="p-8 lg:p-12 max-w-5xl mx-auto space-y-12">
       <header className="flex items-center gap-4">
         <Link
-          href="/cart"
+          href={returnPath}
           className="size-10 rounded-full border border-white/[0.08] flex items-center justify-center text-white/55 hover:text-violet-300 transition-colors bg-white/[0.04]"
         >
           <span className="material-symbols-outlined">arrow_back</span>
         </Link>
         <div>
-          <SectionTitle className="text-2xl font-bold">굿즈 결제</SectionTitle>
+          <SectionTitle className="text-2xl font-bold">
+            {isCandyRecharge ? "캔디 충전" : "굿즈 결제"}
+          </SectionTitle>
           <p className="text-white/55 text-sm font-medium mt-1">
-            현금 결제를 통해 상품 주문을 완료합니다.
+            {isCandyRecharge
+              ? "결제 후 캔디가 즉시 충전됩니다."
+              : "현금 결제를 통해 상품 주문을 완료합니다."}
           </p>
         </div>
       </header>
@@ -35,56 +174,68 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-8 space-y-8">
           <Surface variant="primary" className="p-8 space-y-6">
-            <h3 className="font-black text-lg text-white">배송지 정보</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                placeholder="수령인"
-                className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-                defaultValue="Alex Rivers"
-              />
-              <input
-                placeholder="연락처"
-                className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-                defaultValue="010-1234-5678"
-              />
-              <input
-                placeholder="주소"
-                className="col-span-full px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-                defaultValue="서울특별시 강남구 테헤란로 123"
-              />
-              <input
-                placeholder="상세주소"
-                className="col-span-full px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
-              />
-            </div>
+            <h3 className="font-black text-lg text-white">주문 상품</h3>
+            {loading ? (
+              <p className="text-white/55">로딩 중...</p>
+            ) : (
+              <div className="space-y-4">
+                {cashItems.map((item) => {
+                  const p = productDetails[item.productId];
+                  const imgUrl = getProductImageUrl(p);
+                  return (
+                    <div key={item.productId} className="flex gap-4 p-4 bg-[#201a33] rounded-2xl">
+                      <div className="size-16 rounded-xl overflow-hidden bg-white/5 shrink-0">
+                        {imgUrl ? (
+                          <img src={imgUrl} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="material-symbols-outlined text-white/30">image</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-white truncate">{p?.name}</h4>
+                        <p className="text-xs text-white/55">{p?.artistName}</p>
+                        <p className="text-sm text-violet-300 font-bold mt-1">
+                          {formatPrice(p)} × {item.quantity || 1}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {cashItems.length === 0 && !loading && (
+                  <p className="text-white/55">결제할 현금 상품이 없습니다.</p>
+                )}
+              </div>
+            )}
           </Surface>
 
-          <Surface variant="primary" className="p-8 space-y-6">
-            <h3 className="font-black text-lg text-white">결제 수단 선택</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {["card", "kakao", "naver", "bank"].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMethod(m)}
-                  className={`py-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                    method === m
-                      ? "border-violet-500/50 bg-violet-500/10 text-violet-300"
-                      : "border-white/[0.06] text-white/55 hover:border-white/[0.1] hover:text-white/80"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-xl">
-                    {m === "card"
-                      ? "credit_card"
-                      : m === "bank"
-                        ? "account_balance"
-                        : "account_balance_wallet"}
-                  </span>
-                  <span className="text-[10px] font-black uppercase tracking-widest">{m}</span>
-                </button>
-              ))}
-            </div>
-          </Surface>
+          {hasShippableItem && (
+            <Surface variant="primary" className="p-8 space-y-6">
+              <h3 className="font-black text-lg text-white">배송지 정보</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  placeholder="수령인"
+                  className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
+                  defaultValue=""
+                />
+                <input
+                  placeholder="연락처"
+                  className="px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
+                  defaultValue=""
+                />
+                <input
+                  placeholder="주소"
+                  className="col-span-full px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
+                  defaultValue=""
+                />
+                <input
+                  placeholder="상세주소"
+                  className="col-span-full px-5 py-3.5 bg-[#201a33] border border-white/[0.06] rounded-2xl text-sm font-bold outline-none text-white placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/20"
+                />
+              </div>
+            </Surface>
+          )}
         </div>
 
         <div className="lg:col-span-4">
@@ -93,33 +244,42 @@ export default function CheckoutPage() {
             <div className="space-y-4 mb-8">
               <div className="flex justify-between text-sm text-white/55">
                 <span>총 상품 금액</span>
-                <span>65,000원</span>
+                <span>{totalCash.toLocaleString()}원</span>
               </div>
               <div className="flex justify-between text-sm text-white/55">
                 <span>배송비</span>
-                <span>3,000원</span>
+                <span>{hasShippableItem ? `${SHIPPING_FEE.toLocaleString()}원` : "0원"}</span>
               </div>
               <div className="h-px bg-white/[0.06]" />
               <div className="flex justify-between font-black text-2xl text-violet-300">
                 <span>합계</span>
-                <span>68,000원</span>
+                <span>{totalAmount.toLocaleString()}원</span>
               </div>
             </div>
             <Button
               variant="primary"
               className="w-full py-5 text-base uppercase tracking-widest"
-              onClick={handleComplete}
+              onClick={handlePayment}
+              disabled={cashItems.length === 0 || loading || paying}
             >
-              결제하기
+              {paying ? "결제 처리 중..." : "결제하기"}
             </Button>
             <p className="text-[10px] text-center text-white/45 mt-4 leading-relaxed font-medium italic">
-              현금 결제 완료 시 주문이 확정됩니다.
+              결제 완료 시 주문이 확정됩니다.
               <br />
-              캔디로는 상품을 구매할 수 없습니다.
+              캔디 전용 상품은 별도 구독 플로우를 이용해 주세요.
             </p>
           </Surface>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-white/55">로딩 중...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }

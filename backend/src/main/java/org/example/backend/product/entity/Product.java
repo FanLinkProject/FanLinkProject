@@ -95,16 +95,16 @@ public class Product {
         this.type = type;
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isExclusive = isExclusive != null ? isExclusive : false;
+        this.isMembership = isMembership != null ? isMembership : false;
 
-        if (this.isSubscription) {
+        if (this.isSubscription || this.isMembership) {
             this.quantity = 0L;
         } else {
             this.quantity = quantity != null ? quantity : 0L;
         }
 
-        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
-        this.isExclusive = isExclusive != null ? isExclusive : false;
-        this.isMembership = isMembership != null ? isMembership : false;
         this.representativeMediaAssetId = representativeMediaAssetId;
         this.concertId = concertId;
 
@@ -147,16 +147,16 @@ public class Product {
         this.type = type;
         this.paymentMethod = paymentMethod;
         this.isSubscription = isSubscription != null ? isSubscription : false;
+        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isExclusive = isExclusive != null ? isExclusive : false;
+        this.isMembership = isMembership != null ? isMembership : false;
 
-        if (this.isSubscription) {
+        if (this.isSubscription || this.isMembership) {
             this.quantity = 0L;
         } else {
             this.quantity = quantity != null ? quantity : 0L;
         }
 
-        this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
-        this.isExclusive = isExclusive != null ? isExclusive : false;
-        this.isMembership = isMembership != null ? isMembership : false;
         this.concertId = concertId;
         this.representativeMediaAssetId = representativeMediaAssetId;
 
@@ -164,8 +164,11 @@ public class Product {
     }
 
     public void increaseStock(Long quantity) {
-        if (Boolean.TRUE.equals(isSubscription)) {
-            return; // 구독 상품은 재고 관리 안 함
+        if (artistId == null) {
+            return; // 플랫폼 상품(캔디 충전 등)은 재고 관리 안 함
+        }
+        if (Boolean.TRUE.equals(isSubscription) || Boolean.TRUE.equals(isMembership)) {
+            return; // 구독/멤버십 상품은 재고 관리 안 함
         }
         if (quantity < 0) {
             throw new ProductException(ProductErrorCode.INVALID_PRICE);
@@ -174,8 +177,11 @@ public class Product {
     }
 
     public void decreaseStock(Long quantity) {
-        if (Boolean.TRUE.equals(isSubscription)) {
-            return; // 구독 상품은 재고 관리 안 함
+        if (artistId == null) {
+            return; // 플랫폼 상품(캔디 충전 등)은 재고 관리 안 함
+        }
+        if (Boolean.TRUE.equals(isSubscription) || Boolean.TRUE.equals(isMembership)) {
+            return; // 구독/멤버십 상품은 재고 관리 안 함
         }
 
         if (quantity < 0) {

@@ -74,6 +74,11 @@ public class SecurityConfig {
                     .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
                     .requestMatchers("/api/artist-posts/notices").permitAll()
+                    // 상품 목록/상세/아티스트별 조회 - 마켓 페이지용 (비로그인 접근 허용)
+                    .requestMatchers(GET, "/api/products").permitAll()
+                    .requestMatchers(GET, "/api/products/by-artist/*").permitAll()
+                    .requestMatchers(GET, "/api/products/*").permitAll()
+                    .requestMatchers(GET, "/api/candy-recharge/products").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)
                     .requestMatchers("/api/settlements/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -100,6 +105,7 @@ public class SecurityConfig {
                             && req.getRequestURI().startsWith("/api/notifications/subscribe"))
                     .permitAll()
 
+				.requestMatchers(GET,"api/concerts/**").permitAll()
                     // 관리자
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
@@ -158,10 +164,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // 패턴 사용 시 setAllowedOrigins 대신 setAllowedOriginPatterns 사용 (credentials=true 호환)
-        // http://localhost:3000 = 로컬 개발, https://*.vercel.app = Vercel 배포(프로덕션/프리뷰)
-        config.setAllowedOriginPatterns(List.of(
+        config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
+                "https://fan-link-project.vercel.app",
                 "https://*.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));

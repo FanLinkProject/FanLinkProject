@@ -3,6 +3,7 @@ package org.example.backend.concert.service;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.concert.dto.request.ConcertCreateRequest;
 import org.example.backend.concert.dto.request.ConcertUpdateRequest;
+import org.example.backend.concert.dto.response.ConcertListItemResponse;
 import org.example.backend.concert.dto.response.ConcertMediaAssetResponse;
 import org.example.backend.concert.dto.response.ConcertResponse;
 import org.example.backend.concert.entity.Concert;
@@ -28,8 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -104,23 +108,77 @@ public class ConcertService {
     }
 
     /**
-     * 공연 조회 (단일)
+     * 공연 조회 (단일) - location fetch join으로 N+1 방지
      */
     @Transactional(readOnly = true)
     public ConcertResponse getConcert(Long concertId) {
-        Concert concert = concertRepository.findById(concertId)
+        Concert concert = concertRepository.findByIdWithLocation(concertId)
                 .orElseThrow(() -> new ConcertException(ConcertErrorCode.CONCERT_NOT_FOUND));
         return buildConcertResponse(concert);
     }
 
     /**
-     * 공연 목록 조회
+     * 공연 목록 조회 - 다가오는 공연만, startDateTime 오름차순, 2쿼리 전략(N+1 방지)
      */
     @Transactional(readOnly = true)
-    public List<ConcertResponse> getAllConcerts() {
-        return concertRepository.findAll().stream()
-                .map(this::buildConcertResponse)
-                .collect(Collectors.toList());
+    public List<ConcertListItemResponse> getAllConcerts() {
+        Instant now = Instant.now();
+        List<Concert> concerts = concertRepository.findUpcomingConcerts(now);
+        return buildConcertListItems(concerts);
+    }
+
+    /**
+     * 지도 bounds 내 공연 목록 조회 - 다가오는 공연만, 목록 DTO 동일
+     */
+    @Transactional(readOnly = true)
+    public List<ConcertListItemResponse> getConcertsInBounds(Double swLat, Double swLng, Double neLat, Double neLng) {
+        if (swLat == null || swLng == null || neLat == null || neLng == null) {
+            return Collections.emptyList();
+        }
+        Instant now = Instant.now();
+        List<Concert> concerts = concertRepository.findUpcomingConcertsInBounds(swLat, swLng, neLat, neLng, now);
+        return buildConcertListItems(concerts);
+    }
+
+    /**
+     * 2쿼리 전략: Concert 목록 기준으로 artistNames, posterUrl 한 번에 조회 후 DTO 생성
+     */
+    private List<ConcertListItemResponse> buildConcertListItems(List<Concert> concerts) {
+        if (CollectionUtils.isEmpty(concerts)) {
+            return Collections.emptyList();
+        }
+        List<Long> concertIds = concerts.stream().map(Concert::getId).collect(Collectors.toList());
+
+        List<ConcertArtist> artists = concertArtistRepository.findByConcertIdIn(concertIds);
+        Map<Long, List<String>> artistNamesMap = artists.stream()
+                .collect(Collectors.groupingBy(
+                        ca -> ca.getConcert().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                ca -> ca.getArtist().getNickname() != null && !ca.getArtist().getNickname().isBlank()
+                                        ? ca.getArtist().getNickname()
+                                        : ca.getArtist().getName(),
+                                Collectors.toList()
+                        )
+                ));
+
+        List<ConcertMediaAsset> posters = concertMediaAssetRepository.findByConcertIdInAndType(concertIds, ConcertMediaAssetType.POSTER);
+        String cdnBaseUrl = getCdnBaseUrl();
+        String base = cdnBaseUrl != null && !cdnBaseUrl.isBlank() ? (cdnBaseUrl.endsWith("/") ? cdnBaseUrl : cdnBaseUrl + "/") : "";
+        Map<Long, String> posterUrlMap = posters.stream()
+                .collect(Collectors.toMap(
+                        cma -> cma.getConcert().getId(),
+                        cma -> base + cma.getMediaAsset().getObjectKey(),
+                        (a, b) -> a
+                ));
+
+        List<ConcertListItemResponse> result = new ArrayList<>(concerts.size());
+        for (Concert c : concerts) {
+            List<String> names = artistNamesMap.getOrDefault(c.getId(), Collections.emptyList());
+            String imageUrl = posterUrlMap.get(c.getId());
+            result.add(ConcertListItemResponse.of(c, imageUrl, names));
+        }
+        return result;
     }
 
     /**

@@ -124,7 +124,13 @@ public class AuthService {
         // Redis-RefreshToken 저장
         refreshTokenStore.save(user.getEmail(), refreshToken);
 
-        return new TokenResponse("bearer", accessToken, refreshToken, 3600000L);
+        return TokenResponse.builder()
+                .grantType("bearer")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .accessTokenExpiresIn(3600000L)
+                .role(user.getRole().name())
+                .build();
     }
 
     // 로그아웃

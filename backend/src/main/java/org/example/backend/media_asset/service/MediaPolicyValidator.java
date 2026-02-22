@@ -45,7 +45,8 @@ public class MediaPolicyValidator {
     public boolean isContentTypeAllowed(MediaAssetCategory category, String contentType) {
         String normalized = normalizeContentType(contentType);
         return switch (category) {
-            case PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE
+            case PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE,
+                    CONCERT_POSTER
                     -> IMAGE_CONTENT_TYPES.contains(normalized);
             case POST_VIDEO, REPLAY_VIDEO -> VIDEO_CONTENT_TYPES.contains(normalized);
         };
@@ -62,7 +63,8 @@ public class MediaPolicyValidator {
     // 카테고리별 최대 허용 용량을 반환한다.
     public long resolveMaxBytes(MediaAssetCategory category) {
         return switch (category) {
-            case PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE
+            case PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE,
+                    CONCERT_POSTER
                     -> mediaProperties.getLimits().getImageBytes();
             case POST_VIDEO -> mediaProperties.getLimits().getPostVideoBytes();
             case REPLAY_VIDEO -> mediaProperties.getLimits().getReplayVideoBytes();
@@ -88,7 +90,8 @@ public class MediaPolicyValidator {
         }
         if ((category == MediaAssetCategory.ARTIST_COVER_IMAGE
                 || category == MediaAssetCategory.PRODUCT_IMAGE
-                || category == MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE)
+                || category == MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE
+                || category == MediaAssetCategory.CONCERT_POSTER)
                 && scope == MediaAssetScope.RESTRICTED) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }

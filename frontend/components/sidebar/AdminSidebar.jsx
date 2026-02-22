@@ -46,6 +46,18 @@ const adminMenuItems = [
     icon: "campaign",
     href: "/admin/notices",
   },
+  {
+    id: "ADMIN_CANDYSHOP",
+    label: "캔디샵",
+    icon: "store",
+    href: "/admin/candyshop",
+  },
+  {
+    id: "ADMIN_MARKET",
+    label: "마켓",
+    icon: "shopping_bag",
+    href: "/admin/market",
+  },
 ];
 
 export default function AdminSidebar() {

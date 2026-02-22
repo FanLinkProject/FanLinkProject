@@ -5,7 +5,7 @@
  * - POST /api/media-assets/complete → objectKey만 전달, 검증 후 url 반환
  *
  * 카테고리: PROFILE_IMAGE, ARTIST_COVER_IMAGE, POST_IMAGE, POST_VIDEO,
- *           REPLAY_VIDEO, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE
+ *           REPLAY_VIDEO, REPLAY_THUMBNAIL, PRODUCT_IMAGE, PRODUCT_DESCRIBE_IMAGE, CONCERT_POSTER
  * 스코프: PUBLIC, RESTRICTED (RESTRICTED는 ARTIST만)
  */
 import { BASE_URL, normalizeToken, request } from "@/lib/api";
@@ -19,6 +19,7 @@ export const MediaAssetCategory = {
   REPLAY_THUMBNAIL: "REPLAY_THUMBNAIL",
   PRODUCT_IMAGE: "PRODUCT_IMAGE",
   PRODUCT_DESCRIBE_IMAGE: "PRODUCT_DESCRIBE_IMAGE",
+  CONCERT_POSTER: "CONCERT_POSTER",
 };
 
 export const MediaAssetScope = { PUBLIC: "PUBLIC", RESTRICTED: "RESTRICTED" };
@@ -44,6 +45,7 @@ export const MediaAssetStatus = {
  *   postIdOrTemp?: string;
  *   replayIdOrTemp?: string;
  *   productIdOrTemp?: string;
+ *   concertIdOrTemp?: string;
  *   attachmentCountInPost?: number;
  *   attachmentCountInProduct?: number;
  * }>} items

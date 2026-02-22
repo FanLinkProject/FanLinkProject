@@ -3,7 +3,9 @@ package org.example.backend.payment.adapter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.payment.config.TossPaymentConfig;
+import org.example.backend.payment.dto.PaymentConfirmResult;
 import org.example.backend.payment.dto.TossPaymentDto;
+import org.example.backend.payment.enums.PaymentMethod;
 import org.example.backend.payment.exception.PaymentErrorCode;
 import org.example.backend.payment.exception.PaymentException;
 import org.springframework.http.HttpEntity;
@@ -11,6 +13,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+
+import java.time.OffsetDateTime;
 import java.util.Collections;
 
 @Slf4j
@@ -23,18 +27,14 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
     private HttpHeaders getHeaders() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBasicAuth(tossPaymentConfig.getSecretKey(), ""); // Spring automatically encodes "key:"
+        headers.setBasicAuth(tossPaymentConfig.getSecretKey(), "");
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
         return headers;
     }
 
-    /**
-     * Toss Payments API에 결제 승인을 요청합니다.
-     * 프론트엔드에서 성공적으로 결제 인증을 마친 후 호출됩니다.
-     */
     @Override
-    public TossPaymentDto.PaymentConfirmResponse confirmPayment(String paymentKey, String orderId, Long amount) {
+    public PaymentConfirmResult confirmPayment(String paymentKey, String orderId, Long amount) {
         String url = tossPaymentConfig.getBaseUrl() + "/payments/confirm";
 
         TossPaymentDto.PaymentConfirmRequest request = TossPaymentDto.PaymentConfirmRequest.builder()
@@ -45,19 +45,17 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
         try {
             HttpEntity<TossPaymentDto.PaymentConfirmRequest> entity = new HttpEntity<>(request, getHeaders());
-            return restTemplate.postForObject(url, entity, TossPaymentDto.PaymentConfirmResponse.class);
+            TossPaymentDto.PaymentConfirmResponse response = restTemplate.postForObject(url, entity,
+                    TossPaymentDto.PaymentConfirmResponse.class);
+            return toPaymentConfirmResult(response);
         } catch (Exception e) {
-            log.error("Toss 결제 승인 실패: {}", e.getMessage());
+            log.error("결제 승인 실패: {}", e.getMessage());
             throw new PaymentException(PaymentErrorCode.PAYMENT_CONFIRM_FAILED);
         }
     }
 
-    /**
-     * Toss Payments API에 빌링키 발급을 요청합니다.
-     * 카드 정보를 등록하고 나중에 자동 결제를 수행하기 위해 사용됩니다.
-     */
     @Override
-    public TossPaymentDto.BillingKeyResponse issueBillingKey(String authKey, String customerKey) {
+    public String issueBillingKey(String authKey, String customerKey) {
         String url = tossPaymentConfig.getBaseUrl() + "/billing/authorizations/issue";
 
         TossPaymentDto.BillingKeyRequest request = TossPaymentDto.BillingKeyRequest.builder()
@@ -66,16 +64,13 @@ public class TossPaymentAdapter implements PaymentAdapter {
                 .build();
 
         HttpEntity<TossPaymentDto.BillingKeyRequest> entity = new HttpEntity<>(request, getHeaders());
-
-        return restTemplate.postForObject(url, entity, TossPaymentDto.BillingKeyResponse.class);
+        TossPaymentDto.BillingKeyResponse response = restTemplate.postForObject(url, entity,
+                TossPaymentDto.BillingKeyResponse.class);
+        return response != null ? response.getBillingKey() : null;
     }
 
-    /**
-     * 발급받은 빌링키를 사용하여 결제 승인을 요청합니다.
-     * 정기 결제(구독) 시 스케줄러에 의해 호출됩니다.
-     */
     @Override
-    public TossPaymentDto.PaymentConfirmResponse billingPayment(String billingKey, String customerKey, Long amount,
+    public PaymentConfirmResult billingPayment(String billingKey, String customerKey, Long amount,
             String orderId, String orderName) {
         String url = tossPaymentConfig.getBaseUrl() + "/billing/" + billingKey;
 
@@ -88,12 +83,41 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
         HttpEntity<TossPaymentDto.BillingPaymentRequest> entity = new HttpEntity<>(request, getHeaders());
 
-        return restTemplate.postForObject(url, entity, TossPaymentDto.PaymentConfirmResponse.class);
+        try {
+            TossPaymentDto.PaymentConfirmResponse response = restTemplate.postForObject(url, entity,
+                    TossPaymentDto.PaymentConfirmResponse.class);
+            return toPaymentConfirmResult(response);
+        } catch (Exception e) {
+            log.error("빌링키 결제 실패: {}", e.getMessage());
+            throw new PaymentException(PaymentErrorCode.PAYMENT_CONFIRM_FAILED);
+        }
+    }
+
+    private PaymentConfirmResult toPaymentConfirmResult(TossPaymentDto.PaymentConfirmResponse r) {
+        if (r == null) return null;
+        return PaymentConfirmResult.builder()
+                .paymentKey(r.getPaymentKey())
+                .amount(r.getTotalAmount())
+                .method(convertTossMethod(r.getMethod()))
+                .approvedAt(OffsetDateTime.parse(r.getApprovedAt()).toInstant())
+                .build();
+    }
+
+    private PaymentMethod convertTossMethod(String tossMethod) {
+        return switch (tossMethod != null ? tossMethod : "") {
+            case "카드" -> PaymentMethod.CARD;
+            case "가상계좌" -> PaymentMethod.VIRTUAL_ACCOUNT;
+            case "토스페이" -> PaymentMethod.TOSS_PAY;
+            default -> {
+                log.warn("알 수 없는 결제 수단: {}", tossMethod);
+                yield PaymentMethod.CARD;
+            }
+        };
     }
 
     /**
-     * 주문 번호로 결제 정보를 조회합니다.
-     * (Pending 주문 정리 스케줄러에서 사용)
+     * 주문 번호로 결제 정보를 조회합니다. (Pending 주문 정리 스케줄러에서 사용)
+     * Toss 전용 메서드이므로 PaymentAdapter 인터페이스에는 포함하지 않음.
      */
     public TossPaymentDto.PaymentConfirmResponse getPaymentByOrderNo(String orderNo) {
         String url = tossPaymentConfig.getBaseUrl() + "/payments/orders/" + orderNo;
