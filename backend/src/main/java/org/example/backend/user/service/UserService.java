@@ -187,6 +187,36 @@ public class UserService {
         return new org.springframework.data.domain.PageImpl<>(responses, pageable, artists.getTotalElements());
     }
 
+    // 비로그인/팬 홈 공통: 추천 그룹 (랜덤, GROUP·ACTIVE만)
+    @Transactional(readOnly = true)
+    public Page<User> getRecommendedGroups(Pageable pageable) {
+        return userRepository.findRecommendedGroups(
+                UserRole.GROUP.name(),
+                UserStatus.ACTIVE.name(),
+                pageable
+        );
+    }
+
+    // 팬 홈용: 아티스트 그룹만 조회 (추천은 getRecommendedGroups 재사용, 검색 시에만 별도 조회)
+    @Transactional(readOnly = true)
+    public Page<ArtistSearchResponse> getArtistsGroupsOnly(String nickname, Pageable pageable) {
+        Page<User> groups;
+        if (nickname != null && !nickname.trim().isEmpty()) {
+            groups = userRepository.findArtistsByNicknameOrGroupName(
+                    UserRole.GROUP,
+                    UserStatus.ACTIVE,
+                    nickname.trim(),
+                    pageable
+            );
+        } else {
+            groups = getRecommendedGroups(pageable);
+        }
+        var responses = groups.getContent().stream()
+                .map(ArtistSearchResponse::from)
+                .toList();
+        return new org.springframework.data.domain.PageImpl<>(responses, pageable, groups.getTotalElements());
+    }
+
     // 유저 차단
     public void blockUser(User blocker, BlockRequest request) {
         // 자기 자신을 차단할 수 없음
@@ -454,13 +484,9 @@ public class UserService {
                 "/api/auth/signup"
         );
 
-        // 2) 추천 아티스트 그룹 (랜덤, 최대 10개, 비로그인 홈은 그룹만 노출)
+        // 2) 추천 아티스트 그룹 (비로그인/팬 홈 공통 메소드 사용)
         Pageable recommendedPageable = PageRequest.of(0, 10);
-        List<User> recommendedGroups = userRepository.findRecommendedGroups(
-                UserRole.GROUP.name(),
-                UserStatus.ACTIVE.name(),
-                recommendedPageable
-        ).getContent();
+        List<User> recommendedGroups = getRecommendedGroups(recommendedPageable).getContent();
 
         List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedGroups.stream()
                 .map(artist -> {
@@ -504,16 +530,22 @@ public class UserService {
     // 로그인 유저 메인 홈 화면 조회
     @Transactional(readOnly = true)
     public UserHomeResponse getUserHome(User user) {
-        List<Follow> follows = followRepository.findByFollower(user, PageRequest.of(0, 10))
-                .getContent();
+        // 팬 홈: 내 아티스트는 그룹 계정만 노출
+        List<Follow> followedGroups = followRepository.findByFollowerAndArtist_Role(
+                user, UserRole.GROUP, PageRequest.of(0, 10)
+        ).getContent();
 
-        List<UserHomeResponse.FollowedArtist> followedArtists = follows.stream()
+        List<UserHomeResponse.FollowedArtist> followedArtists = followedGroups.stream()
                 .map(f -> new UserHomeResponse.FollowedArtist(
                         f.getArtist().getId(),
                         f.getArtist().getNickname(),
                         f.getArtist().getProfileImageUrl()
                 ))
                 .collect(Collectors.toList());
+
+        // DM 알림용으로는 팔로우 전체 조회 (기존 동작 유지)
+        List<Follow> follows = followRepository.findByFollower(user, PageRequest.of(0, 10))
+                .getContent();
 
         List<UserHomeResponse.DmNotification> dmNotifications = follows.stream()
                 .map(Follow::getArtist)

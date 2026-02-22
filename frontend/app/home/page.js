@@ -218,15 +218,14 @@ export default function UserHomePage() {
       });
   }, []);
 
-  // 추천 아티스트 (팔로우하지 않은 아티스트)
+  // 추천 아티스트 (그룹만, 팔로우하지 않은 그룹)
   useEffect(() => {
     const headers = getAuthHeaders();
     if (!headers.Authorization) return;
-    // 로그인 팬 홈일 때만 (data가 있고 followedArtists 배열이 있을 때; 없으면 빈 배열로 처리)
     const followed = data?.followedArtists ?? [];
     const followedIds = new Set(followed.map((a) => String(a.artistId)));
     axios
-      .get(`${BASE_URL}/api/user/artists?page=0&size=24`, { headers })
+      .get(`${BASE_URL}/api/user/artists/recommended?page=0&size=24`, { headers })
       .then((res) => {
         const list = res.data?.content ?? res.data ?? [];
         const recommended = Array.isArray(list) ? list.filter((a) => !followedIds.has(String(a.id))) : [];
