@@ -10,7 +10,7 @@
 export const BASE_URL =
     typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL
         ? process.env.NEXT_PUBLIC_API_BASE_URL
-        : "http://15.165.178.159";
+        : "https://api.fanlink.site";
 
 /** STOMP/SockJS 엔드포인트 (라이브챗 등) */
 export const WS_CHAT_URL = `${BASE_URL.replace(/\/$/, "")}/ws-chat`;
