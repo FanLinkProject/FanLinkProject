@@ -14,11 +14,7 @@ import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -44,7 +40,9 @@ public class AuthController {
     @PostMapping("/oauth/exchange")
     public ResponseEntity<TokenResponse> exchangeOAuthCode(@Valid @RequestBody OAuthCodeExchangeRequest request) {
         TokenResponse token = authService.exchangeOAuthCode(request.code());
-      
+        return ResponseEntity.ok(token);
+    }
+
     // Access Token 갱신 (Refresh Token으로 새 Access Token 발급)
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(@RequestParam("refreshToken") String refreshToken) {
