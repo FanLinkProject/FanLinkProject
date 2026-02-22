@@ -21,7 +21,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query("SELECT c FROM Comment c " +
             "WHERE c.targetType = :targetType AND c.targetId = :targetId " +
             "AND c.parent IS NULL " +
-            "AND (c.status = 0 OR EXISTS (SELECT ch FROM Comment ch WHERE ch.parent = c AND ch.status = 0)) " +
+            "AND (c.status = false OR EXISTS (SELECT ch FROM Comment ch WHERE ch.parent = c AND ch.status = false)) " +
             "AND (:lastId IS NULL OR c.id < :lastId) " +
             "ORDER BY c.id DESC")
     Slice<Comment> findRootComments(
@@ -35,7 +35,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
      * 특정 부모 댓글의 자식(대댓글)들만 조회 (No-offset 무한 스크롤)
      */
     @Query("SELECT c FROM Comment c " +
-            "WHERE c.parent.id = :parentId AND c.status = 0 " +
+            "WHERE c.parent.id = :parentId AND c.status = false " +
             "AND (:lastId IS NULL OR c.id > :lastId) " +
             "ORDER BY c.id ASC")
     Slice<Comment> findReplies(
@@ -50,7 +50,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
      */
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Comment c SET c.status = :status WHERE c.targetType = :type AND c.targetId = :id")
-    void updateStatusByTarget(@Param("type") TargetType type, @Param("id") Long id, @Param("status") Integer status);
+    void updateStatusByTarget(@Param("type") TargetType type, @Param("id") Long id, @Param("status") Boolean status);
 
 
 
@@ -62,7 +62,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query("SELECT c.targetId, COUNT(c) FROM Comment c " +
             "WHERE c.targetType = :targetType " +
             "AND c.targetId IN :targetIds " +
-            "AND c.status = 0 " +
+            "AND c.status = false " +
             "GROUP BY c.targetId")
     List<Object[]> countByTargetTypeAndTargetIds(
             @Param("targetType") TargetType targetType,
@@ -75,18 +75,18 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
      * - 쿼리 1회로 해당 페이지의 모든 부모 댓글에 대해 일괄 판별
      */
     @Query("SELECT DISTINCT c.parent.id FROM Comment c " +
-            "WHERE c.parent.id IN :parentIds AND c.status = 0 " +
+            "WHERE c.parent.id IN :parentIds AND c.status = false " +
             "AND c.userId IN (SELECT u.id FROM org.example.backend.user.entity.User u WHERE u.role = 'ARTIST' OR u.role = 'GROUP')")
     List<Long> findParentIdsWithArtistReply(@Param("parentIds") List<Long> parentIds);
 
     /**
      * 내가 쓴 댓글 조회 (페이징 방식)
      * - 부모 댓글과 대댓글 모두 포함
-     * - 활성 상태(status=0)인 것만 조회
+     * - 활성 상태(status=false)인 것만 조회
      * - 최신순 정렬 (id DESC)
      */
     @Query("SELECT c FROM Comment c " +
-            "WHERE c.userId = :userId AND c.status = 0 " +
+            "WHERE c.userId = :userId AND c.status = false " +
             "ORDER BY c.id DESC")
     Page<Comment> findMyComments(
             @Param("userId") Long userId,

@@ -14,7 +14,7 @@ public record CommentResponse(
         String role,            // USER, ARTIST, GROUP, ADMIN
         boolean isArtist,       // 아티스트 댓글 강조용
         String content,
-        Integer status,
+        Boolean status,
         Instant createdAt,
         int replyCount,
         boolean hasReplies,
@@ -35,7 +35,7 @@ public record CommentResponse(
      * - hasArtistReply: 서비스에서 일괄 조회한 Set에 포함 여부로 판별
      */
     public static CommentResponse of(Comment entity, User user, boolean hasArtistReply) {
-        String displayContent = (entity.getStatus() == 0) ? "삭제된 댓글입니다." : entity.getContent();
+        String displayContent = Boolean.TRUE.equals(entity.getStatus()) ? "삭제된 댓글입니다." : entity.getContent();
 
         return new CommentResponse(
                 entity.getId(),

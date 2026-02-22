@@ -101,7 +101,7 @@ public class CommentService {
         Comment parent = null;
         if (request.parentId() != null) {
             parent = commentRepository.findById(request.parentId())
-                    .filter(p -> p.getStatus() == 1)
+                    .filter(p -> Boolean.FALSE.equals(p.getStatus()))
                     .orElseThrow(() -> new CommentException(CommentErrorCode.PARENT_COMMENT_NOT_FOUND));
 
             // 2단계 깊이 제한: 대댓글에 답글 불가
@@ -173,7 +173,7 @@ public class CommentService {
     /**
      * 내가 작성한 댓글 목록 조회 (페이징 방식)
      * - 부모 댓글과 대댓글 모두 포함
-     * - 활성 상태(status=0)인 것만 조회
+     * - 활성 상태(status=false)인 것만 조회
      * - 최신순 정렬
      * - targetType, targetId 정보 포함하여 어떤 게시물에 달린 댓글인지 식별 가능
      *
