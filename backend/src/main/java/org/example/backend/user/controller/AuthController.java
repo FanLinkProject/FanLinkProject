@@ -32,6 +32,13 @@ public class AuthController {
         return ResponseEntity.ok(token);
     }
 
+    // Access Token 갱신 (Refresh Token으로 새 Access Token 발급)
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenResponse> refresh(@RequestParam("refreshToken") String refreshToken) {
+        TokenResponse token = authService.refresh(refreshToken);
+        return ResponseEntity.ok(token);
+    }
+
     // 로그아웃
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestParam("refreshToken") String refreshToken) {

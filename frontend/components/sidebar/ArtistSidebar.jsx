@@ -1,40 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { BASE_URL } from "@/lib/api";
 
 const personalMenuItems = [
-  {
-    id: "ARTIST_ME",
-    label: "My Studio",
-    icon: "person",
-    href: "/home",
-  },
-  {
-    id: "ARTIST_POSTS",
-    label: "게시물 관리",
-    icon: "article",
-    href: "/artist-console/posts",
-  },
-  {
-    id: "ARTIST_LIVE_MGMT",
-    label: "라이브 관리",
-    icon: "sensors",
-    href: "/artist-console/live",
-  },
-  {
-    id: "ARTIST_MILESTONES",
-    label: "등급 관리",
-    icon: "military_tech",
-    href: "/milestone",
-  },
-  {
-    id: "ARTIST_DM",
-    label: "DM",
-    icon: "mail",
-    href: "/dm/artist",
-  },
+  { id: "ARTIST_ME", label: "My Studio", icon: "person", href: "/home" },
+  { id: "ARTIST_POSTS", label: "게시물 관리", icon: "article", href: "/artist-console/posts" },
+  { id: "ARTIST_LIVE_MGMT", label: "라이브 관리", icon: "sensors", href: "/artist-console/live" },
+  { id: "ARTIST_MILESTONES", label: "등급 관리", icon: "military_tech", href: "/milestone" },
+  { id: "ARTIST_DM", label: "DM", icon: "mail", href: "/dm/artist" },
 ];
 
 const businessMenuItems = [
@@ -73,6 +49,18 @@ export default function ArtistSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [canSeeMemberMenu, setCanSeeMemberMenu] = useState(false);
+  const [isGroupMember, setIsGroupMember] = useState(false);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) return;
+    fetch(`${BASE_URL}/api/user/profile`, { headers: { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (profile && profile.groupId != null && profile.id !== profile.groupId) setIsGroupMember(true);
+      })
+      .catch(() => {});
+  }, []);
 
   const isActive = (href) =>
     pathname === href ||
@@ -96,7 +84,9 @@ export default function ArtistSidebar() {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {personalMenuItems.map((item) => (
+            {personalMenuItems
+              .filter((item) => item.id !== "ARTIST_MILESTONES" || !isGroupMember)
+              .map((item) => (
               <Link
                 key={item.id}
                 href={item.href}

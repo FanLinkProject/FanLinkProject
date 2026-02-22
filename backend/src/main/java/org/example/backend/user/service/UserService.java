@@ -152,39 +152,35 @@ public class UserService {
         userRepository.save(currentUser);
     }
 
-    // 아티스트 목록 조회 및 검색
+    // 아티스트 목록 조회: GROUP 계정 + GroupMember에 속하지 않은 개인 ARTIST만 노출
     @Transactional(readOnly = true)
     public Page<ArtistSearchResponse> getArtists(String nickname, Pageable pageable) {
-        Page<User> artists;
-        
         if (nickname != null && !nickname.trim().isEmpty()) {
-            // 닉네임 또는 그룹명으로 검색
-            artists = userRepository.findArtistsByNicknameOrGroupName(
-                    UserRole.ARTIST,
-                    UserStatus.ACTIVE,
-                    nickname.trim(),
-                    pageable
-            );
-        } else {
-            // 전체 목록 조회
-            artists = userRepository.findByRoleAndStatusAndDeletedAtIsNull(
-                    UserRole.ARTIST,
-                    UserStatus.ACTIVE,
-                    pageable
-            );
+            Page<User> artists = userRepository.findArtistsByNicknameOrGroupName(
+                    UserRole.ARTIST, UserStatus.ACTIVE, nickname.trim(), Pageable.unpaged());
+            Page<User> groups = userRepository.findArtistsByNicknameOrGroupName(
+                    UserRole.GROUP, UserStatus.ACTIVE, nickname.trim(), Pageable.unpaged());
+            var artistNotInGroup = artists.getContent().stream()
+                    .filter(user -> groupMemberRepository.findByMember(user).isEmpty())
+                    .toList();
+            var merged = java.util.stream.Stream.concat(artistNotInGroup.stream(), groups.getContent().stream())
+                    .sorted(java.util.Comparator.comparing(User::getNickname, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+            long total = merged.size();
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), merged.size());
+            var pageContent = start >= merged.size() ? java.util.List.<User>of() : merged.subList(start, end);
+            var responses = pageContent.stream().map(ArtistSearchResponse::from).toList();
+            return new org.springframework.data.domain.PageImpl<>(responses, pageable, total);
         }
-
-        // 그룹에 속한 아티스트(멤버)는 추천 리스트에서 제외하고,
-        // 그룹이 없는 개인 아티스트(또는 그룹 계정으로만 쓰이는 아티스트)만 노출
-        var filteredUsers = artists.getContent().stream()
-                .filter(user -> groupMemberRepository.findByMember(user).isEmpty())
-                .toList();
-
-        var responses = filteredUsers.stream()
-                .map(ArtistSearchResponse::from)
-                .toList();
-
-        return new org.springframework.data.domain.PageImpl<>(responses, pageable, artists.getTotalElements());
+        Page<User> listable = userRepository.findListableArtists(
+                java.util.List.of(UserRole.ARTIST, UserRole.GROUP),
+                UserStatus.ACTIVE,
+                UserRole.GROUP,
+                pageable
+        );
+        var responses = listable.getContent().stream().map(ArtistSearchResponse::from).toList();
+        return new org.springframework.data.domain.PageImpl<>(responses, pageable, listable.getTotalElements());
     }
 
     // 유저 차단
@@ -454,14 +450,16 @@ public class UserService {
                 "/api/auth/signup"
         );
 
-        // 2) 추천 아티스트 (랜덤, 최대 10개)
+        // 2) 추천 아티스트 (랜덤, 최대 10개) — 그룹에 속한 개인 아티스트 제외
         Pageable recommendedPageable = PageRequest.of(0, 10);
         List<User> recommendedArtists = userRepository.findRecommendedArtists(
                 UserRole.ARTIST.name(),
                 UserRole.GROUP.name(),
                 UserStatus.ACTIVE.name(),
                 recommendedPageable
-        ).getContent();
+        ).getContent().stream()
+                .filter(u -> u.getRole() == UserRole.GROUP || groupMemberRepository.findByMember(u).isEmpty())
+                .toList();
 
         List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedArtists.stream()
                 .map(artist -> {
@@ -475,13 +473,15 @@ public class UserService {
                 })
                 .toList();
 
-        // 3) 새로운 아티스트 (최근 가입한 순서, 최대 10개)
+        // 3) 새로운 아티스트 (최근 가입한 순서, 최대 10개) — 그룹에 속한 개인 아티스트 제외
         Pageable newArtistsPageable = PageRequest.of(0, 10);
         List<User> newArtists = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                 UserRole.ARTIST,
                 UserStatus.ACTIVE,
                 newArtistsPageable
-        ).getContent();
+        ).getContent().stream()
+                .filter(u -> groupMemberRepository.findByMember(u).isEmpty())
+                .toList();
 
         List<User> newGroups = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                 UserRole.GROUP,
@@ -489,7 +489,6 @@ public class UserService {
                 newArtistsPageable
         ).getContent();
 
-        // ARTIST와 GROUP을 합쳐서 최신순으로 정렬 (createdAt 기준, 최대 10개)
         List<User> allNewArtists = new java.util.ArrayList<>();
         allNewArtists.addAll(newArtists);
         allNewArtists.addAll(newGroups);

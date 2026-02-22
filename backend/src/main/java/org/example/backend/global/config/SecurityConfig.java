@@ -59,6 +59,8 @@ public class SecurityConfig {
                         "/css/**",
                         "/js/**"
                     ).permitAll()
+                    // 아티스트 목록 조회: 비로그인 허용 (GET만, /api/user/** 보다 먼저 매칭되도록)
+                    .requestMatchers(GET, "/api/user/artists").permitAll()
                     // 인증없이 접근 가능한 경로
                     .requestMatchers(
                         "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
@@ -66,6 +68,7 @@ public class SecurityConfig {
                         "/api/home",               // 통합 홈 화면 API (역할별 응답)
                         "/api/guest/**",          // 비로그인 유저 메인 홈 화면 API (하위 호환)
                         "/api/user/artists/*/dashboard",  // 특정 아티스트 대시보드 (비로그인 접근 가능)
+                        "/api/user/artists",            // 아티스트 목록 (비로그인 조회 허용)
                         "/login/oauth2/**",       // OAuth2 로그인 콜백 URL
                         "/oauth2/**",             // OAuth2 관련 URL
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )

@@ -76,6 +76,7 @@ export function NotificationProvider({ children }) {
                 }
             } catch (e) {
                 if (!mountedRef.current) return;
+                if (e?.name === "AbortError") skipReconnect = true;
             } finally {
                 if (mountedRef.current && !skipReconnect) {
                     reconnectRef.current = setTimeout(connectSSE, 3000);
