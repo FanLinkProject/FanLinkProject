@@ -10,18 +10,13 @@ import org.example.backend.delivery.exception.DeliveryErrorCode;
 import org.example.backend.delivery.exception.DeliveryException;
 import org.example.backend.delivery.repository.DeliveryRepository;
 import org.example.backend.delivery.repository.DeliveryStatusHistoryRepository;
-import org.example.backend.global.integration.AfterShipService;
 import org.example.backend.global.integration.DeliveryTracker;
-import org.example.backend.global.integration.FakeDeliveryTracker;
-import org.example.backend.global.integration.SweetTrackerService;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.notification.service.NotificationService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -31,20 +26,9 @@ import java.util.Optional;
 public class DeliveryService {
 
     private final DeliveryRepository deliveryRepository;
-
-    // ★핵심★: 모든 트래커 구현체들을 리스트로 주입받습니다. (@Order로 우선순위 정렬됨)
-    private final List<DeliveryTracker> deliveryTrackers;
-
-    // 특정 트래커 서비스 (국가별 판단용)
-    private final FakeDeliveryTracker fakeDeliveryTracker;
-    private final SweetTrackerService sweetTrackerService;
-    private final AfterShipService afterShipService;
-
+    private final DeliveryTrackerResolver deliveryTrackerResolver;
     private final DeliveryStatusHistoryRepository deliveryStatusHistoryRepository;
     private final NotificationService notificationService;
-
-    @Value("${delivery.mock-enabled:true}")
-    private boolean mockEnabled;
 
     /**
      * [관리자] 배송 시작 (송장 번호 입력)
@@ -82,12 +66,11 @@ public class DeliveryService {
             return DeliveryResponseDto.from(delivery, "READY");
         }
 
-        // ★전략 패턴 적용★: 우선순위에 따라 트래커 선택
-        DeliveryTracker tracker = selectTracker(delivery);
+        DeliveryTracker tracker = deliveryTrackerResolver.resolve(delivery.getCountry(), delivery.getCourierCode());
         
         if (tracker == null) {
-            log.warn("지원하지 않는 택배사 코드입니다. courierCode={}, deliveryId={}", 
-                    delivery.getCourierCode(), deliveryId);
+            log.warn("지원하지 않는 배송 추적 조합입니다. countryCode={}, courierCode={}, deliveryId={}",
+                    delivery.getCountry(), delivery.getCourierCode(), deliveryId);
             throw new DeliveryException(DeliveryErrorCode.UNSUPPORTED_COURIER_CODE);
         }
 
@@ -141,41 +124,6 @@ public class DeliveryService {
                 notifyDeliveryIssue(delivery, externalStatus);
             }
         }
-    }
-
-    /**
-     * 배송 정보에 맞는 트래커를 선택합니다.
-     * 우선순위: FakeDeliveryTracker > 국가별 트래커 (국내/해외)
-     */
-    private DeliveryTracker selectTracker(Delivery delivery) {
-        String courierCode = delivery.getCourierCode();
-
-        // 1순위: FakeDeliveryTracker (개발 모드)
-        if (fakeDeliveryTracker.isSupported(courierCode)) {
-            log.debug("FakeDeliveryTracker 선택: courierCode={}", courierCode);
-            return fakeDeliveryTracker;
-        }
-
-        // 2순위: 국가별 트래커 선택
-        if (delivery.isDomestic()) {
-            // 국내 배송: SweetTracker
-            if (sweetTrackerService.isSupported(courierCode)) {
-                log.debug("SweetTrackerService 선택: 국내 배송, courierCode={}", courierCode);
-                return sweetTrackerService;
-            }
-        } else {
-            // 해외 배송: AfterShip
-            if (afterShipService.isSupported(courierCode)) {
-                log.debug("AfterShipService 선택: 해외 배송, courierCode={}", courierCode);
-                return afterShipService;
-            }
-        }
-
-        // 3순위: 기존 로직 (isSupported로만 판단) - 하위 호환성
-        return deliveryTrackers.stream()
-                .filter(t -> t.isSupported(courierCode))
-                .findFirst()
-                .orElse(null);
     }
 
     private void recordStatusChange(Delivery delivery, DeliveryStatus from, DeliveryStatus to, String reason) {
