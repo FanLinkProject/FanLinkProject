@@ -20,13 +20,26 @@ public class ProductController {
     private final ProductService productService;
 
     /**
-     * 모든 상품 목록을 조회합니다.
-     * 프론트엔드에서 구독 여부(isSubscription)로 필터링하여 보여줄 수 있습니다.
+     * 상품 목록을 조회합니다.
+     * - artistId: 아티스트 상품 관리용 (artist-console)
+     * - artistIds: 그룹+멤버 상품 목록 (쉼표 구분, 팬 마켓 페이지)
+     * - 없음: 전체 상품
      */
     @GetMapping
-    public ResponseEntity<List<ProductDetailResponse>> getAllProducts() {
-        List<ProductDetailResponse> products = productService.getAllProducts();
-        return ResponseEntity.ok(products);
+    public ResponseEntity<List<ProductDetailResponse>> getProducts(
+            @RequestParam(required = false) Long artistId,
+            @RequestParam(required = false) List<Long> artistIds,
+            @RequestParam(required = false) Boolean market) {
+        if (artistId != null) {
+            return ResponseEntity.ok(productService.getProductsByArtistId(artistId));
+        }
+        if (artistIds != null && !artistIds.isEmpty()) {
+            return ResponseEntity.ok(productService.getProductsByArtistIds(artistIds));
+        }
+        if (Boolean.TRUE.equals(market)) {
+            return ResponseEntity.ok(productService.getMarketProducts());
+        }
+        return ResponseEntity.ok(productService.getAllProducts());
     }
 
     @PostMapping
@@ -37,6 +50,16 @@ public class ProductController {
         UserRole role = principalDetails != null ? principalDetails.getUser().getRole() : null;
         ProductDetailResponse product = productService.createProduct(userId, role, request);
         return ResponseEntity.ok(product);
+    }
+
+    /**
+     * 아티스트/그룹별 상품 목록 (팬 마켓 페이지용).
+     * 그룹인 경우 그룹+멤버 상품, 개인 아티스트인 경우 해당 아티스트 상품만 반환.
+     */
+    @GetMapping("/by-artist/{artistId}")
+    public ResponseEntity<List<ProductDetailResponse>> getProductsByArtist(
+            @PathVariable Long artistId) {
+        return ResponseEntity.ok(productService.getProductsByArtistOrGroupId(artistId));
     }
 
     @GetMapping("/{id}")

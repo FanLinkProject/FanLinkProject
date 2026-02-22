@@ -20,7 +20,7 @@ public class ObjectKeyGenerator {
         String ext = sanitizeExt(item.ext());
         String uuid = UUID.randomUUID().toString();
         String prefix = resolvePrefix(item.category(), item.scope(), ownerUserId, item.artistId(),
-                item.postIdOrTemp(), item.replayIdOrTemp(), item.productIdOrTemp());
+                item.postIdOrTemp(), item.replayIdOrTemp(), item.productIdOrTemp(), item.concertIdOrTemp());
 
         return switch (item.category()) {
             case PROFILE_IMAGE -> prefix + uuid + "." + ext;
@@ -31,6 +31,7 @@ public class ObjectKeyGenerator {
             case REPLAY_THUMBNAIL -> prefix + "thumbnail." + ext;
             case PRODUCT_IMAGE -> prefix + uuid + "." + ext;
             case PRODUCT_DESCRIBE_IMAGE -> prefix + uuid + "." + ext;
+            case CONCERT_POSTER -> prefix + uuid + "." + ext;
         };
     }
 
@@ -49,7 +50,8 @@ public class ObjectKeyGenerator {
                                  Long artistId,
                                  String postIdOrTemp,
                                  String replayIdOrTemp,
-                                 String productIdOrTemp) {
+                                 String productIdOrTemp,
+                                 String concertIdOrTemp) {
         return switch (category) {
             case PROFILE_IMAGE ->
                     "public/profiles/" + requireValue(ownerUserId, "ownerUserId") + "/";
@@ -67,6 +69,8 @@ public class ObjectKeyGenerator {
                     "public/products/images/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
             case PRODUCT_DESCRIBE_IMAGE ->
                     "public/products/describe/" + requireText(productIdOrTemp, "productIdOrTemp") + "/";
+            case CONCERT_POSTER ->
+                    "public/concerts/posters/" + requireText(concertIdOrTemp, "concertIdOrTemp") + "/";
         };
     }
 

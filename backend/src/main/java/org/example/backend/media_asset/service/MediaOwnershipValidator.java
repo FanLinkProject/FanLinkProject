@@ -45,6 +45,10 @@ public class MediaOwnershipValidator {
             validateProductOwnership(item, userId, role);
             return;
         }
+        if (category == MediaAssetCategory.CONCERT_POSTER) {
+            validateConcertPosterOwnership(item, userId, role);
+            return;
+        }
         validateReplayOwnership(item, userId, role);
     }
 
@@ -89,6 +93,15 @@ public class MediaOwnershipValidator {
         if (!artistPermissionService.canManagePage(artistId, userId, role, true)) {
             throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
+    }
+
+    // 콘서트 포스터: 아티스트 페이지 관리 권한(그룹+소속멤버). concertIdOrTemp 사용(신규 시 tmp_ 등).
+    private void validateConcertPosterOwnership(PresignItemRequest item, Long userId, UserRole role) {
+        Long artistId = requireValue(item.artistId(), "artistId");
+        if (!artistPermissionService.canManagePage(artistId, userId, role, true)) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        }
+        requireText(item.concertIdOrTemp(), "concertIdOrTemp");
     }
 
     // 공지면 false(그룹 계정만), 아티스트 게시물이면 true(그룹+소속멤버). temp는 true로 처리.

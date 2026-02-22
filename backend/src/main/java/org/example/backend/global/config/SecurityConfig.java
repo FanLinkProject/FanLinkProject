@@ -1,6 +1,6 @@
 package org.example.backend.global.config;
 
-import static org.apache.tomcat.util.http.Method.GET;
+import static org.apache.tomcat.util.http.Method.*;
 
 import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -73,6 +77,11 @@ public class SecurityConfig {
                     .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
                     .requestMatchers("/api/artist-posts/notices").permitAll()
+                    // 상품 목록/상세/아티스트별 조회 - 마켓 페이지용 (비로그인 접근 허용)
+                    .requestMatchers(GET, "/api/products").permitAll()
+                    .requestMatchers(GET, "/api/products/by-artist/*").permitAll()
+                    .requestMatchers(GET, "/api/products/*").permitAll()
+                    .requestMatchers(GET, "/api/candy-recharge/products").permitAll()
                     // 정산 관련 (아티스트/그룹/관리자 전용)
                     .requestMatchers("/api/settlements/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -99,10 +108,12 @@ public class SecurityConfig {
                             && req.getRequestURI().startsWith("/api/notifications/subscribe"))
                     .permitAll()
 
-                    // 관리자
-                    .requestMatchers("/api/admin/**")
+				.requestMatchers(GET, "/api/concerts/**").permitAll()
+
+                // 관리자
+                .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
-                
+
                 // 아티스트, 그룹, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -152,5 +163,22 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource));
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of(
+                "http://localhost:3000",
+                "https://fan-link-project.vercel.app",
+                "https://*.vercel.app"
+        ));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }

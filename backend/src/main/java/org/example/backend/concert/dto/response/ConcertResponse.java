@@ -71,29 +71,19 @@ public class ConcertResponse {
     @AllArgsConstructor
     @Builder
     public static class LocationResponse {
-        private Long id;
-        private String country;
-        private String state;
-        private String city;
-        private String district;
-        private String street;
-        private String zipcode;
+        private Long locationId;
+        private String placeName;
+        private String fullAddress;
         private Double latitude;
         private Double longitude;
-        private String fullAddress;
 
         public static LocationResponse from(org.example.backend.concert.entity.Location location) {
             return LocationResponse.builder()
-                    .id(location.getId())
-                    .country(location.getCountry())
-                    .state(location.getState())
-                    .city(location.getCity())
-                    .district(location.getDistrict())
-                    .street(location.getStreet())
-                    .zipcode(location.getZipcode())
+                    .locationId(location.getId())
+                    .placeName(location.getPlaceName())
+                    .fullAddress(location.getFullAddress())
                     .latitude(location.getLatitude())
                     .longitude(location.getLongitude())
-                    .fullAddress(location.getFullAddress())
                     .build();
         }
     }

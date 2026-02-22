@@ -3,10 +3,12 @@ package org.example.backend.order.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.global.security.details.PrincipalDetails;
+import org.example.backend.order.dto.request.CandyOrderRequestDto;
 import org.example.backend.order.dto.request.OrderRequestDto;
 import org.example.backend.order.service.OrderService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -28,6 +30,15 @@ public class OrderController {
             @RequestBody OrderRequestDto request) {
 
         String orderNo = orderService.createOrder(principal.getUsername(), request);
+        return ResponseEntity.ok(Map.of("orderNo", orderNo));
+    }
+
+    @PostMapping("/candy")
+    public ResponseEntity<Map<String, String>> createCandyOrder(
+            @AuthenticationPrincipal PrincipalDetails principal,
+            @Valid @RequestBody CandyOrderRequestDto request) {
+
+        String orderNo = orderService.createCandyOrder(principal.getUsername(), request);
         return ResponseEntity.ok(Map.of("orderNo", orderNo));
     }
 }

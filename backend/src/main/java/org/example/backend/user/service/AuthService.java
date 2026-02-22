@@ -21,7 +21,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class AuthService {
@@ -121,10 +124,20 @@ public class AuthService {
         String accessToken = jwtTokenProvider.createAccessToken(user.getEmail(), user.getRole().getValue());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getEmail(), user.getRole().getValue());
 
-        // Redis-RefreshToken 저장
-        refreshTokenStore.save(user.getEmail(), refreshToken);
+        // Redis-RefreshToken 저장 (실패해도 로그인은 성공시키고, 리프레시만 제한됨)
+        try {
+            refreshTokenStore.save(user.getEmail(), refreshToken);
+        } catch (Exception e) {
+            log.warn("로그인 성공했으나 RefreshToken Redis 저장 실패 (Redis 점검 필요): {}", e.getMessage());
+        }
 
-        return new TokenResponse("bearer", accessToken, refreshToken, 3600000L);
+        return TokenResponse.builder()
+                .grantType("bearer")
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .accessTokenExpiresIn(3600000L)
+                .role(user.getRole().name())
+                .build();
     }
 
     // 로그아웃

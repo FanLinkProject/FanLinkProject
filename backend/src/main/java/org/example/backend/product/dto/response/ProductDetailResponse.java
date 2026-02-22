@@ -19,6 +19,9 @@ import java.util.List;
 public class ProductDetailResponse {
     private Long id;
     private Long artistId;
+    private String artistName;
+    private Long groupId;   // 그룹 소속 시 그룹 ID (그룹계정 스토어용), 개인 아티스트 시 null
+    private String groupName; // 그룹 소속 시 그룹명, 개인 아티스트 시 null
     private String name;
     private Long price;
     private Long candyPrice;
@@ -29,15 +32,28 @@ public class ProductDetailResponse {
     private Boolean isMembershipOnly;
     private Boolean isExclusive;
     private Boolean isMembership;
+    private Long concertId;
     private Long representativeMediaAssetId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ProductMediaAssetResponse> attachments;
 
     public static ProductDetailResponse from(Product product, List<ProductMediaAssetResponse> attachments) {
+        return from(product, attachments, null, null, null);
+    }
+
+    public static ProductDetailResponse from(Product product, List<ProductMediaAssetResponse> attachments, String artistName) {
+        return from(product, attachments, artistName, null, null);
+    }
+
+    public static ProductDetailResponse from(Product product, List<ProductMediaAssetResponse> attachments,
+            String artistName, Long groupId, String groupName) {
         return ProductDetailResponse.builder()
                 .id(product.getId())
                 .artistId(product.getArtistId())
+                .artistName(artistName)
+                .groupId(groupId)
+                .groupName(groupName)
                 .name(product.getName())
                 .price(product.getPrice())
                 .candyPrice(product.getCandyPrice())
@@ -48,6 +64,7 @@ public class ProductDetailResponse {
                 .isMembershipOnly(product.getIsMembershipOnly())
                 .isExclusive(product.getIsExclusive())
                 .isMembership(product.getIsMembership())
+                .concertId(product.getConcertId())
                 .representativeMediaAssetId(product.getRepresentativeMediaAssetId())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
