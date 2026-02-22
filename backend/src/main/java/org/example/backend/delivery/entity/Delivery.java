@@ -34,7 +34,10 @@ public class Delivery {
     @Enumerated(EnumType.STRING)
     private DeliveryStatus status;
 
-    // 생성자 (주문 시점에는 주소만 있음)
+    /**
+     * 생성자 (주문 시점에는 주소만 있음)
+     * 기존 코드와의 호환을 위해 주소 기반 휴리스틱으로 국가 코드를 추출합니다.
+     */
     public static Delivery createPendingDelivery(String name, String phone, String address, String detail) {
         Delivery delivery = new Delivery();
         delivery.recipientName = name;
@@ -43,6 +46,31 @@ public class Delivery {
         delivery.detailAddress = detail;
         delivery.country = extractCountryFromAddress(address); // 주소에서 국가 추출
         delivery.status = DeliveryStatus.READY; // 기본 상태
+        return delivery;
+    }
+
+    /**
+     * 개선된 생성자: 명시적인 ISO 국가 코드를 받습니다.
+     * countryCode 가 null/blank 인 경우에는 기존 주소 기반 휴리스틱을 사용합니다.
+     */
+    public static Delivery createPendingDelivery(
+            String name,
+            String phone,
+            String address,
+            String detail,
+            String countryCode
+    ) {
+        Delivery delivery = new Delivery();
+        delivery.recipientName = name;
+        delivery.recipientPhone = phone;
+        delivery.address = address;
+        delivery.detailAddress = detail;
+        if (countryCode != null && !countryCode.isBlank()) {
+            delivery.country = countryCode;
+        } else {
+            delivery.country = extractCountryFromAddress(address);
+        }
+        delivery.status = DeliveryStatus.READY;
         return delivery;
     }
 
