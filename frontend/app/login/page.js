@@ -1,31 +1,51 @@
 "use client";
 
 import { BASE_URL } from "@/lib/api";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { login as loginApi } from "@/lib/authApi";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import axios from "axios";
 
 function SocialLoginButton({ provider, onClick }) {
   const configs = {
-    kakao: {
-      label: "카카오로 계속하기",
-      color: "#FEE500",
-      textColor: "#000000",
-    },
     google: {
       label: "Google로 계속하기",
       color: "#FFFFFF",
       textColor: "#000000",
+      border: "border-white/20",
+    },
+    kakao: {
+      label: "카카오로 계속하기",
+      color: "#FEE500",
+      textColor: "#000000",
+      border: "border-transparent",
+    },
+    naver: {
+      label: "네이버로 계속하기",
+      color: "#03C75A",
+      textColor: "#FFFFFF",
+      border: "border-transparent",
+    },
+    instagram: {
+      label: "Instagram으로 계속하기",
+      color: "transparent",
+      textColor: "#FFFFFF",
+      border: "border-transparent",
+      gradient: "linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
     },
   };
   const config = configs[provider];
+  const isInstagram = provider === "instagram";
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{ backgroundColor: config.color, color: config.textColor }}
-      className={`w-full py-3.5 px-6 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-opacity border ${provider === "google" ? "border-white/20" : "border-transparent"}`}>
+      style={{
+        backgroundColor: isInstagram ? undefined : config.color,
+        backgroundImage: isInstagram ? config.gradient : undefined,
+        color: config.textColor,
+      }}
+      className={`w-full py-3.5 px-6 rounded-2xl text-xs font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-opacity border ${config.border}`}>
       {config.label}
     </button>
   );
@@ -33,9 +53,20 @@ function SocialLoginButton({ provider, onClick }) {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+
+  // OAuth 실패 등 쿼리로 전달된 에러 메시지 표시 후 URL 정리
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const err = searchParams.get("error");
+    if (err === "oauth2_failed") {
+      setError("소셜 로그인이 실패했습니다. 다시 시도해 주세요.");
+      window.history.replaceState({}, "", "/login");
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -45,18 +76,14 @@ export default function LoginPage() {
     }
     setError("");
     try {
-      const { data } = await axios.post(`${BASE_URL}/api/auth/login`, {
-        email,
-        password,
-      });
+      const data = await loginApi(email, password);
       const token = data.accessToken?.startsWith("Bearer")
         ? data.accessToken
-        : `Bearer ${data.accessToken}`;
+        : `Bearer ${data.accessToken || ""}`;
       localStorage.setItem("accessToken", token);
       if (data.refreshToken) {
         localStorage.setItem("refreshToken", data.refreshToken);
       }
-      // 현재 로그인한 계정 이메일을 저장해 메인 홈 등에서 식별에 사용
       localStorage.setItem("userEmail", email);
       let role = "FAN";
       if (email.startsWith("artist")) role = "ARTIST";
@@ -68,16 +95,16 @@ export default function LoginPage() {
       else router.push("/home");
     } catch (err) {
       const msg =
-        err.response?.data?.message ||
-        err.response?.status === 401
+        err?.data?.message ||
+        (err?.status === 401
           ? "이메일 또는 비밀번호가 올바르지 않습니다."
-          : "로그인에 실패했습니다. 다시 시도해주세요.";
+          : "로그인이 실패했습니다. 다시 시도해 주세요.");
       setError(msg);
     }
   };
 
   const handleOAuth = (provider) => {
-    const registrationId = provider === "kakao" ? "kakao" : "google";
+    const registrationId = provider;
     window.location.href = `${BASE_URL}/oauth2/authorization/${registrationId}`;
   };
 
@@ -95,19 +122,8 @@ export default function LoginPage() {
         <div className="bg-[#201a33] rounded-[2.5rem] p-10 border border-white/[0.08]">
           <h2 className="text-xl font-bold text-white mb-8 text-center">로그인</h2>
 
-          <div className="space-y-4 mb-8">
-            <SocialLoginButton provider="kakao" onClick={() => handleOAuth("kakao")} />
-            <SocialLoginButton provider="google" onClick={() => handleOAuth("google")} />
-          </div>
-
-          <div className="relative mb-8 flex items-center justify-center">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/[0.08]" />
-            </div>
-            <span className="relative px-4 bg-[#201a33] text-[10px] font-black text-white/50 uppercase tracking-widest">OR</span>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
+          {/* 이메일 로그인 (위쪽) */}
+          <form onSubmit={handleLogin} className="space-y-6 mb-8">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">이메일</label>
               <input
@@ -137,11 +153,22 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-8 text-center">
-            <div className="p-4 bg-white/[0.04] border border-white/[0.06] rounded-2xl mb-4 text-[10px] text-white/55 font-medium">
-              <p>데모 로그인 가이드:</p>
-              <p>아티스트: artist@ / 그룹: group@ / 관리자: admin@ / 팬: fan@</p>
+          <div className="relative mb-8 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/[0.08]" />
             </div>
+            <span className="relative px-4 bg-[#201a33] text-[10px] font-black text-white/50 uppercase tracking-widest">OR</span>
+          </div>
+
+          {/* 소셜 로그인 (아래쪽): 구글, 카카오, 네이버, 인스타 순 */}
+          <div className="space-y-4">
+            <SocialLoginButton provider="google" onClick={() => handleOAuth("google")} />
+            <SocialLoginButton provider="kakao" onClick={() => handleOAuth("kakao")} />
+            <SocialLoginButton provider="naver" onClick={() => handleOAuth("naver")} />
+            <SocialLoginButton provider="instagram" onClick={() => handleOAuth("instagram")} />
+          </div>
+
+          <div className="mt-8 text-center">
             <p className="text-xs font-bold text-white/55">
               계정이 없으신가요? <Link href="/signup" className="text-violet-300 hover:underline">회원가입</Link>
             </p>

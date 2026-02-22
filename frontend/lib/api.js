@@ -6,11 +6,15 @@
  * - (호환) request() 제공: 기존 dev 코드 그대로 사용할 수 있게 래핑
  */
 
-/** Vercel 등에서는 환경 변수 NEXT_PUBLIC_API_BASE_URL 로 API 서버 주소 지정 */
+/**
+ * API 서버 주소.
+ * - 로컬 개발: 백엔드를 localhost:8080 에 띄우면 기본값으로 동작.
+ * - 배포 시: .env.local 에 NEXT_PUBLIC_API_BASE_URL=http(s)://실제백엔드주소 설정.
+ */
 export const BASE_URL =
     typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL
         ? process.env.NEXT_PUBLIC_API_BASE_URL
-        : "http://15.165.178.159";
+        : "http://localhost:8080";
 
 /** STOMP/SockJS 엔드포인트 (라이브챗 등) */
 export const WS_CHAT_URL = `${BASE_URL.replace(/\/$/, "")}/ws-chat`;
