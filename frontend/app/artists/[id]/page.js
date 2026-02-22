@@ -94,7 +94,7 @@ function transformFanPost(p) {
 function ArtistDetailPageInner({ id }) {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "NOTICE", "MV"];
+    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "MV"];
     const tabParam = searchParams.get("tab");
 
     const [artist, setArtist] = useState(null);
@@ -152,6 +152,9 @@ function ArtistDetailPageInner({ id }) {
     const [editContent, setEditContent] = useState("");
     const [editLoading, setEditLoading] = useState(false);
 
+    const [latestNotice, setLatestNotice] = useState(null);
+    const [noticesLoading, setNoticesLoading] = useState(false);
+
     const artistPostsBottomRef = useRef(null);
     const fanPostsBottomRef = useRef(null);
 
@@ -197,6 +200,19 @@ function ArtistDetailPageInner({ id }) {
             setFanPosts(MOCK_POSTS.filter((p) => p.artistId === artId && p.type === "FAN"));
         }
     }, [id, groupId, isRealGroup]);
+
+    // 그룹 공지사항 최신 1건 (getNotices by groupId)
+    useEffect(() => {
+        if (!isRealGroup || !groupId) return;
+        setNoticesLoading(true);
+        request("/api/artist-posts/notices", { query: { groupId, limit: 1 } })
+            .then((data) => {
+                const list = Array.isArray(data) ? data : (data?.content ?? []);
+                setLatestNotice(list.length > 0 ? list[0] : null);
+            })
+            .catch(() => setLatestNotice(null))
+            .finally(() => setNoticesLoading(false));
+    }, [groupId, isRealGroup]);
 
     // JWT에서 currentUser 추출 + 닉네임 조회
     useEffect(() => {
@@ -460,10 +476,6 @@ function ArtistDetailPageInner({ id }) {
         }
     };
 
-    const artistNotices = MOCK_POSTS.filter(
-        (p) => p.artistId === artist.id && p.type === "NOTICE",
-    );
-
     const handleArtistPostLike = (postId) => {
         if (!currentUser) { router.push("/login"); return; }
         const wasLiked = !!artistIsLikedMap[postId];
@@ -632,7 +644,6 @@ function ArtistDetailPageInner({ id }) {
         { id: "ARTIST", label: "Artist" },
         { id: "FAN", label: "Fan" },
         { id: "LIVE", label: "Live" },
-        { id: "NOTICE", label: "Notice" },
         { id: "MARKET", label: "Market" },
         { id: "MV", label: "뮤직비디오" },
     ];
@@ -710,6 +721,33 @@ function ArtistDetailPageInner({ id }) {
                             )
                         )}
                     </div>
+                </Surface>
+            </div>
+
+            {/* 공지사항 섹션 (프로필 카드와 탭 사이) */}
+            <div className="max-w-6xl w-full mx-auto px-8 mt-6 shrink-0">
+                <Surface variant="primary" className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/[0.06]">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs font-black text-white/80 uppercase tracking-widest shrink-0">공지사항</span>
+                        {noticesLoading ? (
+                            <p className="text-white/45 text-sm truncate">불러오는 중...</p>
+                        ) : latestNotice ? (
+                            <Link
+                                href={`/posts/${latestNotice.id}?type=ARTIST&groupId=${postGroupId}`}
+                                className="text-sm font-medium text-white/85 hover:text-violet-300 truncate transition-colors"
+                            >
+                                {latestNotice.title || (latestNotice.content ? `${latestNotice.content.slice(0, 40)}${(latestNotice.content || "").length > 40 ? "..." : ""}` : "공지")}
+                            </Link>
+                        ) : (
+                            <p className="text-white/45 text-sm">등록된 공지가 없습니다.</p>
+                        )}
+                    </div>
+                    <Link
+                        href={`/artists/${id}/notices`}
+                        className="text-xs font-bold text-violet-300 hover:text-violet-200 uppercase tracking-widest shrink-0 transition-colors"
+                    >
+                        전체 공지사항 보기
+                    </Link>
                 </Surface>
             </div>
 
@@ -934,32 +972,6 @@ function ArtistDetailPageInner({ id }) {
                                     </div>
                                 )}
                             </section>
-                        </div>
-                    )}
-
-                    {/* NOTICE 탭 */}
-                    {activeTab === "NOTICE" && (
-                        <div className="space-y-4">
-                            {artistNotices.map((post) => (
-                                <Surface key={post.id} variant="primary" className="p-6">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <span className="px-2 py-0.5 rounded bg-white/10 text-white/90 text-[8px] font-black uppercase">Notice</span>
-                                        <span className="text-[10px] font-bold text-white/55">{post.timestamp}</span>
-                                    </div>
-                                    <h4 className="font-bold text-white mb-2">{post.content.slice(0, 50)}...</h4>
-                                    <Link
-                                        href={`/posts/${post.id}`}
-                                        className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
-                                    >
-                                        전체보기
-                                    </Link>
-                                </Surface>
-                            ))}
-                            {artistNotices.length === 0 && (
-                                <Surface variant="primary" className="py-20 text-center">
-                                    <p className="text-white/55 italic">공지사항이 없습니다.</p>
-                                </Surface>
-                            )}
                         </div>
                     )}
 

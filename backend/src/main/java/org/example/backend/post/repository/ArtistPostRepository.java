@@ -2,6 +2,7 @@ package org.example.backend.post.repository;
 
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,15 +24,28 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long> {
             "ORDER BY a.id DESC")
     List<ArtistPost> findPosts(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId, Pageable pageable);
 
-    // 공지사항(Group이 없는 글) 조회
+    // 공지사항(서비스 전체): 관리자(ROLE_ADMIN)가 올린 글만, 관리자는 group_id 없음 → a.group IS NULL
     @Query("SELECT a FROM ArtistPost a " +
             "JOIN FETCH a.user u " +
             "LEFT JOIN FETCH a.group g " +
             "WHERE a.status = false " +
             "AND a.group IS NULL " +
+            "AND u.role = :adminRole " +
             "AND (:lastPostId IS NULL OR a.id < :lastPostId) " +
             "ORDER BY a.id DESC")
-    List<ArtistPost> findNotices(@Param("lastPostId") Long lastPostId, Pageable pageable);
+    List<ArtistPost> findNotices(@Param("lastPostId") Long lastPostId, @Param("adminRole") UserRole adminRole, Pageable pageable);
+
+    // 공지사항(그룹 페이지): 해당 그룹 계정(ROLE_GROUP)이 올린 글만 조회
+    @Query("SELECT a FROM ArtistPost a " +
+            "JOIN FETCH a.user u " +
+            "LEFT JOIN FETCH a.group g " +
+            "WHERE a.status = false " +
+            "AND a.user.id = :groupId " +
+            "AND u.role = :groupRole " +
+            "AND (:lastPostId IS NULL OR a.id < :lastPostId) " +
+            "ORDER BY a.id DESC")
+    List<ArtistPost> findNoticesByGroupId(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId,
+            @Param("groupRole") UserRole groupRole, Pageable pageable);
 
     // 아티스트 게시글(Group이 있는 글) 조회 - 공지사항 제외
     @Query("SELECT a FROM ArtistPost a " +

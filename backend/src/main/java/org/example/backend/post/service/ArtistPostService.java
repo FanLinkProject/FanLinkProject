@@ -161,7 +161,17 @@ public class ArtistPostService {
 
     public List<ArtistPostResponse> getNotices(Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
-        return artistPostRepository.findNotices(lastPostId, pageable).stream()
+        return artistPostRepository.findNotices(lastPostId, UserRole.ADMIN, pageable).stream()
+                .map(post -> buildPostResponseWithAccess(post,
+                        postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
+                        userId, role, true))
+                .collect(Collectors.toList());
+    }
+
+    /** 그룹 계정이 올린 공지사항만 조회 (해당 그룹 페이지용) */
+    public List<ArtistPostResponse> getNoticesByGroupId(Long groupId, Long lastPostId, int limit, Long userId, UserRole role) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return artistPostRepository.findNoticesByGroupId(groupId, lastPostId, UserRole.GROUP, pageable).stream()
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
                         userId, role, true))

@@ -44,12 +44,15 @@ public class ArtistPostController {
 
     @GetMapping("/notices")
     public ResponseEntity<List<ArtistPostResponse>> getNotices(
+            @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long lastPostId,
             @RequestParam(defaultValue = "10") int limit,
             @AuthenticationPrincipal PrincipalDetails principalDetails) {
         Long userId = principalDetails != null ? principalDetails.getUserId() : null;
-        List<ArtistPostResponse> responses = artistPostService.getNotices(lastPostId, limit, userId,
-                principalDetails != null ? principalDetails.getUser().getRole() : null);
+        var role = principalDetails != null ? principalDetails.getUser().getRole() : null;
+        List<ArtistPostResponse> responses = groupId != null
+                ? artistPostService.getNoticesByGroupId(groupId, lastPostId, limit, userId, role)
+                : artistPostService.getNotices(lastPostId, limit, userId, role);
         return ResponseEntity.ok(responses);
     }
 
