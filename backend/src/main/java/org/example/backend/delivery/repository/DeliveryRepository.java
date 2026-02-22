@@ -3,7 +3,12 @@ package org.example.backend.delivery.repository;
 import org.example.backend.delivery.entity.Delivery;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
+
 public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
-    // 송장번호로 배송 정보 찾기 (나중에 AfterShip webhook 등에서 사용)
-    Delivery findByTrackingNumber(String trackingNumber);
+    Optional<Delivery> findByIdAndOrderUserId(Long id, Long userId);
+
+    Optional<Delivery> findByTrackingNumber(String trackingNumber);
+
+    Optional<Delivery> findByTrackingNumberAndCourierCode(String trackingNumber, String courierCode);
 }

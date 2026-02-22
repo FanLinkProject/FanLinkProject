@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -115,6 +116,33 @@ public class DeliveryService {
         return DeliveryResponseDto.from(delivery, currentStatus);
     }
 
+    @Transactional
+    public DeliveryResponseDto trackDeliveryForUser(Long deliveryId, Long userId) {
+        Delivery delivery = deliveryRepository.findByIdAndOrderUserId(deliveryId, userId)
+                .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED));
+        return trackDelivery(delivery.getId());
+    }
+
+    @Transactional
+    public void handleAfterShipWebhook(String trackingNumber, String courierCode, String externalStatus) {
+        if (trackingNumber == null || trackingNumber.isBlank()) {
+            throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
+        }
+
+        Delivery delivery = resolveWebhookTargetDelivery(trackingNumber, courierCode)
+                .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
+
+        DeliveryStatus mapped = DeliveryStatus.mapAfterShipStatus(externalStatus);
+        DeliveryStatus before = delivery.getStatus();
+        if (before != mapped) {
+            delivery.updateStatus(mapped);
+            recordStatusChange(delivery, before, mapped, "AFTERSHIP_WEBHOOK");
+            if (mapped == DeliveryStatus.ISSUE) {
+                notifyDeliveryIssue(delivery, externalStatus);
+            }
+        }
+    }
+
     /**
      * 배송 정보에 맞는 트래커를 선택합니다.
      * 우선순위: FakeDeliveryTracker > 국가별 트래커 (국내/해외)
@@ -156,6 +184,17 @@ public class DeliveryService {
         }
         DeliveryStatusHistory history = DeliveryStatusHistory.of(delivery, from, to, reason);
         deliveryStatusHistoryRepository.save(history);
+    }
+
+    private Optional<Delivery> resolveWebhookTargetDelivery(String trackingNumber, String courierCode) {
+        if (courierCode != null && !courierCode.isBlank()) {
+            Optional<Delivery> byTrackingAndCourier =
+                    deliveryRepository.findByTrackingNumberAndCourierCode(trackingNumber, courierCode);
+            if (byTrackingAndCourier.isPresent()) {
+                return byTrackingAndCourier;
+            }
+        }
+        return deliveryRepository.findByTrackingNumber(trackingNumber);
     }
 
     private void notifyDeliveryIssue(Delivery delivery, String trackingStatus) {
