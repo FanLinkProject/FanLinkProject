@@ -25,6 +25,7 @@ public class Delivery {
     private String recipientPhone;
     private String address;
     private String detailAddress;
+    private String zipCode;
     private String country;        // 국가 코드 (예: "KR", "US") - 해외/국내 판단용
 
     // --- 배송 추적 정보 (나중에 업데이트됨) ---
@@ -39,14 +40,7 @@ public class Delivery {
      * 기존 코드와의 호환을 위해 주소 기반 휴리스틱으로 국가 코드를 추출합니다.
      */
     public static Delivery createPendingDelivery(String name, String phone, String address, String detail) {
-        Delivery delivery = new Delivery();
-        delivery.recipientName = name;
-        delivery.recipientPhone = phone;
-        delivery.address = address;
-        delivery.detailAddress = detail;
-        delivery.country = extractCountryFromAddress(address); // 주소에서 국가 추출
-        delivery.status = DeliveryStatus.READY; // 기본 상태
-        return delivery;
+        return createPendingDelivery(name, phone, address, detail, null, null);
     }
 
     /**
@@ -60,17 +54,33 @@ public class Delivery {
             String detail,
             String countryCode
     ) {
+        return createPendingDelivery(name, phone, address, detail, countryCode, null);
+    }
+
+    /**
+     * 주문 생성 시점 배송 정보 생성.
+     * countryCode/zipCode 가 없으면 기존 휴리스틱을 사용합니다.
+     */
+    public static Delivery createPendingDelivery(
+            String name,
+            String phone,
+            String address,
+            String detail,
+            String countryCode,
+            String zipCode
+    ) {
         Delivery delivery = new Delivery();
         delivery.recipientName = name;
         delivery.recipientPhone = phone;
         delivery.address = address;
         delivery.detailAddress = detail;
+        delivery.zipCode = zipCode;
         if (countryCode != null && !countryCode.isBlank()) {
             delivery.country = countryCode;
         } else {
-            delivery.country = extractCountryFromAddress(address);
+            delivery.country = extractCountryFromAddress(address); // 주소에서 국가 추출
         }
-        delivery.status = DeliveryStatus.READY;
+        delivery.status = DeliveryStatus.READY; // 기본 상태
         return delivery;
     }
 
