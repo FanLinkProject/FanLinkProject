@@ -229,4 +229,16 @@ public class SubscriptionService {
                 return subscriptionRepository.findByUserIdAndIsActive(userId, true);
         }
 
+        /**
+         * 해당 아티스트의 DM(캔디 구독) 상품을 현재 유저가 활성 구독 중인지 여부.
+         *
+         * @param userId   유저 ID
+         * @param artistId 아티스트(상품 소유자) ID
+         * @return 구독 중이면 true
+         */
+        public boolean hasActiveDmSubscription(Long userId, Long artistId) {
+                return subscriptionRepository.existsActiveSubscriptionForArtist(
+                        userId, artistId, Instant.now());
+        }
+
 }

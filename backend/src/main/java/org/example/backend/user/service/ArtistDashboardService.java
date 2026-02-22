@@ -8,10 +8,12 @@ import org.example.backend.notification.repository.NotificationRepository;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.product.entity.Product;
+import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.product.repository.ProductRepository;
 import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.dto.response.ArtistDashboardResponse;
+import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
@@ -103,6 +105,9 @@ public class ArtistDashboardService {
                 membershipButtonUrl
         );
 
+        // 5-1) 소속 멤버 목록 (그룹인 경우 또는 개인 아티스트가 소속 그룹이 있는 경우)
+        List<ArtistDashboardResponse.MemberItem> memberItems = resolveMemberItems(artist);
+
         // 6) 게시글 목록 (최대 20개)
         List<ArtistPost> posts = artistPostRepository
                 .findByUserAndStatusOrderByCreatedAtDesc(artist, false, PageRequest.of(0, 20))
@@ -181,9 +186,48 @@ public class ArtistDashboardService {
                 followStatus,
                 membershipInfo,
                 isGroupMember,
+                memberItems,
                 postItems,
                 liveNotificationItems,
                 shopItems
         );
+    }
+
+    private List<ArtistDashboardResponse.MemberItem> resolveMemberItems(User artist) {
+        if (artist.getRole() != UserRole.ARTIST && artist.getRole() != UserRole.GROUP) {
+            return List.of();
+        }
+        User groupUser;
+        List<GroupMember> members;
+        if (artist.getRole() == UserRole.GROUP) {
+            groupUser = artist;
+            members = groupMemberRepository.findByGroup(artist);
+        } else {
+            var membership = groupMemberRepository.findByMember(artist).orElse(null);
+            if (membership == null || membership.getGroup() == null) {
+                return List.of();
+            }
+            groupUser = membership.getGroup();
+            members = groupMemberRepository.findByGroup(groupUser);
+        }
+        Long groupUserId = groupUser.getId();
+        return members.stream()
+                .filter(gm -> !gm.getMember().getId().equals(groupUserId))
+                .map(gm -> {
+                    var member = gm.getMember();
+                    Long dmProductId = null;
+                    List<Product> dmProducts = productRepository.findByArtistIdAndPaymentMethod(
+                            member.getId(), ProductPaymentMethod.CANDY_ONLY);
+                    if (!dmProducts.isEmpty()) {
+                        dmProductId = dmProducts.get(0).getId();
+                    }
+                    return new ArtistDashboardResponse.MemberItem(
+                            member.getId(),
+                            member.getNickname(),
+                            member.getProfileImageUrl(),
+                            dmProductId
+                    );
+                })
+                .collect(Collectors.toList());
     }
 }

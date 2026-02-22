@@ -1,11 +1,17 @@
 package org.example.backend.subscription.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.chat.entity.ChatRoom;
+import org.example.backend.chat.repository.ChatRoomRepository;
+import org.example.backend.chat.service.ChatDMService;
+import org.example.backend.subscription.dto.CheckDmResponse;
 import org.example.backend.subscription.dto.CreateCandySubscriptionRequest;
 import org.example.backend.subscription.dto.CreateCashSubscriptionRequest;
 import org.example.backend.subscription.dto.SubscriptionResponse;
 import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.service.SubscriptionService;
+import org.example.backend.user.entity.User;
+import org.example.backend.user.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +27,9 @@ import org.example.backend.global.security.details.PrincipalDetails;
 public class SubscriptionController {
 
         private final SubscriptionService subscriptionService;
+        private final ChatDMService chatDMService;
+        private final ChatRoomRepository chatRoomRepository;
+        private final UserRepository userRepository;
 
         /**
          * 현금 구독 생성 (캔디 정기 충전)
@@ -91,5 +100,25 @@ public class SubscriptionController {
                                 .collect(Collectors.toList());
 
                 return ResponseEntity.ok(responses);
+        }
+
+        /**
+         * 해당 아티스트와의 DM 구독 여부 및 채팅방 ID 조회.
+         * 구독 중이면 채팅방 입장을 위해 join 후 roomId를 반환합니다.
+         */
+        @GetMapping("/check-dm")
+        public ResponseEntity<CheckDmResponse> checkDmSubscription(
+                        @RequestParam Long artistId,
+                        @AuthenticationPrincipal PrincipalDetails principal) {
+                Long userId = principal.getUser().getId();
+                if (!subscriptionService.hasActiveDmSubscription(userId, artistId)) {
+                        return ResponseEntity.ok(CheckDmResponse.notSubscribed());
+                }
+                chatDMService.joinChatDMRoom(userId, artistId);
+                User artist = userRepository.findById(artistId)
+                        .orElseThrow(() -> new IllegalArgumentException("아티스트를 찾을 수 없습니다."));
+                ChatRoom room = chatRoomRepository.findByOwner(artist)
+                        .orElseThrow(() -> new IllegalStateException("DM 채팅방을 찾을 수 없습니다."));
+                return ResponseEntity.ok(CheckDmResponse.subscribed(room.getId()));
         }
 }

@@ -17,7 +17,8 @@ public enum ProductErrorCode implements ErrorCode {
     MEDIA_ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "MEDIA_ASSET_NOT_FOUND", "미디어 파일을 찾을 수 없습니다."),
     MEDIA_ASSET_NOT_READY(HttpStatus.CONFLICT, "MEDIA_ASSET_NOT_READY", "미디어 파일 업로드가 완료되지 않았습니다."),
     INVALID_MEDIA_ASSET_CATEGORY(HttpStatus.BAD_REQUEST, "INVALID_MEDIA_ASSET_CATEGORY", "상품 첨부는 PRODUCT_IMAGE 또는 PRODUCT_DESCRIBE_IMAGE만 가능합니다."),
-    PRODUCT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "PRODUCT_ACCESS_DENIED", "상품 등록/수정은 팬페이지 관리 계정만 가능합니다.");
+    PRODUCT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "PRODUCT_ACCESS_DENIED", "상품 등록/수정은 팬페이지 관리 계정만 가능합니다."),
+    DUPLICATE_DM_PRODUCT(HttpStatus.BAD_REQUEST, "DUPLICATE_DM_PRODUCT", "해당 아티스트에 이미 DM 구독 상품이 등록되어 있습니다.");
 
     private final HttpStatus status;
     private final String code;

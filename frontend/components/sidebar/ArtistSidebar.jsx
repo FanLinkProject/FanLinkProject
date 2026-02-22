@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -73,6 +73,24 @@ export default function ArtistSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [canSeeMemberMenu, setCanSeeMemberMenu] = useState(false);
+  const [showMarketMenu, setShowMarketMenu] = useState(true);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) return;
+    const authHeader = token.startsWith("Bearer") ? token : `Bearer ${token}`;
+    fetch("http://localhost:8080/api/artist/mypage", { headers: { Authorization: authHeader } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data?.teamInfo) return;
+        const type = data.teamInfo.type;
+        const groupName = data.teamInfo.groupName;
+        const isGroup = type === "GROUP";
+        const isSoloArtist = type === "ARTIST" && !groupName;
+        setShowMarketMenu(isGroup || isSoloArtist);
+      })
+      .catch(() => setShowMarketMenu(true));
+  }, []);
 
   const isActive = (href) =>
     pathname === href ||
@@ -121,7 +139,9 @@ export default function ArtistSidebar() {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {businessMenuItems.map((item) => (
+            {businessMenuItems
+              .filter((item) => item.id !== "ARTIST_MARKET_MGMT" || showMarketMenu)
+              .map((item) => (
               <Link
                 key={item.id}
                 href={item.href}

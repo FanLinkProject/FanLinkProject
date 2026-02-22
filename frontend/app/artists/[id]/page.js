@@ -8,6 +8,8 @@ import axios from "axios";
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
 import { request, apiGet } from "@/lib/api";
+import { createCandySubscription } from "@/lib/subscriptionApi";
+import { getProduct } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
@@ -155,6 +157,14 @@ function ArtistDetailPageInner({ id }) {
 
     const [latestNotice, setLatestNotice] = useState(null);
     const [noticesLoading, setNoticesLoading] = useState(false);
+    const [showLoginRequiredModal, setShowLoginRequiredModal] = useState(false);
+    const [dmCheckLoading, setDmCheckLoading] = useState(false);
+    const [showDmSubscribeConfirmModal, setShowDmSubscribeConfirmModal] = useState(false);
+    const [dmSubscribeTargetMember, setDmSubscribeTargetMember] = useState(null);
+    const [showDmSubscribePaymentModal, setShowDmSubscribePaymentModal] = useState(false);
+    const [dmPaymentLoading, setDmPaymentLoading] = useState(false);
+    const [dmPaymentCandyBalance, setDmPaymentCandyBalance] = useState(null);
+    const [dmPaymentProductPrice, setDmPaymentProductPrice] = useState(null);
 
     const artistPostsBottomRef = useRef(null);
     const fanPostsBottomRef = useRef(null);
@@ -170,6 +180,13 @@ function ArtistDetailPageInner({ id }) {
                     const info = data?.artistInfo || {};
                     const follow = data?.followStatus || {};
                     const membership = data?.membershipInfo || {};
+                    const rawMembers = Array.isArray(data?.members) ? data.members : [];
+                    const members = rawMembers.map((m) => ({
+                        id: m.memberId,
+                        name: m.nickname || "",
+                        avatar: m.profileImageUrl || "",
+                        dmProductId: m.dmProductId ?? null,
+                    }));
                     setArtist({
                         id: String(groupId),
                         name: info.nickname || "",
@@ -180,7 +197,7 @@ function ArtistDetailPageInner({ id }) {
                         membershipUrl: membership.membershipButtonUrl || `/candy/payment?artistId=${groupId}`,
                         memberCount: "",
                         postCount: "",
-                        members: [],
+                        members,
                     });
                     setIsGroupMember(data?.isGroupMember ?? false);
                 })
@@ -425,6 +442,23 @@ function ArtistDetailPageInner({ id }) {
         return () => observer.disconnect();
     }, [fanPostsHasNext, fanPostsLastId, loadMoreFanPosts, fanPostsLoading, isGroupMember, artist?.isFollowing]);
 
+    useEffect(() => {
+        if (!showDmSubscribePaymentModal || !dmSubscribeTargetMember?.dmProductId) return;
+        Promise.all([
+            apiGet("/api/user/profile"),
+            getProduct(dmSubscribeTargetMember.dmProductId),
+        ])
+            .then(([profile, product]) => {
+                setDmPaymentCandyBalance(profile?.candy != null ? Number(profile.candy) : 0);
+                const price = product?.candyPrice != null ? Number(product.candyPrice) : 0;
+                setDmPaymentProductPrice(price);
+            })
+            .catch(() => {
+                setDmPaymentCandyBalance(0);
+                setDmPaymentProductPrice(0);
+            });
+    }, [showDmSubscribePaymentModal, dmSubscribeTargetMember?.dmProductId]);
+
     if (!artist) return null;
 
     const postGroupId = isRealGroup ? groupId : artist.id;
@@ -536,6 +570,61 @@ function ArtistDetailPageInner({ id }) {
         if (!post) return;
         setEditingPost({ id: postId, content: post.content });
         setEditContent(post.content);
+    };
+
+    const handleDmClick = async (member) => {
+        if (!currentUser) {
+            setShowLoginRequiredModal(true);
+            return;
+        }
+        setDmCheckLoading(true);
+        try {
+            const data = await apiGet("/api/subscriptions/check-dm", { query: { artistId: member.id } });
+            if (data?.hasSubscription && data?.roomId != null) {
+                router.push(`/dm/fan?roomId=${data.roomId}`);
+                return;
+            }
+            setDmSubscribeTargetMember(member);
+            setShowDmSubscribeConfirmModal(true);
+        } catch (err) {
+            console.error("DM 구독 확인 실패", err);
+            setDmSubscribeTargetMember(member);
+            setShowDmSubscribeConfirmModal(true);
+        } finally {
+            setDmCheckLoading(false);
+        }
+    };
+
+    const handleDmSubscribeConfirm = () => {
+        setShowDmSubscribeConfirmModal(false);
+        if (dmSubscribeTargetMember) {
+            setDmPaymentCandyBalance(null);
+            setDmPaymentProductPrice(null);
+            setShowDmSubscribePaymentModal(true);
+        }
+    };
+
+    const handleDmSubscribePayment = async () => {
+        const member = dmSubscribeTargetMember;
+        if (!member?.dmProductId) return;
+        setDmPaymentLoading(true);
+        try {
+            await createCandySubscription(member.dmProductId);
+            setShowDmSubscribePaymentModal(false);
+            setDmSubscribeTargetMember(null);
+            const data = await apiGet("/api/subscriptions/check-dm", {
+                query: { artistId: member.id },
+            });
+            if (data?.hasSubscription && data?.roomId != null) {
+                router.push(`/dm/fan?roomId=${data.roomId}`);
+            } else {
+                router.push(`/dm/fan?artistId=${member.id}`);
+            }
+        } catch (err) {
+            alert(err?.message || "구독 처리에 실패했습니다.");
+        } finally {
+            setDmPaymentLoading(false);
+        }
     };
 
     const handleSaveEdit = async () => {
@@ -752,6 +841,49 @@ function ArtistDetailPageInner({ id }) {
                 </Surface>
             </div>
 
+            {/* Members 섹션 (공지사항 아래, 가로 리스트) - DM 상품 있는 멤버만 DM하기 표시 */}
+            {artist?.members?.length > 0 && (
+                <div className="max-w-6xl w-full mx-auto px-8 mt-6 shrink-0">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4">Members</h3>
+                    <div className="flex gap-6 overflow-x-auto pb-4 -mx-1 px-1">
+                        {artist.members.map((member) => (
+                            <div
+                                key={member.id}
+                                className="w-40 shrink-0"
+                            >
+                                <Surface
+                                    variant="card"
+                                    className="p-5 flex flex-col items-center text-center group h-full"
+                                >
+                                    <div className="relative mb-3">
+                                        <img
+                                            src={member.avatar || getDefaultAvatarUrl()}
+                                            className="size-20 rounded-2xl border border-white/[0.08] object-cover"
+                                            alt=""
+                                        />
+                                    </div>
+                                    <h3 className="font-medium text-white text-sm truncate w-full mb-0.5">
+                                        {member.name}
+                                    </h3>
+                                    <p className="text-[10px] text-white/55 truncate w-full mb-2">"{member.name}"</p>
+                                    {member.dmProductId && (
+                                        <button
+                                            type="button"
+                                            disabled={dmCheckLoading}
+                                            onClick={() => handleDmClick(member)}
+                                            className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline flex items-center justify-center gap-1 disabled:opacity-60"
+                                        >
+                                            <span className="material-symbols-outlined text-xs">mail</span>
+                                            {dmCheckLoading ? "확인 중…" : "DM하기"}
+                                        </button>
+                                    )}
+                                </Surface>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* 탭 */}
             <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 border-b border-white/[0.06] mt-8 shrink-0">
                 <div className="max-w-6xl mx-auto px-8 flex gap-8">
@@ -773,8 +905,8 @@ function ArtistDetailPageInner({ id }) {
             </div>
 
             {/* 콘텐츠 */}
-            <div className="max-w-6xl w-full mx-auto px-8 py-8 flex-1 grid grid-cols-12 gap-8">
-                <div className="col-span-12 lg:col-span-8 space-y-6">
+            <div className="max-w-6xl w-full mx-auto px-8 py-8 flex-1">
+                <div className="space-y-6">
 
                     {/* ARTIST 탭 */}
                     {activeTab === "ARTIST" && (
@@ -1011,68 +1143,6 @@ function ArtistDetailPageInner({ id }) {
                         </div>
                     )}
                 </div>
-
-                {/* 사이드바 */}
-                <aside className="hidden lg:col-span-4 lg:flex flex-col gap-6">
-                    <Surface variant="primary" className="p-8 border border-violet-500/20">
-                        <div className="mb-6">
-              <span className="bg-violet-500/20 text-violet-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                Exclusive Access
-              </span>
-                            <h3 className="font-black text-2xl text-white mt-4 leading-tight">공식 멤버십 가입</h3>
-                            <p className="text-sm text-white/70 mt-4 leading-relaxed font-medium">
-                                {artist.name}를 직접 응원하고 전용 스트리밍과 굿즈 혜택을 받으세요.
-                            </p>
-                        </div>
-                        <div className="bg-white/[0.06] rounded-2xl p-4 mb-8 border border-white/[0.06]">
-                            <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-white/55">멤버십 1단계</span>
-                                <span className="font-black text-xl text-white flex items-center gap-1 tabular-nums">
-                  <span className="material-symbols-outlined text-violet-300 fill-icon">token</span>
-                                    {CANDY_COST} 캔디 / 월
-                </span>
-                            </div>
-                        </div>
-                        <div className="mb-6 px-1 flex justify-between items-center text-[11px] font-bold text-white/55 uppercase tracking-widest">
-                            <span>내 보유 캔디</span>
-                            <span className="text-white tabular-nums">{candyBalance.toLocaleString()} 캔디</span>
-                        </div>
-                        {candyBalance >= CANDY_COST ? (
-                            <Button href={`/candy/payment?artistId=${artist.id}`} variant="primary" className="w-full py-4 text-xs uppercase tracking-widest">
-                                캔디로 구독하기
-                            </Button>
-                        ) : (
-                            <Button href="/candy/recharge" variant="primary" className="w-full py-4 text-xs uppercase tracking-widest">
-                                캔디 충전하기
-                            </Button>
-                        )}
-                        <p className="text-[9px] text-center text-white/45 mt-4">캔디 차감 시 즉시 혜택이 적용됩니다</p>
-                    </Surface>
-
-                    <Surface variant="secondary" className="p-8 sticky top-24">
-                        <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-6">Members</h3>
-                        <div className="space-y-4">
-                            {artist.members.map((member) => (
-                                <div
-                                    key={member.id}
-                                    className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] transition-colors group"
-                                >
-                                    <img src={member.avatar} className="size-12 rounded-xl border border-white/[0.08]" alt="" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-white truncate">{member.name}</p>
-                                        <Link
-                                            href="/dm/fan"
-                                            className="text-[10px] font-black text-violet-300 uppercase tracking-widest mt-1 hover:underline flex items-center gap-1"
-                                        >
-                                            <span className="material-symbols-outlined text-xs">mail</span>
-                                            DM 보내기
-                                        </Link>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </Surface>
-                </aside>
             </div>
 
             {/* 수정 모달 */}
@@ -1181,6 +1251,157 @@ function ArtistDetailPageInner({ id }) {
                                 disabled={createLoading}
                             >
                                 {createLoading ? "게시 중..." : "게시하기"}
+                            </Button>
+                        </div>
+                    </Surface>
+                </div>
+            )}
+
+            {/* DM 구독 필요 확인 모달 */}
+            {showDmSubscribeConfirmModal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && (setShowDmSubscribeConfirmModal(false), setDmSubscribeTargetMember(null))}
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <Surface
+                        variant="primary"
+                        className="relative w-full max-w-md p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-lg font-bold text-white mb-2">DM 상품 구독이 필요합니다</h3>
+                        <p className="text-sm text-white/70 mb-6">
+                            구독하시겠습니까?
+                        </p>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="ghost"
+                                className="flex-1 py-3"
+                                onClick={() => {
+                                    setShowDmSubscribeConfirmModal(false);
+                                    setDmSubscribeTargetMember(null);
+                                }}
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                variant="primary"
+                                className="flex-1 py-3"
+                                onClick={handleDmSubscribeConfirm}
+                            >
+                                구독하기
+                            </Button>
+                        </div>
+                    </Surface>
+                </div>
+            )}
+
+            {/* DM 구독 상품 결제 모달 */}
+            {showDmSubscribePaymentModal && dmSubscribeTargetMember && (
+                <div
+                    className="fixed inset-0 z-[101] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && (setShowDmSubscribePaymentModal(false), setDmSubscribeTargetMember(null))}
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <Surface
+                        variant="primary"
+                        className="relative w-full max-w-md p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-lg font-bold text-white mb-2">DM 구독 상품 결제</h3>
+                        <p className="text-sm text-white/70 mb-4">
+                            {dmSubscribeTargetMember.name}와의 1:1 DM 구독을 캔디로 결제합니다. 구독 후 DM을 이용하실 수 있습니다.
+                        </p>
+                        <div className="rounded-xl bg-white/[0.06] border border-white/[0.08] p-4 space-y-3 mb-6">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-white/60">현재 잔여 캔디</span>
+                                <span className="font-bold text-white tabular-nums">
+                                    {dmPaymentCandyBalance !== null
+                                        ? `${Number(dmPaymentCandyBalance).toLocaleString()} 캔디`
+                                        : "—"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-white/60">필요 캔디</span>
+                                <span className="font-bold text-violet-300 tabular-nums">
+                                    {dmPaymentProductPrice !== null
+                                        ? `${Number(dmPaymentProductPrice).toLocaleString()} 캔디`
+                                        : "—"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm pt-1 border-t border-white/[0.08]">
+                                <span className="text-white/60">결제 후 남는 캔디</span>
+                                <span className="font-bold text-white tabular-nums">
+                                    {dmPaymentCandyBalance !== null && dmPaymentProductPrice !== null
+                                        ? `${Math.max(0, Number(dmPaymentCandyBalance) - Number(dmPaymentProductPrice)).toLocaleString()} 캔디`
+                                        : "—"}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="ghost"
+                                className="flex-1 py-3"
+                                onClick={() => {
+                                    setShowDmSubscribePaymentModal(false);
+                                    setDmSubscribeTargetMember(null);
+                                }}
+                                disabled={dmPaymentLoading}
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                variant="primary"
+                                className="flex-1 py-3"
+                                onClick={handleDmSubscribePayment}
+                                disabled={
+                                    dmPaymentLoading ||
+                                    dmPaymentCandyBalance === null ||
+                                    dmPaymentProductPrice === null ||
+                                    Number(dmPaymentCandyBalance) < Number(dmPaymentProductPrice)
+                                }
+                            >
+                                {dmPaymentLoading ? "처리 중…" : "캔디로 구독하기"}
+                            </Button>
+                        </div>
+                    </Surface>
+                </div>
+            )}
+
+            {/* 로그인 필요 모달 (DM하기 등) */}
+            {showLoginRequiredModal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && setShowLoginRequiredModal(false)}
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <Surface
+                        variant="primary"
+                        className="relative w-full max-w-md p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-lg font-bold text-white mb-2">로그인이 필요합니다</h3>
+                        <p className="text-sm text-white/70 mb-6">DM을 이용하려면 로그인해 주세요.</p>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="ghost"
+                                className="flex-1 py-3"
+                                onClick={() => setShowLoginRequiredModal(false)}
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                variant="primary"
+                                className="flex-1 py-3"
+                                onClick={() => {
+                                    setShowLoginRequiredModal(false);
+                                    router.push("/login");
+                                }}
+                            >
+                                로그인하기
                             </Button>
                         </div>
                     </Surface>
