@@ -70,8 +70,8 @@ export default function AdminSidebar() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
+      window.location.href = "/home";
     }
-    router.push("/login");
   };
 
   return (
@@ -105,8 +105,8 @@ export default function AdminSidebar() {
       <div className="mt-4 pt-3 border-t border-white/[0.06]">
         <button
           type="button"
-          onClick={handleLogout}
-          className="w-full text-left text-[11px] text-white/55 hover:text-white/80 hover:bg-white/[0.06] px-3 py-2 rounded-xl flex items-center gap-2 transition-colors"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleLogout(); }}
+          className="w-full text-left text-[11px] text-white/55 hover:text-white/80 hover:bg-white/[0.06] px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
         >
           <span className="material-symbols-outlined text-sm">logout</span>
           <span className="font-medium">로그아웃</span>
