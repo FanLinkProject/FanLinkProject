@@ -235,7 +235,9 @@ public class UserService {
         List<ArtistGroupCardResponse> cards = groups.getContent().stream()
                 .map(group -> {
                     long followerCount = followRepository.countByArtist(group);
-                    long postCount = artistPostRepository.countByGroupId(group.getId());
+                    long artistPostCount = artistPostRepository.countByGroupId(group.getId());
+                    long fanPostCount = fanPostRepository.countByGroupId(group.getId());
+                    long postCount = artistPostCount + fanPostCount;
                     return new ArtistGroupCardResponse(
                             group.getId(),
                             group.getNickname(),
