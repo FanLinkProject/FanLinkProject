@@ -53,15 +53,6 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Preflight(OPTIONS): 인증 없이 통과 → CORS 헤더가 정상 응답되도록
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // 테스트용 코드 추후 삭제- 테스트 페이지 접근 허용
-                .requestMatchers(
-                        "/",
-                        "/index.html",
-                        "/callback.html",
-                        "/favicon.ico",
-                        "/css/**",
-                        "/js/**"
-                    ).permitAll()
                     // 인증없이 접근 가능한 경로
                     .requestMatchers(
                         "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
@@ -165,20 +156,20 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
-                "https://fan-link-project.vercel.app",
-                "https://*.vercel.app"
-        ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
+//    @Bean
+//    public CorsConfigurationSource corsConfigurationSource() {
+//        CorsConfiguration config = new CorsConfiguration();
+//        config.setAllowedOriginPatterns(List.of(
+//                "http://localhost:3000",
+//                "https://fan-link-project.vercel.app",
+//                "https://*.vercel.app"
+//        ));
+//        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+//        config.setAllowedHeaders(List.of("*"));
+//        config.setAllowCredentials(true);
+//
+//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+//        source.registerCorsConfiguration("/**", config);
+//        return source;
+//    }
 }
