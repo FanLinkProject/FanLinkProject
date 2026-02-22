@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiGet } from "@/lib/api";
@@ -15,7 +15,7 @@ import {
 import Surface from "@/components/ui/Surface";
 
 // TODO: 데이터 많을 경우 백엔드 검색 API(/api/concerts/search?q=)로 전환 권장
-export default function ConcertSearchPage() {
+function ConcertSearchPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const qFromUrl = searchParams?.get("q") ?? "";
@@ -163,5 +163,19 @@ export default function ConcertSearchPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ConcertSearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[50vh] flex items-center justify-center text-white/55">
+          로딩 중...
+        </div>
+      }
+    >
+      <ConcertSearchPageInner />
+    </Suspense>
   );
 }
