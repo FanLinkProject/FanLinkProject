@@ -744,6 +744,10 @@ function ArtistDetailPageInner({ id }) {
                                 <Surface variant="primary" className="py-12 text-center">
                                     <p className="text-white/55">로딩 중...</p>
                                 </Surface>
+                            ) : artistPosts.length === 0 ? (
+                                <Surface variant="primary" className="py-12 text-center">
+                                    <p className="text-white/55">등록된 포스트가 없습니다.</p>
+                                </Surface>
                             ) : (
                                 <>
                                     <PostFeed
@@ -795,6 +799,10 @@ function ArtistDetailPageInner({ id }) {
                                     {fanPostsLoading ? (
                                         <Surface variant="primary" className="py-12 text-center">
                                             <p className="text-white/55">로딩 중...</p>
+                                        </Surface>
+                                    ) : fanPosts.length === 0 ? (
+                                        <Surface variant="primary" className="py-12 text-center">
+                                            <p className="text-white/55">등록된 포스트가 없습니다.</p>
                                         </Surface>
                                     ) : (
                                         <>
