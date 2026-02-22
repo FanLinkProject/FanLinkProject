@@ -8,6 +8,7 @@ import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
 import org.example.backend.user.dto.response.ArtistDashboardResponse;
+import org.example.backend.user.dto.response.ArtistGroupCardResponse;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.UserHomeResponse;
@@ -91,6 +92,16 @@ public class UserController {
             @PageableDefault(size = 10) Pageable pageable
     ) {
         Page<ArtistSearchResponse> response = userService.getArtistsGroupsOnly(nickname, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    // /artists 페이지용: 그룹만 조회, 팬 수·포스트 수(그룹+멤버 합계) 포함
+    @GetMapping("/artists/list")
+    public ResponseEntity<Page<ArtistGroupCardResponse>> getArtistGroupsList(
+            @RequestParam(value = "nickname", required = false) String nickname,
+            @PageableDefault(size = 24) Pageable pageable
+    ) {
+        Page<ArtistGroupCardResponse> response = userService.getArtistGroupsWithStats(nickname, pageable);
         return ResponseEntity.ok(response);
     }
 

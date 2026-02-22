@@ -153,11 +153,6 @@ export default function UserHomePage() {
   const [error, setError] = useState("");
   const [isArtistHome, setIsArtistHome] = useState(false);
 
-  const [showAllArtistsModal, setShowAllArtistsModal] = useState(false);
-  const [allArtistsSearch, setAllArtistsSearch] = useState("");
-  const [allArtistsList, setAllArtistsList] = useState([]);
-  const [allArtistsLoading, setAllArtistsLoading] = useState(false);
-
   const [isGuestHome, setIsGuestHome] = useState(false);
   const [guestData, setGuestData] = useState(null);
 
@@ -259,27 +254,6 @@ export default function UserHomePage() {
 
     fetchLive();
   }, [data?.followedArtists]);
-
-  const fetchAllArtists = useCallback((nickname = "") => {
-    const headers = getAuthHeaders();
-    if (!headers.Authorization) return;
-    setAllArtistsLoading(true);
-    const params = nickname.trim() ? { nickname: nickname.trim(), page: 0, size: 100 } : { page: 0, size: 100 };
-    axios
-      .get(`${BASE_URL}/api/user/artists`, { headers, params })
-      .then((res) => {
-        const list = res.data?.content ?? res.data ?? [];
-        setAllArtistsList(Array.isArray(list) ? list : []);
-      })
-      .catch(() => setAllArtistsList([]))
-      .finally(() => setAllArtistsLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!showAllArtistsModal) return;
-    const t = setTimeout(() => fetchAllArtists(allArtistsSearch), 300);
-    return () => clearTimeout(t);
-  }, [showAllArtistsModal, allArtistsSearch, fetchAllArtists]);
 
   // 팔로우한 아티스트 그룹들의 게시글 통합 피드 (팬 홈)
   useEffect(() => {
@@ -524,17 +498,13 @@ export default function UserHomePage() {
       <section>
         <SectionTitle className="mb-6">추천 아티스트</SectionTitle>
         <div className="flex gap-6 overflow-x-auto pb-4 -mx-1 px-1">
-          <button
-            type="button"
-            onClick={() => {
-              setShowAllArtistsModal(true);
-              setAllArtistsSearch("");
-            }}
+          <Link
+            href="/artists"
             className="w-40 shrink-0 flex flex-col items-center justify-center min-h-[180px] rounded-2xl border-2 border-dashed border-white/[0.15] bg-white/[0.02] hover:bg-white/[0.06] hover:border-violet-500/30 transition-all text-white/60 hover:text-violet-300"
           >
             <span className="material-symbols-outlined text-4xl mb-2">add</span>
             <span className="text-xs font-bold">모든 아티스트 보기</span>
-          </button>
+          </Link>
           {recommendedArtists.map((artist) => (
             <Link
               key={artist.id}
@@ -590,61 +560,6 @@ export default function UserHomePage() {
             </div>
           )}
         </section>
-      )}
-
-      {/* 전체 아티스트 조회 모달 */}
-      {showAllArtistsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#201a33] rounded-2xl border border-white/[0.08] w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl">
-            <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
-              <h3 className="text-lg font-black text-white">모든 아티스트</h3>
-              <button
-                type="button"
-                onClick={() => setShowAllArtistsModal(false)}
-                className="size-10 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <div className="p-4 border-b border-white/[0.06]">
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-white/55 text-xl">search</span>
-                <input
-                  type="text"
-                  value={allArtistsSearch}
-                  onChange={(e) => setAllArtistsSearch(e.target.value)}
-                  placeholder="아티스트 닉네임으로 검색..."
-                  className="w-full pl-12 pr-4 py-3 bg-[#16102a] border border-white/[0.08] rounded-xl text-sm font-medium text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
-                />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {allArtistsLoading ? (
-                <p className="text-sm text-white/55 py-8 text-center">불러오는 중...</p>
-              ) : allArtistsList.length === 0 ? (
-                <p className="text-sm text-white/55 py-8 text-center">검색 결과가 없습니다.</p>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {allArtistsList.map((artist) => (
-                    <Link
-                      key={artist.id}
-                      href={`/artists/${artist.id}`}
-                      onClick={() => setShowAllArtistsModal(false)}
-                      className="flex flex-col items-center text-center p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:border-violet-500/20 transition-all"
-                    >
-                      <img
-                        src={artist.profileImageUrl || `https://picsum.photos/seed/a-${artist.id}/200/200`}
-                        className="size-16 rounded-xl border border-white/[0.08] object-cover mb-2"
-                        alt=""
-                      />
-                      <span className="font-bold text-white text-sm truncate w-full">{artist.nickname}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       )}
 
     </div>

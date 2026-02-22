@@ -56,4 +56,9 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long> {
             "ORDER BY a.id DESC")
     List<ArtistPost> findMyArtistPosts(@Param("writerId") Long writerId,
             @Param("lastPostId") Long lastPostId, Pageable pageable);
+
+    // 그룹 계정 + 소속 멤버가 작성한 포스트 수 (삭제되지 않은 글만)
+    @Query("SELECT COUNT(a) FROM ArtistPost a WHERE a.status = false " +
+            "AND (a.user.id = :groupId OR a.group.id = :groupId)")
+    long countByGroupId(@Param("groupId") Long groupId);
 }

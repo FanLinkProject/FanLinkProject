@@ -18,6 +18,7 @@ import org.example.backend.like.entity.Like;
 import org.example.backend.like.enums.LikeTarget;
 import org.example.backend.like.repository.LikeRepository;
 import org.example.backend.media_asset.service.MediaAssetService;
+import org.example.backend.user.dto.response.ArtistGroupCardResponse;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.GuestHomeResponse;
@@ -215,6 +216,37 @@ public class UserService {
                 .map(ArtistSearchResponse::from)
                 .toList();
         return new org.springframework.data.domain.PageImpl<>(responses, pageable, groups.getTotalElements());
+    }
+
+    // /artists 페이지용: 그룹만 조회 + 팬 수·포스트 수(그룹+멤버 합계)
+    @Transactional(readOnly = true)
+    public Page<ArtistGroupCardResponse> getArtistGroupsWithStats(String nickname, Pageable pageable) {
+        Page<User> groups;
+        if (nickname != null && !nickname.trim().isEmpty()) {
+            groups = userRepository.findArtistsByNicknameOrGroupName(
+                    UserRole.GROUP,
+                    UserStatus.ACTIVE,
+                    nickname.trim(),
+                    pageable
+            );
+        } else {
+            groups = getRecommendedGroups(pageable);
+        }
+        List<ArtistGroupCardResponse> cards = groups.getContent().stream()
+                .map(group -> {
+                    long followerCount = followRepository.countByArtist(group);
+                    long postCount = artistPostRepository.countByGroupId(group.getId());
+                    return new ArtistGroupCardResponse(
+                            group.getId(),
+                            group.getNickname(),
+                            group.getName(),
+                            group.getProfileImageUrl(),
+                            followerCount,
+                            postCount
+                    );
+                })
+                .toList();
+        return new org.springframework.data.domain.PageImpl<>(cards, pageable, groups.getTotalElements());
     }
 
     // 유저 차단
