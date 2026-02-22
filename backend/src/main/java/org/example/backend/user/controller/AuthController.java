@@ -39,10 +39,16 @@ public class AuthController {
         TokenResponse token = authService.login(request);
         return ResponseEntity.ok(token);
     }
-
+  
+    //oauth2 임시교환토큰
     @PostMapping("/oauth/exchange")
     public ResponseEntity<TokenResponse> exchangeOAuthCode(@Valid @RequestBody OAuthCodeExchangeRequest request) {
         TokenResponse token = authService.exchangeOAuthCode(request.code());
+      
+    // Access Token 갱신 (Refresh Token으로 새 Access Token 발급)
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenResponse> refresh(@RequestParam("refreshToken") String refreshToken) {
+        TokenResponse token = authService.refresh(refreshToken);
         return ResponseEntity.ok(token);
     }
 

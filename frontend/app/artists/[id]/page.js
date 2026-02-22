@@ -8,7 +8,7 @@ import axios from "axios";
 // 데이터 및 유틸리티
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
-import { request, apiGet, BASE_URL } from "@/lib/api";
+import { request, apiGet, apiPost, BASE_URL } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
@@ -136,10 +136,11 @@ function ArtistDetailPageInner({ paramsId }) {
                         name: info.nickname || "",
                         avatar: info.profileImageUrl || "",
                         cover: info.bannerImageUrl || "",
-                        isSubscribed: follow.isFollowing || false,
+                        isFollowing: follow.isFollowing || false,
+                        isSubscribed: membership.hasActiveMembership || false,
                         memberCount: info.followerCount || 0,
                         postCount: info.postCount || 0,
-                        members: info.members || [], // 만약 멤버 리스트가 온다면
+                        members: info.members || [],
                         backendId: groupId
                     });
                 })
@@ -318,8 +319,24 @@ function ArtistDetailPageInner({ paramsId }) {
                                     {attendanceLoading ? "..." : "출석"}
                                 </Button>
                             </>
+                        ) : artist.isFollowing ? (
+                            <Button variant="ghost" className="px-8" disabled>팔로우중</Button>
                         ) : (
-                            <Button variant="primary" className="px-10 py-4">구독하기</Button>
+                            <Button
+                                variant="primary"
+                                className="px-10 py-4"
+                                onClick={async () => {
+                                    const id = artist.backendId ?? artist.id;
+                                    if (!id || !isRealGroup) return;
+                                    try {
+                                        await apiPost(`/api/user/follow/${id}`);
+                                        setArtist((prev) => (prev ? { ...prev, isFollowing: true, memberCount: (prev.memberCount || 0) + 1 } : prev));
+                                    } catch (e) {
+                                        console.error(e);
+                                    }
+                                }}>
+                                팔로우하기
+                            </Button>
                         )}
                     </div>
                 </Surface>
@@ -366,12 +383,20 @@ function ArtistDetailPageInner({ paramsId }) {
             <div className="max-w-6xl w-full mx-auto px-8 py-10 grid grid-cols-12 gap-10">
                 <div className="col-span-12 lg:col-span-8">
                     {activeTab === "ARTIST" && (
-                        <PostFeed
-                            posts={isRealGroup ? artistPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "ARTIST")}
-                            postLinkBase="/posts"
-                            isLikedMap={Object.fromEntries([...likedPostIds].map(id => [id, true]))}
-                            onLike={handleLike}
-                        />
+                        (() => {
+                            const posts = isRealGroup ? artistPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "ARTIST");
+                            if (posts.length === 0) {
+                                return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">아티스트 게시글이 없습니다.</p>;
+                            }
+                            return (
+                                <PostFeed
+                                    posts={posts}
+                                    postLinkBase="/posts"
+                                    isLikedMap={Object.fromEntries([...likedPostIds].map(id => [id, true]))}
+                                    onLike={handleLike}
+                                />
+                            );
+                        })()
                     )}
 
                     {activeTab === "FAN" && (
@@ -383,10 +408,13 @@ function ArtistDetailPageInner({ paramsId }) {
                                             <span className="material-symbols-outlined mr-2">edit</span> 팬 포스트 작성
                                         </Button>
                                     </div>
-                                    <PostFeed
-                                        posts={isRealGroup ? fanPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "FAN")}
-                                        onLike={handleLike}
-                                    />
+                                    {(() => {
+                                        const posts = isRealGroup ? fanPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "FAN");
+                                        if (posts.length === 0) {
+                                            return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">팬 게시글이 없습니다.</p>;
+                                        }
+                                        return <PostFeed posts={posts} onLike={handleLike} />;
+                                    })()}
                                 </div>
                             ) : (
                                 <Surface className="p-20 text-center italic text-white/40">구독자 전용 공간입니다.</Surface>
@@ -420,28 +448,34 @@ function ArtistDetailPageInner({ paramsId }) {
 
                             <section>
                                 <h3 className="text-xs font-black text-white/40 mb-6 uppercase tracking-widest">Replay (VOD)</h3>
-                                <div className="grid grid-cols-2 gap-6">
-                                    {vodList.map(vod => (
-                                        <Link key={vod.id} href={`/live/${vod.id}`} className="group">
-                                            <div className="aspect-video rounded-2xl overflow-hidden relative mb-3">
-                                                <img src={vod.thumbnail} className="w-full h-full object-cover" alt="" />
-                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
-                                                    <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
+                                {vodList.length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-6">
+                                        {vodList.map(vod => (
+                                            <Link key={vod.id} href={`/live/${vod.id}`} className="group">
+                                                <div className="aspect-video rounded-2xl overflow-hidden relative mb-3">
+                                                    <img src={vod.thumbnail} className="w-full h-full object-cover" alt="" />
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                                                        <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <h5 className="font-bold text-white truncate">{vod.title}</h5>
-                                            <p className="text-white/40 text-xs mt-1">{vod.startTime}</p>
-                                        </Link>
-                                    ))}
-                                </div>
+                                                <h5 className="font-bold text-white truncate">{vod.title}</h5>
+                                                <p className="text-white/40 text-xs mt-1">{vod.startTime}</p>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">다시보기가 없습니다.</p>
+                                )}
                             </section>
                         </div>
                     )}
 
                     {activeTab === "MV" && (
-                        <div className="grid grid-cols-2 gap-6">
-                            {musicVideosLoading ? <p>로딩 중...</p> :
-                                musicVideos.map(mv => (
+                        musicVideosLoading ? (
+                            <p className="text-white/40">로딩 중...</p>
+                        ) : musicVideos.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-6">
+                                {musicVideos.map(mv => (
                                     <Surface key={mv.id} className="p-4 group cursor-pointer">
                                         <a href={mv.embedUrl} target="_blank" rel="noreferrer">
                                             <div className="aspect-video rounded-xl overflow-hidden mb-4">
@@ -450,23 +484,33 @@ function ArtistDetailPageInner({ paramsId }) {
                                             <h4 className="font-bold text-white truncate">{mv.title}</h4>
                                         </a>
                                     </Surface>
-                                ))
-                            }
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">뮤직비디오가 없습니다.</p>
+                        )
                     )}
 
                     {activeTab === "NOTICE" && (
-                        <div className="space-y-4">
-                            {MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE").map(notice => (
-                                <Surface key={notice.id} className="p-6">
-                                    <div className="flex gap-3 items-center mb-3">
-                                        <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold">NOTICE</span>
-                                        <span className="text-white/40 text-xs">{notice.timestamp}</span>
-                                    </div>
-                                    <p className="text-white/80 font-medium">{notice.content}</p>
-                                </Surface>
-                            ))}
-                        </div>
+                        (() => {
+                            const notices = isRealGroup ? artistNotices : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE");
+                            if (notices.length === 0) {
+                                return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">공지사항이 없습니다.</p>;
+                            }
+                            return (
+                                <div className="space-y-4">
+                                    {notices.map(notice => (
+                                        <Surface key={notice.id} className="p-6">
+                                            <div className="flex gap-3 items-center mb-3">
+                                                <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold">NOTICE</span>
+                                                <span className="text-white/40 text-xs">{notice.timestamp || formatTimestamp(notice.createdAt)}</span>
+                                            </div>
+                                            <p className="text-white/80 font-medium">{notice.content}</p>
+                                        </Surface>
+                                    ))}
+                                </div>
+                            );
+                        })()
                     )}
                 </div>
 

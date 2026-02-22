@@ -60,6 +60,7 @@ public class SecurityConfig {
                         "/api/home",               // 통합 홈 화면 API (역할별 응답)
                         "/api/guest/**",          // 비로그인 유저 메인 홈 화면 API (하위 호환)
                         "/api/user/artists/*/dashboard",  // 특정 아티스트 대시보드 (비로그인 접근 가능)
+                        "/api/user/artists",            // 아티스트 목록 (비로그인 조회 허용)
                         "/login/oauth2/**",       // OAuth2 로그인 콜백 URL
                         "/oauth2/**",             // OAuth2 관련 URL
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )
@@ -155,21 +156,4 @@ public class SecurityConfig {
 
         return http.build();
     }
-
-//    @Bean
-//    public CorsConfigurationSource corsConfigurationSource() {
-//        CorsConfiguration config = new CorsConfiguration();
-//        config.setAllowedOriginPatterns(List.of(
-//                "http://localhost:3000",
-//                "https://fan-link-project.vercel.app",
-//                "https://*.vercel.app"
-//        ));
-//        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-//        config.setAllowedHeaders(List.of("*"));
-//        config.setAllowCredentials(true);
-//
-//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-//        source.registerCorsConfiguration("/**", config);
-//        return source;
-//    }
 }

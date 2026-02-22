@@ -160,6 +160,34 @@ public class AuthService {
         return issueTokenResponse(user);
     }
 
+    // Access Token 갱신 (Refresh Token 검증 후 새 Access Token 발급)
+    @Transactional(readOnly = true)
+    public TokenResponse refresh(String refreshToken) {
+        if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new BusinessException(UserErrorCode.INVALID_TOKEN);
+        }
+        String email = jwtTokenProvider.getUserEmail(refreshToken);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(UserErrorCode.ACCOUNT_INACTIVE);
+        }
+        // Redis에 저장된 refresh token과 일치하는지 확인 (로그아웃 후 재사용 방지)
+        String stored = refreshTokenStore.get(email);
+        if (stored == null || !stored.equals(refreshToken)) {
+            throw new BusinessException(UserErrorCode.INVALID_TOKEN);
+        }
+        String newAccessToken = jwtTokenProvider.createAccessToken(user.getEmail(), user.getRole().getValue());
+        return TokenResponse.builder()
+                .grantType("bearer")
+                .accessToken(newAccessToken)
+                .refreshToken(refreshToken)
+                .accessTokenExpiresIn(3600000L)
+                .role(user.getRole().name())
+                .build();
+    }
+
+    // 로그아웃
     public void logout(String refreshToken) {
         if (isBlank(refreshToken) || !jwtTokenProvider.validateToken(refreshToken)) {
             throw new BusinessException(UserErrorCode.INVALID_TOKEN);

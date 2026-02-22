@@ -43,6 +43,22 @@ export function getToken() {
     return normalizeToken(raw);
 }
 
+/** refreshToken 조회 (Bearer 제거한 값) */
+function getRefreshTokenRaw() {
+    if (typeof window === "undefined") return "";
+    const raw = window.localStorage.getItem("refreshToken") ?? "";
+    return typeof raw === "string" ? raw.replace(/^Bearer\s+/i, "").trim() : "";
+}
+
+/** 토큰 제거 후 로그인 페이지로 이동 (refresh 실패 시) */
+function clearStorageAndRedirectToLogin() {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("accessToken");
+    window.localStorage.removeItem("refreshToken");
+    window.localStorage.removeItem("token");
+    window.location.href = "/login";
+}
+
 /** query 객체를 URLSearchParams로 안전하게 변환 */
 function toQueryString(query) {
     if (!query || typeof query !== "object") return "";
@@ -90,7 +106,8 @@ function throwApiError(res, data) {
 }
 
 /**
- * 공통 fetch: Authorization 자동 첨부, query 지원, 401/403 분기 throw.
+ * 공통 fetch: Authorization 자동 첨부, query 지원.
+ * 401 시 refresh token으로 갱신 후 1회 재시도, 갱신 실패 시 로그아웃 처리 후 로그인 페이지로 이동.
  *
  * @param {string} method - GET, POST, PATCH, etc.
  * @param {string} path - /api/... 또는 절대 URL
@@ -99,34 +116,71 @@ function throwApiError(res, data) {
  *   token?: string,
  *   query?: object,
  *   headers?: Record<string, string>,
+ *   signal?: AbortSignal,
+ *   _skipRefresh?: boolean,
  * }} [opts]
  */
 export async function apiFetch(method, path, body, opts = {}) {
-    const token = opts.token != null ? normalizeToken(opts.token) : getToken();
+    const skipRefresh = opts._skipRefresh === true;
 
-    const base =
-        path.startsWith("http")
-            ? path
-            : `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
-
-    const url = `${base}${toQueryString(opts.query)}`;
-
-    const headers = {
-        ...(body != null && method !== "GET" ? { "Content-Type": "application/json" } : {}),
-        ...(token ? { Authorization: token } : {}),
-        ...(opts.headers || {}),
+    const doFetch = async (authToken) => {
+        const token = authToken ?? (opts.token != null ? normalizeToken(opts.token) : getToken());
+        const base =
+            path.startsWith("http")
+                ? path
+                : `${BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+        const url = `${base}${toQueryString(opts.query)}`;
+        const headers = {
+            ...(body != null && method !== "GET" ? { "Content-Type": "application/json" } : {}),
+            ...(token ? { Authorization: token } : {}),
+            ...(opts.headers || {}),
+        };
+        const res = await fetch(url, {
+            method,
+            headers,
+            ...(body != null && method !== "GET" ? { body: JSON.stringify(body) } : {}),
+            ...(opts.signal != null ? { signal: opts.signal } : {}),
+        });
+        const data = await parseBody(res);
+        return { res, data };
     };
 
-    const res = await fetch(url, {
-        method,
-        headers,
-        ...(body != null && method !== "GET" ? { body: JSON.stringify(body) } : {}),
-        ...(opts.signal != null ? { signal: opts.signal } : {}),
-    });
+    const { res, data } = await doFetch();
 
-    const data = await parseBody(res);
-    if (!res.ok) throwApiError(res, data);
-    return data;
+    if (res.ok) return data;
+
+    if (res.status === 401 && !skipRefresh && typeof window !== "undefined") {
+        const refreshToken = getRefreshTokenRaw();
+        if (!refreshToken) {
+            clearStorageAndRedirectToLogin();
+            throwApiError(res, data);
+        }
+        const refreshUrl = `${BASE_URL}/api/auth/refresh?refreshToken=${encodeURIComponent(refreshToken)}`;
+        let refreshRes;
+        try {
+            refreshRes = await fetch(refreshUrl, { method: "POST" });
+        } catch {
+            clearStorageAndRedirectToLogin();
+            throwApiError(res, data);
+        }
+        const refreshData = await parseBody(refreshRes);
+        if (!refreshRes.ok) {
+            clearStorageAndRedirectToLogin();
+            throwApiError(res, data);
+        }
+        const newAccess = refreshData?.accessToken;
+        if (newAccess && typeof window !== "undefined") {
+            window.localStorage.setItem("accessToken", newAccess.startsWith("Bearer ") ? newAccess : `Bearer ${newAccess}`);
+            if (refreshData?.refreshToken) {
+                window.localStorage.setItem("refreshToken", refreshData.refreshToken);
+            }
+        }
+        const retry = await doFetch(newAccess ? (newAccess.startsWith("Bearer ") ? newAccess : `Bearer ${newAccess}`) : getToken());
+        if (!retry.res.ok) throwApiError(retry.res, retry.data);
+        return retry.data;
+    }
+
+    throwApiError(res, data);
 }
 
 export function apiGet(path, opts) {
