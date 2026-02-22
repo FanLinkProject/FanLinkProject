@@ -185,12 +185,6 @@ FanLinkProject/
 │   ├── package.json                  # npm 의존성
 │   └── next.config.mjs               # Next.js 설정
 │
-├── DOCS/                             # 문서
-│   ├── README.md                     # 프로젝트 소개 (이 파일)
-│   ├── API_명세서.md                 # API 명세서
-│   ├── delivery.md                   # 배송 시스템 문서
-│   └── mentoring.md                  # 멘토링 문서
-│
 ├── docker-compose.yml                # Docker Compose 설정
 └── mysql-data/                       # MySQL 데이터 볼륨
 ```
