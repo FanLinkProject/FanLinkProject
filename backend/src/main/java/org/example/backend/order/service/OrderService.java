@@ -28,6 +28,7 @@ import org.example.backend.order.exception.OrderException;
 import org.example.backend.payment.service.PaymentService;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.user.service.ArtistPermissionService;
+import org.example.backend.user.repository.FollowRepository;
 import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
@@ -44,6 +45,7 @@ public class OrderService {
         private final UserRepository userRepository;
         private final PaymentService paymentService;
         private final ArtistPermissionService artistPermissionService;
+        private final FollowRepository followRepository;
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
@@ -67,6 +69,9 @@ public class OrderService {
                         // PESSIMISTIC_WRITE 락으로 동시 구매 시 재고 정합성 보장 (race condition 방지)
                         Product product = productRepository.findByIdForUpdate(itemDto.productId())
                                         .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
+
+                        // 아티스트 상품: 팔로우 필수
+                        validateFollowRequired(user, product);
 
                         // 유료 팬 가입 상품 중복 구매 방지: 10개월 내 동일 아티스트 membership 상품 재구매 차단
                         if (Boolean.TRUE.equals(product.getIsMembership())) {
@@ -168,6 +173,9 @@ public class OrderService {
                 if (product.getPaymentMethod() != ProductPaymentMethod.CANDY_ONLY) {
                         throw new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND);
                 }
+
+                validateFollowRequired(user, product);
+
                 Long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
                 if (candyPrice <= 0) {
                         throw new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND);
@@ -224,6 +232,19 @@ public class OrderService {
                                 .filter(order -> canManageOrder(order, operatorUserId, operatorRole))
                                 .map(ArtistOrderDeliveryResponseDto::from)
                                 .toList();
+        }
+
+        private void validateFollowRequired(User user, Product product) {
+                if (product.getArtistId() == null) {
+                        return; // 플랫폼 상품(캔디 충전 등)은 팔로우 불필요
+                }
+                User artist = userRepository.findById(product.getArtistId()).orElse(null);
+                if (artist == null) {
+                        return;
+                }
+                if (!followRepository.existsByFollowerAndArtist(user, artist)) {
+                        throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                }
         }
 
         private void validateShippingRequest(OrderRequestDto request) {
