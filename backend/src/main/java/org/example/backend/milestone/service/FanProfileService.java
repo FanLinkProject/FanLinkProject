@@ -12,6 +12,7 @@ import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,14 +61,19 @@ public class FanProfileService {
     }
 
     /**
-     * 본인 팬 프로필일 때만 방문 수 +1 후 자동승급 체크
+     * 본인 팬 프로필일 때만 출석 처리 (하루 1회). 이미 오늘 출석했으면 예외.
      */
     public void increaseVisitCount(Long fanProfileId, Long userId) {
         FanProfile profile = getFan(fanProfileId);
         if (!profile.getFan().getId().equals(userId)) {
             throw new MilestoneException(MilestoneErrorCode.NOT_FANPROFILE_OWNER);
         }
-        profile.increaseVisitCount();
+        LocalDate today = LocalDate.now();
+        if (profile.getLastVisitDate() != null && profile.getLastVisitDate().equals(today)) {
+            throw new MilestoneException(MilestoneErrorCode.ALREADY_VISITED_TODAY);
+        }
+        profile.recordVisit(today);
+        fanProfileRepository.save(profile); // 명시적 UPDATE 반영 후 승급 체크
         fanGradeAutoUpgradeService.checkAndUpgradeForFan(fanProfileId);
     }
 
@@ -86,7 +92,7 @@ public class FanProfileService {
     }
 
     /**
-     * 팬이 자신의 팬 프로필 목록 조회 (아티스트별)
+     * 팬이 자신의 팬 프로필 목록 조회 (그룹별)
      */
     public List<FanProfileResponse> getMyFanProfiles(Long fanUserId) {
         User fan = userRepository.findById(fanUserId)
@@ -97,22 +103,25 @@ public class FanProfileService {
     }
 
     /**
-     * 팬 프로필 생성 (테스트용 - 아티스트 구독 시 등으로 대체 예정)
+     * 팬 프로필 생성 (테스트용 - 그룹 구독 시 등으로 대체 예정)
      */
-    public FanProfileResponse createFanProfile(Long fanUserId, Long artistId) {
+    public FanProfileResponse createFanProfile(Long fanUserId, Long groupId) {
         User fan = userRepository.findById(fanUserId)
                 .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.FANPROFILE_NOT_FOUND));
-        User artist = userRepository.findById(artistId)
-                .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.ARTIST_NOT_FOUND));
-        if (artist.getRole() != UserRole.ARTIST) {
-            throw new MilestoneException(MilestoneErrorCode.ARTIST_NOT_FOUND);
+        if (fan.getRole() != UserRole.USER) {
+            throw new MilestoneException(MilestoneErrorCode.FAN_ONLY_CREATE_PROFILE);
         }
-        if (fanProfileRepository.existsByFanAndArtist(fan, artist)) {
-            return FanProfileResponse.from(fanProfileRepository.findByFanAndArtist(fan, artist).orElseThrow());
+        User group = userRepository.findById(groupId)
+                .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.GROUP_NOT_FOUND));
+        if (group.getRole() != UserRole.GROUP && group.getRole() != UserRole.ARTIST) {
+            throw new MilestoneException(MilestoneErrorCode.NOT_GROUP_USER);
+        }
+        if (fanProfileRepository.existsByFanAndGroup(fan, group)) {
+            return FanProfileResponse.from(fanProfileRepository.findByFanAndGroup(fan, group).orElseThrow());
         }
         FanProfile profile = FanProfile.builder()
                 .fan(fan)
-                .artist(artist)
+                .group(group)
                 .postCount(0)
                 .commentCount(0)
                 .visitCount(0)

@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MOCK_ARTISTS } from "@/lib/mockData";
+import { request } from "@/lib/api";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 
 const personalMenuItems = [
   { id: "ARTIST_ME", label: "My Studio", icon: "person", href: "/artist-console" },
@@ -15,7 +17,6 @@ const businessMenuItems = [
   { id: "ARTIST_MARKET_MGMT", label: "상품 관리", icon: "shopping_bag", href: "/artist-console/market" },
   { id: "ARTIST_ORDERS", label: "주문/배송", icon: "local_shipping", href: "/artist-console/orders" },
   { id: "ARTIST_SETTLEMENT", label: "정산 관리", icon: "account_balance_wallet", href: "/artist-console/settlement" },
-  { id: "ARTIST_ACCOUNT", label: "정산 계좌", icon: "payments", href: "/artist-console/account" },
 ];
 
 const adminMenuItems = [
@@ -28,8 +29,22 @@ const adminMenuItems = [
 
 export default function Sidebar({ userRole = "FAN", canManageBusiness = false }) {
   const pathname = usePathname();
-  const followingArtists = MOCK_ARTISTS.filter((a) => a.isSubscribed);
-  const dmArtists = MOCK_ARTISTS.filter((a) => a.isPremiumSubscribed);
+  const [followingArtists, setFollowingArtists] = useState([]);
+  const [dmArtists, setDmArtists] = useState([]);
+
+  useEffect(() => {
+    if (userRole !== "FAN") return;
+    request("/api/user/followings", { query: { page: 0, size: 20 } })
+      .then((data) => {
+        const list = data?.content ?? [];
+        setFollowingArtists(list);
+        setDmArtists(list);
+      })
+      .catch(() => {
+        setFollowingArtists([]);
+        setDmArtists([]);
+      });
+  }, [userRole]);
 
   const isActive = (href) => pathname === href || (href !== "/artist-console" && pathname?.startsWith(href));
 
@@ -53,12 +68,12 @@ export default function Sidebar({ userRole = "FAN", canManageBusiness = false })
                     className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-all text-left group"
                   >
                     <img
-                      src={a.avatar}
-                      className="size-9 rounded-full border border-slate-100 group-hover:border-primary-300 shadow-sm"
+                      src={a.profileImageUrl || getDefaultAvatarUrl(a.nickname)}
+                      className="size-9 rounded-full border border-slate-100 group-hover:border-primary-300 shadow-sm object-cover"
                       alt=""
                     />
                     <span className="text-[13px] font-medium text-slate-700 truncate group-hover:text-primary-600 transition-colors leading-tight">
-                      {a.name}
+                      {a.nickname ?? a.name}
                     </span>
                   </Link>
                 ))}
@@ -76,13 +91,13 @@ export default function Sidebar({ userRole = "FAN", canManageBusiness = false })
                     className="flex items-center gap-3 px-2 py-2.5 rounded-2xl hover:bg-slate-50 transition-all text-left group"
                   >
                     <img
-                      src={a.avatar}
-                      className="size-10 rounded-2xl border border-slate-100 group-hover:border-primary-200 shadow-sm"
+                      src={a.profileImageUrl || getDefaultAvatarUrl(a.nickname)}
+                      className="size-10 rounded-2xl border border-slate-100 group-hover:border-primary-200 shadow-sm object-cover"
                       alt=""
                     />
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
                       <p className="text-sm font-medium text-slate-900 truncate group-hover:text-primary-600 transition-colors leading-tight">
-                        {a.name}
+                        {a.nickname ?? a.name}
                       </p>
                       <p className="text-[10px] text-slate-400 font-normal uppercase tracking-wider truncate leading-tight">
                         아티스트

@@ -83,7 +83,7 @@ function ArtistDetailPageInner({ paramsId }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const tabParam = searchParams.get("tab");
-    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "NOTICE", "MARKET", "MV"];
+    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "MARKET", "MV"];
 
     // 상태 관리
     const [artist, setArtist] = useState(null);
@@ -191,9 +191,23 @@ function ArtistDetailPageInner({ paramsId }) {
         setCurrentUser(user);
         if (!user) return;
         axios.get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
-            .then(res => setFanProfiles(res.data || []))
+            .then(res => {
+                const list = Array.isArray(res.data) ? res.data : (res.data?.content ?? []);
+                setFanProfiles(list);
+            })
             .catch(() => {});
     }, []);
+
+    // 4-1. 공지사항 (탭 아래 섹션용, 최근 3건)
+    useEffect(() => {
+        if (!isRealGroup || !groupId) return;
+        request("/api/artist-posts/notices", { query: { groupId, limit: 3 } })
+            .then((data) => {
+                const list = Array.isArray(data) ? data : (data?.content ?? []);
+                setArtistNotices(list);
+            })
+            .catch(() => setArtistNotices([]));
+    }, [groupId, isRealGroup]);
 
     // 5. MV 탭 활성화 시 로드
     useEffect(() => {
@@ -217,15 +231,33 @@ function ArtistDetailPageInner({ paramsId }) {
     };
 
     const handleAttendance = async () => {
-        const fanProfile = fanProfiles.find(p => String(p.artistId) === String(paramsId) || p.artistName === artist?.name);
-        if (!fanProfile || attendanceLoading) return;
+        let fanProfile = fanProfiles.find(p => String(p.groupId) === String(paramsId) || String(p.artistId) === String(paramsId) || (artist?.name && p.groupName === artist.name));
+        if (!fanProfile && !attendanceLoading && isRealGroup && groupId) {
+            try {
+                const { data } = await axios.post(`${FAN_PROFILES_API}`, { groupId }, { headers: getAuthHeaders() });
+                if (data?.id) {
+                    setFanProfiles(prev => [...prev, data]);
+                    fanProfile = data;
+                }
+            } catch (e) { /* 이미 있거나 실패 시 아래에서 알림 */ }
+        }
+        if (!fanProfile || attendanceLoading) {
+            if (!fanProfile) alert("이 아티스트에 대한 출석 정보를 불러올 수 없습니다. 잠시 후 새로고침 후 다시 시도해 주세요.");
+            return;
+        }
+        const todayStr = new Date().toLocaleDateString("en-CA");
+        const lastVisit = fanProfile.lastVisitDate != null ? String(fanProfile.lastVisitDate).slice(0, 10) : null;
+        if (lastVisit === todayStr) return;
         setAttendanceLoading(true);
         try {
             await axios.post(`${FAN_PROFILES_API}/${fanProfile.id}/increase-visit`, {}, { headers: getAuthHeaders() });
-            setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, visitCount: (p.visitCount || 0) + 1 } : p));
+            setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, visitCount: (p.visitCount || 0) + 1, lastVisitDate: todayStr } : p));
             alert("출석 완료!");
         } catch (err) {
-            console.error(err);
+            if (err?.response?.data?.code === "ALREADY_VISITED_TODAY") {
+                setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, lastVisitDate: todayStr } : p));
+                alert("오늘 이미 출석했습니다.");
+            } else console.error(err);
         } finally {
             setAttendanceLoading(false);
         }
@@ -274,11 +306,15 @@ function ArtistDetailPageInner({ paramsId }) {
 
     if (!artist) return null;
 
+    const todayStr = new Date().toLocaleDateString("en-CA");
+    const currentFanProfile = fanProfiles.find(p => String(p.groupId) === String(paramsId) || String(p.artistId) === String(paramsId) || (artist?.name && p.groupName === artist.name));
+    const lastVisitStr = currentFanProfile?.lastVisitDate != null ? String(currentFanProfile.lastVisitDate).slice(0, 10) : null;
+    const attendanceDoneToday = !!currentFanProfile && lastVisitStr === todayStr;
+
     const tabs = [
         { id: "ARTIST", label: "Artist" },
         { id: "FAN", label: "Fan" },
         { id: "LIVE", label: "Live" },
-        { id: "NOTICE", label: "Notice" },
         { id: "MARKET", label: "Market" },
         { id: "MV", label: "뮤직비디오" },
     ];
@@ -290,7 +326,7 @@ function ArtistDetailPageInner({ paramsId }) {
         <div className="flex flex-col min-h-full relative pb-20">
             {/* 커버 섹션 */}
             <div className="h-64 w-full relative overflow-hidden shrink-0">
-                <img src={artist.cover} className="w-full h-full object-cover" alt="" />
+                {artist.cover ? <img src={artist.cover} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-white/5" />}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
             </div>
 
@@ -299,7 +335,7 @@ function ArtistDetailPageInner({ paramsId }) {
                 <Surface variant="primary" className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]">
                     <div className="flex items-end gap-6">
                         <div className="rounded-2xl border-2 border-white/[0.08] shadow-2xl -mt-24 overflow-hidden bg-[#201a33] size-40">
-                            <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} />
+                            {artist.avatar ? <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} /> : <div className="w-full h-full bg-white/10" />}
                         </div>
                         <div className="pb-1">
                             <div className="flex items-center gap-2">
@@ -315,8 +351,8 @@ function ArtistDetailPageInner({ paramsId }) {
                         {artist.isSubscribed ? (
                             <>
                                 <Button variant="ghost" className="px-8" disabled>구독 중</Button>
-                                <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading}>
-                                    {attendanceLoading ? "..." : "출석"}
+                                <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
+                                    {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
                                 </Button>
                             </>
                         ) : artist.isFollowing ? (
@@ -347,8 +383,8 @@ function ArtistDetailPageInner({ paramsId }) {
                 <div className="max-w-6xl w-full mx-auto px-8 mt-12">
                     <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {artistConcerts.map((c) => (
-                            <Link key={c.id} href={`/concerts/${c.id}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
+                        {artistConcerts.map((c, i) => (
+                            <Link key={c.id ?? `concert-${i}`} href={`/concerts/${c.id}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
                                 <div className="aspect-[16/10] overflow-hidden">
                                     <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                 </div>
@@ -379,11 +415,50 @@ function ArtistDetailPageInner({ paramsId }) {
                 </div>
             </div>
 
+            {/* 공지사항 섹션 (탭과 피드 사이) */}
+            {(() => {
+                const notices = isRealGroup ? artistNotices : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE");
+                if (notices.length === 0) return null;
+                const latest = notices[0];
+                return (
+                    <div className="max-w-6xl w-full mx-auto px-8 pt-8">
+                        <div className="flex items-center justify-between gap-4 mb-4">
+                            <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">공지사항</h3>
+                            <Link
+                                href={`/artists/${paramsId}/notices`}
+                                className="text-xs font-bold text-violet-300 hover:text-violet-200 flex items-center gap-1"
+                            >
+                                전체 공지 확인
+                                <span className="material-symbols-outlined text-sm">chevron_right</span>
+                            </Link>
+                        </div>
+                        <Link
+                            href={`/posts/${latest.id}?type=ARTIST&groupId=${groupId}`}
+                            className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-5"
+                        >
+                            <div className="flex gap-3 items-center mb-2">
+                                <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold">NOTICE</span>
+                                <span className="text-white/40 text-xs">{latest.timestamp || formatTimestamp(latest.createdAt)}</span>
+                            </div>
+                            <p className="text-white/80 font-medium line-clamp-2">{latest.title || (latest.content ? `${(latest.content || "").slice(0, 80)}${(latest.content || "").length > 80 ? "..." : ""}` : "공지")}</p>
+                        </Link>
+                    </div>
+                );
+            })()}
+
             {/* 메인 콘텐츠 영역 */}
             <div className="max-w-6xl w-full mx-auto px-8 py-10 grid grid-cols-12 gap-10">
                 <div className="col-span-12 lg:col-span-8">
                     {activeTab === "ARTIST" && (
-                        (() => {
+                        !currentUser ? (
+                            <Surface className="p-20 text-center border border-white/10">
+                                <p className="text-white/70 font-medium mb-2">로그인 후 이용해 주세요.</p>
+                                <p className="text-sm text-white/50 mb-6">아티스트 게시글을 보려면 로그인이 필요합니다.</p>
+                                <Button href="/login" variant="primary" className="px-8 py-3">
+                                    로그인
+                                </Button>
+                            </Surface>
+                        ) : (() => {
                             const posts = isRealGroup ? artistPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "ARTIST");
                             if (posts.length === 0) {
                                 return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">아티스트 게시글이 없습니다.</p>;
@@ -400,26 +475,36 @@ function ArtistDetailPageInner({ paramsId }) {
                     )}
 
                     {activeTab === "FAN" && (
-                        <>
-                            {artist.isSubscribed ? (
-                                <div className="space-y-6">
-                                    <div className="flex justify-end">
-                                        <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-                                            <span className="material-symbols-outlined mr-2">edit</span> 팬 포스트 작성
-                                        </Button>
+                        !currentUser ? (
+                            <Surface className="p-20 text-center border border-white/10">
+                                <p className="text-white/70 font-medium mb-2">로그인 후 이용해 주세요.</p>
+                                <p className="text-sm text-white/50 mb-6">팬 탭 게시글을 보려면 로그인이 필요합니다.</p>
+                                <Button href="/login" variant="primary" className="px-8 py-3">
+                                    로그인
+                                </Button>
+                            </Surface>
+                        ) : (
+                            <>
+                                {artist.isSubscribed ? (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-end">
+                                            <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+                                                <span className="material-symbols-outlined mr-2">edit</span> 팬 포스트 작성
+                                            </Button>
+                                        </div>
+                                        {(() => {
+                                            const posts = isRealGroup ? fanPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "FAN");
+                                            if (posts.length === 0) {
+                                                return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">팬 게시글이 없습니다.</p>;
+                                            }
+                                            return <PostFeed posts={posts} onLike={handleLike} />;
+                                        })()}
                                     </div>
-                                    {(() => {
-                                        const posts = isRealGroup ? fanPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "FAN");
-                                        if (posts.length === 0) {
-                                            return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">팬 게시글이 없습니다.</p>;
-                                        }
-                                        return <PostFeed posts={posts} onLike={handleLike} />;
-                                    })()}
-                                </div>
-                            ) : (
-                                <Surface className="p-20 text-center italic text-white/40">구독자 전용 공간입니다.</Surface>
-                            )}
-                        </>
+                                ) : (
+                                    <Surface className="p-20 text-center italic text-white/40">구독자 전용 공간입니다.</Surface>
+                                )}
+                            </>
+                        )
                     )}
 
                     {activeTab === "LIVE" && (
@@ -491,27 +576,6 @@ function ArtistDetailPageInner({ paramsId }) {
                         )
                     )}
 
-                    {activeTab === "NOTICE" && (
-                        (() => {
-                            const notices = isRealGroup ? artistNotices : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE");
-                            if (notices.length === 0) {
-                                return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">공지사항이 없습니다.</p>;
-                            }
-                            return (
-                                <div className="space-y-4">
-                                    {notices.map(notice => (
-                                        <Surface key={notice.id} className="p-6">
-                                            <div className="flex gap-3 items-center mb-3">
-                                                <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold">NOTICE</span>
-                                                <span className="text-white/40 text-xs">{notice.timestamp || formatTimestamp(notice.createdAt)}</span>
-                                            </div>
-                                            <p className="text-white/80 font-medium">{notice.content}</p>
-                                        </Surface>
-                                    ))}
-                                </div>
-                            );
-                        })()
-                    )}
                 </div>
 
                 {/* 사이드바 */}

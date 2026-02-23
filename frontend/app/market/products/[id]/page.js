@@ -140,9 +140,7 @@ export default function ProductDetailPage({ params }) {
   }
 
   const imgUrl = getProductImageUrl(product);
-  const describeImages = product.attachments?.filter(
-    (a) => a.category === "PRODUCT_DESCRIBE_IMAGE"
-  ) || product.attachments || [];
+  const detailImages = (product.attachments || []).filter((a) => a?.url);
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-16">
@@ -154,7 +152,7 @@ export default function ProductDetailPage({ params }) {
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 bg-[#201a33] rounded-[3.5rem] p-12 border border-white/[0.08]">
-        <div className="space-y-6">
+        <div>
           <div className="aspect-square rounded-[3rem] overflow-hidden bg-white/5 border border-white/[0.06]">
             {imgUrl ? (
               <img src={imgUrl} className="w-full h-full object-cover" alt={product.name} />
@@ -164,41 +162,33 @@ export default function ProductDetailPage({ params }) {
               </div>
             )}
           </div>
-          {describeImages.length > 0 && (
-            <div className="space-y-4">
-              <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/55">상세 설명</h5>
-              <div className="flex flex-col gap-4">
-                {describeImages.map((a) => (
-                  a.url && (
-                    <img key={a.mediaAssetId} src={a.url} alt="" className="w-full rounded-2xl" />
-                  )
-                ))}
+        </div>
+        <div className="flex flex-col">
+          {product.artistId != null ? (
+            <Link href={`/artists/${product.artistId}`} className="flex items-center gap-4 mb-8 cursor-pointer group w-fit">
+              <div className="size-12 rounded-2xl border border-white/[0.1] bg-white/5 flex items-center justify-center">
+                <span className="material-symbols-outlined text-white/50">person</span>
+              </div>
+              <div>
+                <h4 className="text-base font-black text-white group-hover:text-violet-300 transition-colors">
+                  {product.artistName || "아티스트"}
+                </h4>
+                <p className="text-[10px] text-white/55 uppercase tracking-widest font-black">OFFICIAL MERCHANDISE</p>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-4 mb-8 w-fit">
+              <div className="size-12 rounded-2xl border border-white/[0.1] bg-white/5 flex items-center justify-center">
+                <span className="material-symbols-outlined text-white/50">redeem</span>
+              </div>
+              <div>
+                <h4 className="text-base font-black text-white">FanLink</h4>
+                <p className="text-[10px] text-white/55 uppercase tracking-widest font-black">캔디로 구매</p>
               </div>
             </div>
           )}
-        </div>
-        <div className="flex flex-col">
-          <Link href={`/artists/${product.artistId}`} className="flex items-center gap-4 mb-8 cursor-pointer group w-fit">
-            <div className="size-12 rounded-2xl border border-white/[0.1] bg-white/5 flex items-center justify-center">
-              <span className="material-symbols-outlined text-white/50">person</span>
-            </div>
-            <div>
-              <h4 className="text-base font-black text-white group-hover:text-violet-300 transition-colors">
-                {product.artistName || "아티스트"}
-              </h4>
-              <p className="text-[10px] text-white/55 uppercase tracking-widest font-black">OFFICIAL MERCHANDISE</p>
-            </div>
-          </Link>
           <h1 className="text-4xl font-black text-white mb-3 tracking-tight">{product.name}</h1>
           <p className="text-3xl font-black text-violet-300 mb-10">{formatPrice(product)}</p>
-          {describeImages.length === 0 && (
-            <div className="flex-1 mb-10">
-              <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/55 mb-5">상세 설명</h5>
-              <p className="text-white/75 leading-relaxed text-lg font-medium">
-                이 상품은 아티스트가 직접 참여하여 제작된 공식 굿즈입니다.
-              </p>
-            </div>
-          )}
           <div className="mt-12 flex gap-4">
             <button
               type="button"
@@ -220,9 +210,24 @@ export default function ProductDetailPage({ params }) {
         </div>
       </div>
 
+      {detailImages.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex flex-col gap-4 max-w-2xl mx-auto">
+            {detailImages.map((a) => (
+              <img
+                key={a.mediaAssetId}
+                src={a.url}
+                alt=""
+                className="w-full rounded-2xl border border-white/[0.06]"
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {sameArtistProducts.length > 0 && (
         <section>
-          <h3 className="text-2xl font-black text-white mb-8 px-2">{product.artistName}의 다른 굿즈</h3>
+          <h3 className="text-2xl font-black text-white mb-8 px-2">{(product.artistName || "아티스트")}의 다른 굿즈</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {sameArtistProducts.map((p) => (
               <Link
@@ -241,7 +246,7 @@ export default function ProductDetailPage({ params }) {
                   )}
                 </div>
                 <div className="px-1">
-                  <p className="text-[9px] font-black text-white/55 uppercase tracking-widest mb-1">{p.artistName}</p>
+                  <p className="text-[9px] font-black text-white/55 uppercase tracking-widest mb-1">{p.artistName || (p.artistId == null ? "FanLink" : "아티스트")}</p>
                   <h4 className="text-sm font-bold text-white truncate mb-1">{p.name}</h4>
                   <p className="text-base font-black text-violet-300">{formatPrice(p)}</p>
                 </div>

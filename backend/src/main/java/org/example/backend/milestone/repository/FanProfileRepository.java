@@ -9,14 +9,14 @@ import java.util.Optional;
 
 public interface FanProfileRepository extends JpaRepository<FanProfile, Long> {
 
-    List<FanProfile> findAllByArtist(User artist);
+    List<FanProfile> findAllByGroup(User group);
 
     List<FanProfile> findAllByFan(User fan);
 
-    Optional<FanProfile> findByFanAndArtist(User fan, User artist);
+    Optional<FanProfile> findByFanAndGroup(User fan, User group);
 
-    boolean existsByFanAndArtist(User fan, User artist);
+    boolean existsByFanAndGroup(User fan, User group);
 
-    //댓글 파트에서 사용
-    Optional<FanProfile> findByFan_IdAndArtist_Id(Long fanId, Long artistId);
+    /** 댓글/게시글 파트에서 사용 (그룹 기준) */
+    Optional<FanProfile> findByFan_IdAndGroup_Id(Long fanId, Long groupId);
 }

@@ -22,4 +22,8 @@ public interface FanPostRepository extends JpaRepository<FanPost, Long> {
             "AND (:lastPostId IS NULL OR f.id < :lastPostId) " +
             "ORDER BY f.id DESC")
     List<FanPost> findPosts(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId, Pageable pageable);
+
+    // 해당 그룹 팬 탭에 팬이 작성한 포스트 수 (삭제되지 않은 글만)
+    @Query("SELECT COUNT(f) FROM FanPost f WHERE f.status = false AND f.group.id = :groupId")
+    long countByGroupId(@Param("groupId") Long groupId);
 }

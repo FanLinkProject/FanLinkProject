@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { request } from "@/lib/api";
 import { getProductsByArtist } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
@@ -86,21 +87,21 @@ export default function ArtistMarketPage({ params }) {
       setLoading(false);
       return;
     }
-    getProductsByArtist(numId)
-      .then((list) => {
-        setProducts(Array.isArray(list) ? list : []);
-        if (list?.length > 0) {
-          const isGroupStore = list.some((p) => p.groupId === numId);
-          const storeName = isGroupStore
-            ? (list.find((p) => p.groupId === numId)?.groupName || "그룹")
-            : (list[0].artistName || "아티스트");
-          setArtist({ id: numId, name: storeName, avatar: null, cover: null, isGroup: isGroupStore });
-        } else {
-          setArtist({ id: numId, name: "아티스트", avatar: null, cover: null, isGroup: false });
-        }
-      })
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false));
+    Promise.all([
+      request(`/api/user/artists/${numId}/dashboard`).catch(() => null),
+      getProductsByArtist(numId),
+    ]).then(([dashboard, list]) => {
+      const productList = Array.isArray(list) ? list : [];
+      setProducts(productList);
+      const info = dashboard?.artistInfo;
+      const storeName = info?.nickname?.trim() || (productList.length > 0
+        ? (productList.some((p) => p.groupId === numId)
+            ? (productList.find((p) => p.groupId === numId)?.groupName || "그룹")
+            : (productList[0].artistName || "아티스트"))
+        : "아티스트");
+      const isGroup = dashboard != null ? !!dashboard.isGroup : (productList.length > 0 && productList.some((p) => p.groupId === numId));
+      setArtist({ id: numId, name: storeName, avatar: info?.profileImageUrl || null, cover: info?.bannerImageUrl || null, isGroup });
+    }).catch(() => setProducts([])).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -129,7 +130,7 @@ export default function ArtistMarketPage({ params }) {
         </button>
         <div>
           <SectionTitle className="text-2xl font-bold">
-            {artistName} {artist?.isGroup ? "그룹 공식 스토어" : "개인 스토어"}
+            {artistName} 공식 스토어
           </SectionTitle>
           <p className="text-xs text-white/55 font-bold uppercase tracking-widest mt-1">
             Total {products.length} Items
@@ -145,7 +146,7 @@ export default function ArtistMarketPage({ params }) {
           </div>
           <div>
             <h2 className="text-3xl font-black text-white">
-              {artistName} {artist?.isGroup ? "그룹" : "개인"} 굿즈 스토어
+              {artistName} 굿즈 스토어
             </h2>
             <p className="text-white/70 font-medium mt-1 italic">
               아티스트의 감성이 담긴 공식 굿즈를 확인하세요.

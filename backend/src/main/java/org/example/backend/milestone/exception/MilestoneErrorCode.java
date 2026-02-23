@@ -10,12 +10,14 @@ public enum MilestoneErrorCode implements ErrorCode {
     // ====== NOT FOUND ======
     MILESTONE_NOT_FOUND(HttpStatus.NOT_FOUND, "MILESTONE_NOT_FOUND", "존재하지 않는 마일스톤입니다."),
     FANPROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FANPROFILE_NOT_FOUND", "존재하지 않는 팬프로필입니다."),
-    ARTIST_NOT_FOUND(HttpStatus.NOT_FOUND, "ARTIST_NOT_FOUND", "존재하지 않는 아티스트입니다."),
+    GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "존재하지 않는 그룹 계정입니다."),
 
     // ====== 권한/소유 관련 ======
-    NOT_ARTIST_USER(HttpStatus.FORBIDDEN, "NOT_ARTIST_USER", "아티스트만 마일스톤을 생성할 수 있습니다."),
+    NOT_GROUP_USER(HttpStatus.FORBIDDEN, "NOT_GROUP_USER", "해당 ID는 아티스트/그룹 계정이 아닙니다. 아티스트 또는 그룹 페이지에서만 팬 프로필을 만들 수 있습니다."),
+    FAN_ONLY_CREATE_PROFILE(HttpStatus.FORBIDDEN, "FAN_ONLY_CREATE_PROFILE", "팬(일반 회원)만 팬 프로필을 생성할 수 있습니다. 로그인 계정을 확인해 주세요."),
     NOT_MILESTONE_OWNER(HttpStatus.FORBIDDEN, "NOT_MILESTONE_OWNER", "본인이 소유한 마일스톤이 아닙니다."),
     NOT_FANPROFILE_OWNER(HttpStatus.FORBIDDEN, "NOT_FANPROFILE_OWNER", "본인의 팬 프로필만 방문일을 갱신할 수 있습니다."),
+    ALREADY_VISITED_TODAY(HttpStatus.BAD_REQUEST, "ALREADY_VISITED_TODAY", "오늘 이미 출석했습니다. 내일 다시 시도해 주세요."),
 
     // ====== 생성/수정 검증 ======
     DUPLICATE_MILESTONE_NAME(HttpStatus.BAD_REQUEST, "DUPLICATE_MILESTONE_NAME", "해당 이름의 등급이 이미 존재합니다."),

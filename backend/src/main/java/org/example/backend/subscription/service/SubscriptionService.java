@@ -134,9 +134,12 @@ public class SubscriptionService {
                 Product product = productRepository.findById(productId)
                                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품입니다."));
 
-                // 2. 멤버십 상품 검증 (캔디 결제 상품인지 확인)
+                // 2. 캔디 결제 + 구독 상품 검증 (구독 상품만 매월 캔디 차감 대상)
                 if (product.getPaymentMethod() != ProductPaymentMethod.CANDY_ONLY) {
                         throw new IllegalArgumentException("캔디 구독은 캔디 결제 상품만 가능합니다.");
+                }
+                if (!Boolean.TRUE.equals(product.getIsSubscription())) {
+                        throw new IllegalArgumentException("구독 상품만 구독할 수 있습니다. 단건 상품은 마켓에서 구매해 주세요.");
                 }
 
                 // 3. 중복 구독 확인
@@ -227,6 +230,18 @@ public class SubscriptionService {
          */
         public List<Subscription> getMySubscriptions(Long userId) {
                 return subscriptionRepository.findByUserIdAndIsActive(userId, true);
+        }
+
+        /**
+         * 해당 아티스트의 DM(캔디 구독) 상품을 현재 유저가 활성 구독 중인지 여부.
+         *
+         * @param userId   유저 ID
+         * @param artistId 아티스트(상품 소유자) ID
+         * @return 구독 중이면 true
+         */
+        public boolean hasActiveDmSubscription(Long userId, Long artistId) {
+                return subscriptionRepository.existsActiveSubscriptionForArtist(
+                        userId, artistId, Instant.now());
         }
 
 }

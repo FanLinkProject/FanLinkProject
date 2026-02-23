@@ -37,7 +37,8 @@ public class Comment {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    private Integer status = 1; // 1: 활성, 0: 삭제
+    @Column(nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean status = false; // 삭제 여부 (false: 활성, true: 삭제)
 
     @CreatedDate
     @Column(updatable = false)
@@ -51,7 +52,7 @@ public class Comment {
     private Comment parent;
 
     // 활성 상태인 자식 댓글 수 (DB 서브쿼리로 조회, children 컬렉션 로딩 불필요)
-    @Formula("(SELECT COUNT(*) FROM comments c WHERE c.parent_id = id AND c.status = 1)")
+    @Formula("(SELECT COUNT(*) FROM comments c WHERE c.parent_id = id AND c.status = 0)")
     private int activeReplyCount;
 
     @Builder
@@ -63,11 +64,11 @@ public class Comment {
         this.parent = parent;
     }
 
-    public void delete() { this.status = 0; }
+    public void delete() { this.status = true; }
 
 
     public void update(String content) {
-        if (this.status == 0) {
+        if (Boolean.TRUE.equals(this.status)) {
             throw new CommentException(CommentErrorCode.COMMENT_NOT_FOUND); // 이미 삭제된 댓글은 수정 불가
         }
         this.content = content;
