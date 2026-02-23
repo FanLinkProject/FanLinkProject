@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.ArtistProfileUpdateRequest;
+import org.example.backend.user.dto.response.ArtistDashboardKpiResponse;
 import org.example.backend.user.dto.response.ArtistHomeResponse;
 import org.example.backend.user.dto.response.ArtistMyPageResponse;
 import org.example.backend.user.service.ArtistService;
@@ -24,6 +25,15 @@ public class ArtistController {
             @AuthenticationPrincipal PrincipalDetails principalDetails
     ) {
         ArtistHomeResponse response = artistService.getArtistHome(principalDetails.getUser());
+        return ResponseEntity.ok(response);
+    }
+
+    // 운영 요약(대시보드) KPI
+    @GetMapping("/dashboard/summary")
+    public ResponseEntity<ArtistDashboardKpiResponse> getDashboardSummary(
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        ArtistDashboardKpiResponse response = artistService.getDashboardKpis(principalDetails.getUser());
         return ResponseEntity.ok(response);
     }
 

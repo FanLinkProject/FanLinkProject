@@ -1,16 +1,44 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
+import { BASE_URL } from "@/lib/api";
 
-const orders = [
-  { id: "ORD-12345", date: "2025.02.20", product: "Signature Hoodie - Violet", amount: "68,000원", status: "배송준비" },
-  { id: "ORD-12344", date: "2025.02.18", product: "Signed Vinyl", amount: "45,000원", status: "배송중" },
-];
+function getAuthHeaders() {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("accessToken");
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
+  return pure ? { Authorization: `Bearer ${pure}` } : {};
+}
+
+function formatKRW(n) {
+  if (n == null || Number.isNaN(n)) return "0원";
+  return `${Number(n).toLocaleString("ko-KR")}원`;
+}
 
 export default function ArtistOrdersPage() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) {
+      setLoading(false);
+      return;
+    }
+    axios
+      .get(`${BASE_URL}/api/artist/orders`, { headers, params: { size: 50 } })
+      .then((res) => {
+        const content = res.data?.content ?? [];
+        setOrders(Array.isArray(content) ? content : []);
+      })
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="p-8 lg:p-12 max-w-5xl mx-auto space-y-10">
       <header className="flex items-center justify-between">
@@ -35,26 +63,40 @@ export default function ArtistOrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
-              <tr key={order.id} className="border-b border-white/[0.06] hover:bg-white/[0.03] transition-colors">
-                <td className="px-8 py-6">
-                  <p className="font-bold text-white">#{order.id}</p>
-                  <p className="text-[10px] text-white/55">{order.date}</p>
-                </td>
-                <td className="px-8 py-6 font-medium text-white/80">{order.product}</td>
-                <td className="px-8 py-6 font-black text-white tabular-nums">{order.amount}</td>
-                <td className="px-8 py-6">
-                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-violet-500/20 text-violet-300">
-                    {order.status}
-                  </span>
-                </td>
-                <td className="px-8 py-6">
-                  <button type="button" className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline">
-                    송장 입력
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="px-8 py-12 text-center text-white/55 text-sm">
+                  로딩 중…
                 </td>
               </tr>
-            ))}
+            ) : orders.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-8 py-12 text-center text-white/55 text-sm">
+                  주문 내역이 없습니다.
+                </td>
+              </tr>
+            ) : (
+              orders.map((order) => (
+                <tr key={order.orderNo} className="border-b border-white/[0.06] hover:bg-white/[0.03] transition-colors">
+                  <td className="px-8 py-6">
+                    <p className="font-bold text-white">#{order.orderNo}</p>
+                    <p className="text-[10px] text-white/55">{order.date}</p>
+                  </td>
+                  <td className="px-8 py-6 font-medium text-white/80">{order.productName}</td>
+                  <td className="px-8 py-6 font-black text-white tabular-nums">{formatKRW(order.totalAmount)}</td>
+                  <td className="px-8 py-6">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-violet-500/20 text-violet-300">
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <button type="button" className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline">
+                      송장 입력
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </Surface>

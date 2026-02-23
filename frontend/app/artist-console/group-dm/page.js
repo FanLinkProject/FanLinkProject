@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { MOCK_ARTISTS } from "@/lib/mockData";
+import { request } from "@/lib/api";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 
 const fanReplies = {
   gm1: [
@@ -33,26 +34,24 @@ const fanReplies = {
 };
 
 export default function ArtistGroupDMPage() {
-  const artist = MOCK_ARTISTS[0];
+  const [profile, setProfile] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [input, setInput] = useState("");
   const [selectedBundleId, setSelectedBundleId] = useState(null);
   const [messages, setMessages] = useState([
-    {
-      id: "gm1",
-      senderId: artist.id,
-      text: "팬 여러분, 오늘 라이브 정말 즐거웠어요! 다들 잘 보셨나요? ✨",
-      timestamp: "오후 10:45",
-      isMe: true,
-    },
-    {
-      id: "gm2",
-      senderId: artist.id,
-      text: "내일은 깜짝 선물을 준비했으니 기대해주세요! 🎁",
-      timestamp: "오후 11:10",
-      isMe: true,
-    },
+    { id: "gm1", senderId: null, text: "팬 여러분, 오늘 라이브 정말 즐거웠어요! 다들 잘 보셨나요? ✨", timestamp: "오후 10:45", isMe: true },
+    { id: "gm2", senderId: null, text: "내일은 깜짝 선물을 준비했으니 기대해주세요! 🎁", timestamp: "오후 11:10", isMe: true },
   ]);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    request("/api/user/profile")
+      .then((data) => setProfile(data))
+      .catch(() => setProfile(null));
+    request("/api/artist/mypage")
+      .then((data) => setTeamMembers(data?.teamInfo?.members ?? []))
+      .catch(() => setTeamMembers([]));
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,7 +65,7 @@ export default function ArtistGroupDMPage() {
       ...prev,
       {
         id: Date.now().toString(),
-        senderId: artist.id,
+        senderId: profile?.id,
         text: input,
         timestamp: "방금 전",
         isMe: true,
@@ -132,19 +131,19 @@ export default function ArtistGroupDMPage() {
                   <p className="text-[10px] text-white/55 truncate mt-0.5">전체 팬 대상 메시지</p>
                 </div>
               </button>
-              {artist.members.map((member) => (
+              {teamMembers.map((member) => (
                 <button
                   key={member.id}
                   type="button"
                   className="w-full p-4 rounded-2xl flex items-center gap-4 transition-all text-left hover:bg-white/[0.04] opacity-70"
                 >
                   <img
-                    src={member.avatar}
-                    className="size-12 rounded-2xl border border-white/10 grayscale-[50%]"
+                    src={member.profileImageUrl || getDefaultAvatarUrl(member.nickname)}
+                    className="size-12 rounded-2xl border border-white/10 grayscale-[50%] object-cover"
                     alt=""
                   />
                   <div className="min-w-0">
-                    <p className="font-bold text-sm text-white truncate">{member.name}</p>
+                    <p className="font-bold text-sm text-white truncate">{member.nickname ?? member.name}</p>
                     <p className="text-[10px] text-white/55 truncate mt-0.5">준비 중인 채널입니다</p>
                   </div>
                 </button>
@@ -162,7 +161,7 @@ export default function ArtistGroupDMPage() {
             </Link>
             <div className="flex flex-col">
               <h3 className="font-black text-white flex items-center gap-2">
-                {artist.name} Group Channel
+                {(profile?.nickname ?? profile?.name ?? "Studio")} Group Channel
                 <span className="px-2 py-0.5 bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest rounded-md">
                   Broadcast
                 </span>

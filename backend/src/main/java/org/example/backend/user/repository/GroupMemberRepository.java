@@ -2,6 +2,7 @@ package org.example.backend.user.repository;
 
 import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,6 +40,21 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
 
     // 그룹의 모든 멤버 조회
     List<GroupMember> findByGroup(User group);
+
+    /** 그룹의 멤버 중 역할이 ARTIST인 사용자만 조회 (그룹 계정·자기 자신 제외) */
+    List<GroupMember> findByGroupAndMember_Role(User group, UserRole role);
+
+    /** 그룹의 멤버 중 ARTIST이면서 그룹 본인(member_id != group_id)이 아닌 것만 조회 */
+    @Query("SELECT gm FROM GroupMember gm WHERE gm.group = :group AND gm.member.role = :role AND gm.member.id <> gm.group.id")
+    List<GroupMember> findByGroupAndMemberRoleExcludingSelf(@Param("group") User group, @Param("role") UserRole role);
+
+    /**
+     * 멤버 목록 노출용: group_id = member_id 인 행(그룹 계정 자기 자신)은 제외하고,
+     * role = 'ARTIST' 인 멤버만 조회.
+     * (GroupMember에는 그룹 계정을 멤버로 넣어둔 행이 있어도 되고, 조회 시에만 제외)
+     */
+    @Query(value = "SELECT gm.* FROM group_members gm INNER JOIN users u ON u.id = gm.member_id WHERE gm.group_id = :groupId AND gm.member_id <> gm.group_id AND u.role = 'ARTIST'", nativeQuery = true)
+    List<GroupMember> findArtistMembersExcludingGroupSelf(@Param("groupId") Long groupId);
 
     // ID만으로 그룹-멤버 관계 존재 여부 확인 (User 객체 로드 없이)
     @Query("SELECT COUNT(gm) > 0 FROM GroupMember gm WHERE gm.group.id = :groupId AND gm.member.id = :memberId")
