@@ -123,7 +123,7 @@ export default function MilestonePage() {
     }
     const userData = parseJwt(token);
     const role = userData?.role;
-    const isArtist = role === "ARTIST" || role === "ROLE_ARTIST";
+    const isArtist = role === "ARTIST" || role === "ROLE_ARTIST" || role === "GROUP" || role === "ROLE_GROUP";
     if (!isArtist) {
       router.push("/mypage");
       return;

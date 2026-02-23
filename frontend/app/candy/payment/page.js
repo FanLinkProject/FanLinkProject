@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { MOCK_ARTISTS } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
+import { request } from "@/lib/api";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 
 const CANDY_COST = 500;
 
@@ -24,24 +25,53 @@ function BenefitItem({ icon, text }) {
 function CandyPaymentClient() {
   const searchParams = useSearchParams();
   const artistId = searchParams.get("artistId");
-  const artist = MOCK_ARTISTS.find((x) => x.id === artistId) || MOCK_ARTISTS[0];
-  const candyBalance = 1500;
+  const [artist, setArtist] = useState(null);
+  const [candyBalance, setCandyBalance] = useState(0);
+
+  useEffect(() => {
+    if (!artistId) return;
+    request(`/api/user/artists/${artistId}/dashboard`)
+      .then((data) => {
+        const info = data?.artistInfo;
+        setArtist(info ? { id: artistId, nickname: info.nickname, name: info.nickname, profileImageUrl: info.profileImageUrl } : null);
+      })
+      .catch(() => setArtist(null));
+    request("/api/user/profile").then((p) => setCandyBalance(Number(p?.candy ?? 0))).catch(() => setCandyBalance(0));
+  }, [artistId]);
   const isBalanceSufficient = candyBalance >= CANDY_COST;
   const expectedBalance = candyBalance - CANDY_COST;
+  const displayName = artist?.nickname ?? artist?.name ?? "아티스트";
 
   const handlePayment = () => {
-    if (!isBalanceSufficient) return;
+    if (!isBalanceSufficient || !artistId) return;
     alert(
-      `${artist.name} 공식 멤버십 구독이 완료되었습니다!\n${CANDY_COST} 캔디가 차감되었습니다.`,
+      `${displayName} 공식 멤버십 구독이 완료되었습니다!\n${CANDY_COST} 캔디가 차감되었습니다.`,
     );
-    window.location.href = `/artists/${artist.id}`;
+    window.location.href = `/artists/${artistId}`;
   };
+
+  if (artistId && artist === null && candyBalance === 0) {
+    return (
+      <div className="p-8 lg:p-12 max-w-4xl mx-auto">
+        <p className="text-white/55">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (!artistId) {
+    return (
+      <div className="p-8 lg:p-12 max-w-4xl mx-auto">
+        <p className="text-white/55">아티스트 정보가 없습니다.</p>
+        <Link href="/artists" className="text-violet-300 text-sm mt-2 inline-block">아티스트 목록으로</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 lg:p-12 max-w-4xl mx-auto space-y-12">
       <header className="flex items-center gap-4">
         <Link
-          href={`/artists/${artist.id}`}
+          href={`/artists/${artistId}`}
           className="size-10 rounded-full border border-white/[0.08] flex items-center justify-center text-white/55 hover:text-violet-300 transition-colors bg-white/[0.04]"
         >
           <span className="material-symbols-outlined">arrow_back</span>
@@ -58,13 +88,13 @@ function CandyPaymentClient() {
         <Surface variant="primary" className="p-10 flex flex-col h-full min-h-0 gap-8">
           <div className="flex items-center gap-5 shrink-0">
             <img
-              src={artist.avatar}
-              className="size-20 rounded-2xl border-2 border-white/[0.08]"
+              src={artist?.profileImageUrl || getDefaultAvatarUrl(displayName)}
+              className="size-20 rounded-2xl border-2 border-white/[0.08] object-cover"
               alt=""
             />
             <div>
               <h3 className="text-2xl font-black text-white tracking-tight">
-                {artist.name}
+                {displayName}
               </h3>
               <span className="text-violet-300 text-[10px] font-black uppercase tracking-widest">
                 Official Artist
