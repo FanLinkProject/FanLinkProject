@@ -11,7 +11,7 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-const SHIPPING_FEE = 3000;
+const DEFAULT_SHIPPING_FEE = 3000;
 
 function getProductImageUrl(product) {
   const rep = product?.attachments?.find(
@@ -41,6 +41,7 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [returnPath, setReturnPath] = useState("/cart");
+  const [shippingFee, setShippingFee] = useState(DEFAULT_SHIPPING_FEE);
   const [shippingInfo, setShippingInfo] = useState({
     recipientName: "",
     recipientPhone: "",
@@ -93,7 +94,7 @@ function CheckoutContent() {
     const p = productDetails[i.productId];
     return p && p.artistId != null && !p.isMembership && !p.concertId;
   });
-  const totalAmount = totalCash + (hasShippableItem ? SHIPPING_FEE : 0);
+  const totalAmount = totalCash + (hasShippableItem ? shippingFee : 0);
 
   const orderName =
     cashItems.length === 0
@@ -118,6 +119,15 @@ function CheckoutContent() {
     setPaying(true);
     try {
       const config = await getPaymentConfig();
+      const parsedShippingFee = Number(config?.shippingFee);
+      const effectiveShippingFee = Number.isFinite(parsedShippingFee)
+        ? parsedShippingFee
+        : shippingFee;
+      if (effectiveShippingFee !== shippingFee) {
+        setShippingFee(effectiveShippingFee);
+      }
+      const effectiveTotalAmount =
+        totalCash + (hasShippableItem ? effectiveShippingFee : 0);
       if (!config?.clientKey) {
         throw new Error("결제 설정을 불러올 수 없습니다.");
       }
@@ -156,7 +166,7 @@ function CheckoutContent() {
 
       const { orderNo } = await createOrder({
         name: orderName,
-        totalAmount: totalAmount,
+        totalAmount: effectiveTotalAmount,
         totalCandyAmount: 0,
         orderItems,
         recipientName: hasShippableItem ? payloadShipping.recipientName : null,
@@ -176,7 +186,7 @@ function CheckoutContent() {
 
       const tossPayments = await loadTossPayments(config.clientKey);
       await tossPayments.requestPayment("카드", {
-        amount: totalAmount,
+        amount: effectiveTotalAmount,
         orderId: orderNo,
         orderName,
         customerName: "구매자",
@@ -337,7 +347,7 @@ function CheckoutContent() {
               </div>
               <div className="flex justify-between text-sm text-white/55">
                 <span>배송비</span>
-                <span>{hasShippableItem ? `${SHIPPING_FEE.toLocaleString()}원` : "0원"}</span>
+                <span>{hasShippableItem ? `${shippingFee.toLocaleString()}원` : "0원"}</span>
               </div>
               <div className="h-px bg-white/[0.06]" />
               <div className="flex justify-between font-black text-2xl text-violet-300">
