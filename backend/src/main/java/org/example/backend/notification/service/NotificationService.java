@@ -103,6 +103,7 @@ public class NotificationService {
                 .sender(sender)
                 .type(request.getType())
                 .content(request.getContent())
+                .targetId(request.getTargetId())
                 .build();
 
         notificationRepository.save(notification);
