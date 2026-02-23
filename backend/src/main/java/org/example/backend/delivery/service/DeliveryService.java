@@ -3,6 +3,7 @@ package org.example.backend.delivery.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.delivery.dto.DeliveryResponseDto;
+import org.example.backend.delivery.dto.DeliveryStatusHistoryResponseDto;
 import org.example.backend.delivery.entity.Delivery;
 import org.example.backend.delivery.entity.DeliveryStatusHistory;
 import org.example.backend.delivery.enums.DeliveryStatus;
@@ -17,6 +18,7 @@ import org.example.backend.notification.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -37,6 +39,8 @@ public class DeliveryService {
     public DeliveryResponseDto startShipping(Long deliveryId, String courierCode, String trackingNumber) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
+        validateStartShippingInput(courierCode, trackingNumber);
+        assertTrackingUnique(deliveryId, courierCode, trackingNumber);
 
         DeliveryStatus before = delivery.getStatus();
         delivery.startShipping(courierCode, trackingNumber);
@@ -106,6 +110,16 @@ public class DeliveryService {
         return trackDelivery(delivery.getId());
     }
 
+    @Transactional(readOnly = true)
+    public List<DeliveryStatusHistoryResponseDto> getStatusHistoryForUser(Long deliveryId, Long userId) {
+        deliveryRepository.findByIdAndOrderUserId(deliveryId, userId)
+                .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED));
+
+        return deliveryStatusHistoryRepository.findByDelivery_IdOrderByCreatedAtAsc(deliveryId).stream()
+                .map(DeliveryStatusHistoryResponseDto::from)
+                .toList();
+    }
+
     @Transactional
     public void handleAfterShipWebhook(String trackingNumber, String courierCode, String externalStatus) {
         if (trackingNumber == null || trackingNumber.isBlank()) {
@@ -143,6 +157,22 @@ public class DeliveryService {
             }
         }
         return deliveryRepository.findByTrackingNumber(trackingNumber);
+    }
+
+    private void validateStartShippingInput(String courierCode, String trackingNumber) {
+        if (courierCode == null || courierCode.isBlank()
+                || trackingNumber == null || trackingNumber.isBlank()) {
+            throw new DeliveryException(DeliveryErrorCode.INVALID_TRACKING_NUMBER);
+        }
+    }
+
+    private void assertTrackingUnique(Long deliveryId, String courierCode, String trackingNumber) {
+        deliveryRepository.findByTrackingNumberAndCourierCode(trackingNumber, courierCode)
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(deliveryId)) {
+                        throw new DeliveryException(DeliveryErrorCode.DUPLICATE_TRACKING_INFO);
+                    }
+                });
     }
 
     private void notifyDeliveryIssue(Delivery delivery, String trackingStatus) {

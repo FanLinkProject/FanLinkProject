@@ -13,7 +13,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.Instant;
 
 @Entity
-@Table(name = "delivery_status_history")
+@Table(
+        name = "delivery_status_history",
+        indexes = {
+                @Index(name = "idx_delivery_status_history_delivery_created", columnList = "delivery_id,created_at")
+        }
+)
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -58,4 +63,3 @@ public class DeliveryStatusHistory {
                 .build();
     }
 }
-
