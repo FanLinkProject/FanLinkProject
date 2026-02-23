@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import axios from "axios";
 import { redirectToGuestHome } from "@/lib/authRedirect";
 
-const BASE_URL = "http://localhost:8080";
+import { BASE_URL } from "@/lib/api";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};

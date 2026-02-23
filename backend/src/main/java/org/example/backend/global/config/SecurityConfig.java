@@ -11,6 +11,7 @@ import org.example.backend.global.security.service.PrincipalOAuth2UserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -45,20 +46,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
 
             // 세션 관리: STATELESS (JWT 기반 인증으로 세션 사용 안 함)
-            .sessionManagement(session -> 
+            .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
             // 요청별 인증/인가 설정
             .authorizeHttpRequests(auth -> auth
-                // 테스트용 코드 추후 삭제- 테스트 페이지 접근 허용
-                .requestMatchers(
-                        "/",
-                        "/index.html",
-                        "/callback.html",
-                        "/favicon.ico",
-                        "/css/**",
-                        "/js/**"
-                    ).permitAll()
+                // Preflight(OPTIONS): 인증 없이 통과 → CORS 헤더가 정상 응답되도록
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     // 인증없이 접근 가능한 경로
                     .requestMatchers(
                         "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
@@ -66,6 +60,7 @@ public class SecurityConfig {
                         "/api/home",               // 통합 홈 화면 API (역할별 응답)
                         "/api/guest/**",          // 비로그인 유저 메인 홈 화면 API (하위 호환)
                         "/api/user/artists/*/dashboard",  // 특정 아티스트 대시보드 (비로그인 접근 가능)
+                        "/api/user/artists",            // 아티스트 목록 (비로그인 조회 허용)
                         "/login/oauth2/**",       // OAuth2 로그인 콜백 URL
                         "/oauth2/**",             // OAuth2 관련 URL
                         "/error"                  // 에러 페이지(인증안된 경로 일때 )
@@ -105,10 +100,12 @@ public class SecurityConfig {
                             && req.getRequestURI().startsWith("/api/notifications/subscribe"))
                     .permitAll()
 
-                    // 관리자
-                    .requestMatchers("/api/admin/**")
+				.requestMatchers(GET, "/api/concerts/**").permitAll()
+
+                // 관리자
+                .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
-                
+
                 // 아티스트, 그룹, 관리자
                 .requestMatchers("/api/artist/**")
                     .hasAnyRole("ARTIST", "GROUP", "ADMIN")
@@ -154,22 +151,9 @@ public class SecurityConfig {
                     .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             )
 
-            // CORS 설정 적용
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+            // CORS 설정 적용 (CorsConfig에서 생성한 단일 Bean 사용)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource));
 
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
     }
 }

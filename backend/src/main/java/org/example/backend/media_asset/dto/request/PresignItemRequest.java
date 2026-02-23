@@ -22,6 +22,7 @@ public record PresignItemRequest(
         String postIdOrTemp,
         String replayIdOrTemp,
         String productIdOrTemp,
+        String concertIdOrTemp,
         Integer attachmentCountInPost,
         Integer attachmentCountInProduct
 ) {

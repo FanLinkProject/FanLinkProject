@@ -6,8 +6,6 @@ import { getProducts } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 
-const ADMIN_MARKET_RETURN = "/admin/market";
-
 function getProductImageUrl(product) {
   const rep = product.attachments?.find(
     (a) => a.mediaAssetId === product.representativeMediaAssetId
@@ -28,10 +26,7 @@ function ProductCard({ product }) {
   return (
     <Link
       href={`/market/products/${product.id}`}
-      onClick={() =>
-        typeof window !== "undefined" &&
-        sessionStorage.setItem("productDetailReturnPath", ADMIN_MARKET_RETURN)
-      }
+      onClick={() => typeof window !== "undefined" && sessionStorage.setItem("productDetailReturnPath", "/admin/market")}
       className="flex flex-col group h-full"
     >
       <Surface variant="card" className="p-5 flex flex-col h-full">
@@ -52,7 +47,7 @@ function ProductCard({ product }) {
         <div className="flex-1 px-1">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[10px] font-black text-white/55 uppercase tracking-widest">
-              {product.artistName || (product.artistId == null ? "FanLink" : "아티스트")}
+              {product.artistName || "아티스트"}
             </span>
           </div>
           <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
@@ -86,6 +81,7 @@ export default function AdminMarketPage() {
       (product.artistName || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // 그룹계정 스토어: groupId != null인 상품만 groupId별로 묶음
   const groupStores = [];
   const seenGroups = new Set();
   for (const p of allProducts) {
@@ -102,17 +98,19 @@ export default function AdminMarketPage() {
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
-      <header className="flex items-center gap-4 mb-6">
-        <Link
-          href="/admin"
-          className="size-10 rounded-full border border-white/10 flex items-center justify-center text-white/55 hover:text-violet-300 transition-colors bg-white/5"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </Link>
-        <div>
-          <SectionTitle className="text-2xl font-bold">마켓 (관리자)</SectionTitle>
-          <p className="text-white/55 text-sm font-medium mt-1">
-            전체 굿즈 조회
+      <header className="relative h-64 rounded-2xl overflow-hidden border border-white/[0.06] shadow-[0_6px_20px_rgba(0,0,0,0.45),0_0_12px_rgba(140,90,255,0.12)] group mb-12">
+        <img
+          src="https://picsum.photos/seed/market-hero/1200/400"
+          className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:scale-[1.02] transition-transform duration-700"
+          alt=""
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0b0814]/95 via-[#1a0f2e]/50 to-transparent flex flex-col justify-center px-12">
+          <span className="text-white/80 text-[11px] font-black uppercase tracking-[0.2em] mb-3">
+            OFFICIAL MARKET
+          </span>
+          <h1 className="text-white text-4xl font-black mb-2">공식 굿즈 샵</h1>
+          <p className="text-white/80 text-lg font-medium">
+            좋아하는 아티스트의 소중한 기록을 소장하세요.
           </p>
         </div>
       </header>
@@ -168,58 +166,58 @@ export default function AdminMarketPage() {
       {!searchTerm && groupStores.length > 0 && (
         <div className="space-y-16 pt-12 border-t border-white/10">
           <div className="space-y-10">
-            <SectionTitle className="px-2 mb-8">그룹별 스토어</SectionTitle>
-            {groupStores.map((store) => {
-              const preview = store.products.slice(0, 4);
-              if (preview.length === 0) return null;
-              return (
-                <div key={`group-${store.id}`} className="space-y-8">
-                  <div className="flex items-center justify-between px-2">
-                    <Link
-                      href={`/artists/${store.id}/market`}
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          sessionStorage.setItem("artistMarketReturnPath", ADMIN_MARKET_RETURN);
-                        }
-                      }}
-                      className="flex items-center gap-4 group"
-                    >
-                      <div className="size-10 rounded-2xl border border-white/[0.08] bg-white/5 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-white/50">groups</span>
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-white group-hover:text-violet-300 transition-colors">
-                          {store.name}
-                        </h3>
-                        <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">
-                          그룹 공식 스토어
-                        </p>
-                      </div>
-                      <span className="material-symbols-outlined text-white/55 group-hover:text-violet-300 group-hover:translate-x-1 transition-all">
-                        chevron_right
-                      </span>
-                    </Link>
-                    <Link
-                      href={`/artists/${store.id}/market`}
-                      onClick={() => {
-                        if (typeof window !== "undefined") {
-                          sessionStorage.setItem("artistMarketReturnPath", ADMIN_MARKET_RETURN);
-                        }
-                      }}
-                      className="text-xs font-bold text-violet-300 hover:text-violet-200"
-                    >
-                      전체 상품 보기
-                    </Link>
+              <SectionTitle className="px-2 mb-8">그룹계정 스토어</SectionTitle>
+              {groupStores.map((store) => {
+                const preview = store.products.slice(0, 4);
+                if (preview.length === 0) return null;
+                return (
+                  <div key={`group-${store.id}`} className="space-y-8">
+                    <div className="flex items-center justify-between px-2">
+                      <Link
+                        href={`/artists/${store.id}/market`}
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            sessionStorage.setItem("artistMarketReturnPath", "/admin/market");
+                          }
+                        }}
+                        className="flex items-center gap-4 group"
+                      >
+                        <div className="size-10 rounded-2xl border border-white/[0.08] bg-white/5 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-white/50">groups</span>
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-white group-hover:text-violet-300 transition-colors">
+                            {store.name}
+                          </h3>
+                          <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">
+                            그룹 공식 스토어
+                          </p>
+                        </div>
+                        <span className="material-symbols-outlined text-white/55 group-hover:text-violet-300 group-hover:translate-x-1 transition-all">
+                          chevron_right
+                        </span>
+                      </Link>
+                      <Link
+                        href={`/artists/${store.id}/market`}
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            sessionStorage.setItem("artistMarketReturnPath", "/admin/market");
+                          }
+                        }}
+                        className="text-xs font-bold text-violet-300 hover:text-violet-200"
+                      >
+                        전체 상품 보기
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                      {preview.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {preview.map((product) => (
-                      <ProductCard key={product.id} product={product} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
         </div>
       )}
     </div>

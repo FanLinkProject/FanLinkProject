@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.BlockRequest;
+import org.example.backend.user.dto.request.OAuthProfileCompleteRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
@@ -55,6 +56,16 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    /** OAuth 간편가입 후 부족한 추가 정보 입력 저장 */
+    @PutMapping("/profile/complete")
+    public ResponseEntity<UserProfileResponse> completeOAuthProfile(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @Valid @RequestBody OAuthProfileCompleteRequest request
+    ) {
+        UserProfileResponse response = userService.updateOAuthProfileComplete(principalDetails.getUser(), request);
+        return ResponseEntity.ok(response);
+    }
+
     // 비밀번호 변경
     @PutMapping("/password")
     public ResponseEntity<Void> updatePassword(
@@ -75,7 +86,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // 아티스트 목록 조회 및 검색
+    // 아티스트 목록 조회: GROUP 계정 + 그룹에 속하지 않은 개인 ARTIST만
     @GetMapping("/artists")
     public ResponseEntity<Page<ArtistSearchResponse>> getArtists(
             @RequestParam(value = "nickname", required = false) String nickname,

@@ -10,6 +10,7 @@ import AdminSidebar from "@/components/sidebar/AdminSidebar";
 import ArtistSidebar from "@/components/sidebar/ArtistSidebar";
 import FanSidebar from "@/components/sidebar/FanSidebar";
 import GroupSidebar from "@/components/sidebar/GroupSidebar";
+import { BASE_URL } from "@/lib/api";
 
 const AUTH_PATHS = ["/login", "/signup"];
 const AUTH_PREFIX = "/signup/";
@@ -31,7 +32,8 @@ function getRoleFromToken() {
   }
 }
 
-function getNavbarVariant(pathname, role) {
+/** 경로·역할에 따라 nav/sidebar variant 반환 (admin | artist | group | fan) */
+function getLayoutVariant(pathname, role) {
   if (!pathname) return "fan";
   if (pathname.startsWith("/admin")) return "admin";
   if (
@@ -41,42 +43,17 @@ function getNavbarVariant(pathname, role) {
     pathname.startsWith("/posts")
   ) {
     if (role === "ROLE_ADMIN") return "admin";
-    if (role === "ROLE_GROUP") return "artist";
+    if (role === "ROLE_GROUP") return "group";
     if (role === "ROLE_ARTIST") return "artist";
     return "fan";
   }
   if (
     pathname.startsWith("/artist-console") ||
     pathname.startsWith("/milestone") ||
-    pathname.startsWith("/dm/artist")
+    pathname.startsWith("/dm/artist") ||
+    pathname.startsWith("/group") ||
+    pathname.startsWith("/studio")
   )
-    return "artist";
-  if (pathname.startsWith("/group") || pathname.startsWith("/studio"))
-    return "artist";
-  return "fan";
-}
-
-function getSidebarVariant(pathname, role) {
-  if (!pathname) return "fan";
-  if (pathname.startsWith("/admin")) return "admin";
-  if (
-    pathname === "/home" ||
-    pathname === "/mypage" ||
-    pathname === "/notifications" ||
-    pathname.startsWith("/posts")
-  ) {
-    if (role === "ROLE_ADMIN") return "admin";
-    if (role === "ROLE_GROUP") return "artist";
-    if (role === "ROLE_ARTIST") return "artist";
-    return "fan";
-  }
-  if (
-    pathname.startsWith("/artist-console") ||
-    pathname.startsWith("/milestone") ||
-    pathname.startsWith("/dm/artist")
-  )
-    return "artist";
-  if (pathname.startsWith("/group") || pathname.startsWith("/studio"))
     return "artist";
   return "fan";
 }
@@ -85,7 +62,7 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [role, setRole] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -101,7 +78,7 @@ export default function AppShell({ children }) {
     const pure = token?.replace(/^Bearer\s+/i, "").trim();
     if (!pure) return;
 
-    fetch("http://localhost:8080/api/home", {
+    fetch(`${BASE_URL}/api/home`, {
       headers: { Authorization: `Bearer ${pure}` },
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -121,8 +98,7 @@ export default function AppShell({ children }) {
   const showNavbar = !isAuthView;
   const showSidebar =
     mounted && pathname != null && !isAuthView && !isLiveDetail;
-  const navVariant = getNavbarVariant(pathname, role);
-  const sidebarVariant = getSidebarVariant(pathname, role);
+  const layoutVariant = getLayoutVariant(pathname, role);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0b0814] via-[#1a0f2e] to-[#0b0814] flex flex-col relative">
@@ -133,28 +109,28 @@ export default function AppShell({ children }) {
       />
       {showNavbar && (
         <>
-          {navVariant === "admin" && (
+          {layoutVariant === "admin" && (
             <AdminNavBar
               showSidebarToggle={showSidebar}
               sidebarOpen={sidebarOpen}
               onSidebarToggle={() => setSidebarOpen((v) => !v)}
             />
           )}
-          {navVariant === "artist" && (
+          {layoutVariant === "artist" && (
             <ArtistNavBar
               showSidebarToggle={showSidebar}
               sidebarOpen={sidebarOpen}
               onSidebarToggle={() => setSidebarOpen((v) => !v)}
             />
           )}
-          {navVariant === "group" && (
+          {layoutVariant === "group" && (
             <GroupNavBar
               showSidebarToggle={showSidebar}
               sidebarOpen={sidebarOpen}
               onSidebarToggle={() => setSidebarOpen((v) => !v)}
             />
           )}
-          {navVariant === "fan" && (
+          {layoutVariant === "fan" && (
             <FanNavBar
               showSidebarToggle={showSidebar}
               sidebarOpen={sidebarOpen}
@@ -172,10 +148,10 @@ export default function AppShell({ children }) {
             }`}
             aria-hidden={!sidebarOpen}
           >
-            {sidebarVariant === "admin" && <AdminSidebar />}
-            {sidebarVariant === "artist" && <ArtistSidebar />}
-            {sidebarVariant === "group" && <GroupSidebar />}
-            {sidebarVariant === "fan" && <FanSidebar />}
+            {layoutVariant === "admin" && <AdminSidebar />}
+            {layoutVariant === "artist" && <ArtistSidebar />}
+            {layoutVariant === "group" && <GroupSidebar />}
+            {layoutVariant === "fan" && <FanSidebar />}
           </div>
         )}
 

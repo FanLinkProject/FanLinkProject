@@ -1,0 +1,249 @@
+### ============================================================
+### 배송 시스템 테스트 파일
+### ============================================================
+### 이 파일은 배송 추적 시스템의 전체 플로우를 테스트합니다.
+### 
+### 테스트 시나리오:
+### 1. 로그인하여 인증 토큰 획득
+### 2. 주문 생성 (배송지 정보 포함)
+### 3. 송장 번호 등록 (FakeDeliveryTracker 사용)
+### 4. 배송 추적 조회
+### 5. 다양한 케이스 테스트 (국내/해외, 다양한 상태)
+### ============================================================
+
+### 환경 변수 설정
+@host = http://localhost:8080
+@email = test@example.com
+@password = 1234
+@authToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6IlJPTEVfVVNFUiIsImlhdCI6MTc3MDgzNjQ4NCwiZXhwIjoxNzcwODQwMDg0fQ.AGWoutRE7uO3N1ZpbElCQNDgy-a4xGB9jyU80C1EyYM
+
+### ============================================
+### 1단계: 이메일 인증 코드 발송
+### ============================================
+POST http://localhost:8080/api/verification/email/send
+Content-Type: application/json
+
+{
+  "email": "{{email}}"
+}
+
+
+### ============================================================
+### 0. [회원가입] DTO 필수값 모두 포함
+### 주의: emailVerificationCode가 실제 검증 로직을 탄다면,
+### 서버 로그나 DB에서 발급된 코드를 확인해서 수정해야 할 수 있습니다.
+### ============================================================
+POST {{host}}/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "name": "최형규",
+  "nickname": "테스터",
+  "gender": "M",
+  "birth": "1990-01-01",
+  "phoneNumber": "010-1234-5678",
+  "privacyPolicyAgreed": true,
+  "emailVerificationCode": "012842",
+  "role": "USER"
+}
+
+### ============================================================
+### 1. [로그인] 인증 토큰 획득
+### ============================================================
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+> {%
+    if (response.status === 200 && response.body.accessToken) {
+        client.global.set("authToken", response.body.accessToken);
+        client.log("✅ 토큰 획득 성공: " + response.body.accessToken);
+    } else {
+        client.log("❌ 로그인 실패: " + response.status);
+    }
+%}
+
+### ============================================================
+### 2. [주문 생성 - 국내 배송] 배송지 정보 포함 주문 생성
+### ============================================================
+POST {{host}}/api/orders?email={{email}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "테스트 상품 주문",
+  "totalAmount": 10000,
+  "totalCandyAmount": 0,
+  "orderItems": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "recipientName": "홍길동",
+  "recipientPhone": "010-1234-5678",
+  "address": "서울시 강남구 테헤란로 123",
+  "detailAddress": "101동 101호",
+  "zipCode": "06234"
+}
+
+> {%
+    // 주문 생성 후 deliveryId를 저장 (실제로는 Order에서 Delivery를 조회해야 함)
+    if (response.status === 200 || response.status === 201) {
+        client.log("✅ 주문 생성 성공");
+        // 주문 ID를 저장 (실제 응답 구조에 맞게 수정 필요)
+        // client.global.set("orderId", response.body.id);
+    } else {
+        client.log("❌ 주문 생성 실패: " + response.status);
+    }
+%}
+
+### ============================================================
+### 3. [배송 - 송장 등록 - FakeDeliveryTracker] 
+### 개발/테스트 모드: courierCode = "TEST" 사용
+### ============================================================
+### 시나리오 1: 배송 준비 상태 (운송장 끝자리 1)
+POST {{host}}/api/deliveries/1/start?courier=TEST&number=12341
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+> {%
+    if (response.status === 200) {
+        client.log("✅ 송장 등록 성공 (FakeDeliveryTracker - Pending 상태)");
+    } else {
+        client.log("❌ 송장 등록 실패: " + response.status);
+    }
+%}
+
+### ============================================================
+### 4. [배송 - 추적 조회] FakeDeliveryTracker로 조회
+### ============================================================
+GET {{host}}/api/deliveries/1
+Authorization: Bearer {{authToken}}
+
+> {%
+    if (response.status === 200) {
+        client.log("✅ 배송 추적 조회 성공");
+        client.log("상태: " + response.body.trackingStatus);
+        client.log("배송 상태: " + response.body.status);
+    } else {
+        client.log("❌ 배송 추적 조회 실패: " + response.status);
+    }
+%}
+
+### ============================================================
+### 5. [배송 - 송장 등록 - 배송 중 상태] 
+### 운송장 끝자리 2 = InTransit
+### ============================================================
+POST {{host}}/api/deliveries/1/start?courier=TEST&number=12342
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 6. [배송 - 추적 조회] 배송 중 상태 확인
+### ============================================================
+GET {{host}}/api/deliveries/1
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 7. [배송 - 송장 등록 - 배송 완료 상태] 
+### 운송장 끝자리 3 = Delivered
+### ============================================================
+POST {{host}}/api/deliveries/1/start?courier=TEST&number=12343
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 8. [배송 - 추적 조회] 배송 완료 상태 확인
+### ============================================================
+GET {{host}}/api/deliveries/1
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 9. [주문 생성 - 해외 배송 테스트] 
+### 주소에 한글이 없으면 해외로 판단
+### ============================================================
+POST {{host}}/api/orders?email={{email}}
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "해외 배송 테스트 주문",
+  "totalAmount": 50000,
+  "totalCandyAmount": 0,
+  "orderItems": [
+    {
+      "productId": 1,
+      "quantity": 1
+    }
+  ],
+  "recipientName": "John Doe",
+  "recipientPhone": "+1-555-1234-5678",
+  "address": "123 Main Street, New York, NY 10001",
+  "detailAddress": "Apt 4B",
+  "zipCode": "10001"
+}
+
+### ============================================================
+### 10. [배송 - 송장 등록 - 해외 배송] 
+### 해외 택배사 코드 (예: dhl, fedex) - AfterShip 사용 예정
+### 주의: API 키가 없으면 동작하지 않음
+### ============================================================
+POST {{host}}/api/deliveries/2/start?courier=dhl&number=1234567890
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 11. [배송 - 추적 조회 - 해외 배송] 
+### AfterShip API 키가 없으면 에러 발생
+### ============================================================
+GET {{host}}/api/deliveries/2
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 12. [배송 - 송장 등록 - 국내 배송] 
+### 국내 택배사 코드 (숫자) - SweetTracker 사용 예정
+### 주의: API 키가 없으면 동작하지 않음
+### ============================================================
+POST {{host}}/api/deliveries/1/start?courier=04&number=1234567890123
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 13. [배송 - 추적 조회 - 국내 배송] 
+### SweetTracker API 키가 없으면 에러 발생
+### ============================================================
+GET {{host}}/api/deliveries/1
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 14. [에러 케이스 테스트] 존재하지 않는 배송 조회
+### ============================================================
+GET {{host}}/api/deliveries/99999
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 15. [에러 케이스 테스트] 지원하지 않는 택배사 코드
+### ============================================================
+POST {{host}}/api/deliveries/1/start?courier=INVALID&number=12345
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+### ============================================================
+### 테스트 완료
+### ============================================================
+### 
+### 참고사항:
+### 1. FakeDeliveryTracker는 courierCode="TEST"일 때만 동작
+### 2. 개발 모드 (delivery.mock-enabled=true)일 때 FakeDeliveryTracker 우선 사용
+### 3. 국내 배송: 주소에 한글이 포함되면 자동으로 "KR"로 설정
+### 4. 해외 배송: 주소에 한글이 없으면 "INTERNATIONAL"로 설정
+### 5. 실제 API 키가 없으면 AfterShip/SweetTracker는 동작하지 않음
+### 6. deliveryId는 실제 주문 생성 후 Order에서 Delivery를 조회하여 확인 필요
+### ============================================================

@@ -1,116 +1,164 @@
 package org.example.backend.user.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Random;
+import java.time.Instant;
+import java.util.Map;
+import java.security.SecureRandom;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class VerificationCodeService {
 
     private final StringRedisTemplate redisTemplate;
-    
-    /** 인증 코드 길이 (6자리) */
+
     private static final int CODE_LENGTH = 6;
-    
-    /** 인증 코드 유효 시간 (5분) */
     private static final long CODE_EXPIRE_TIME = 5;
-    
-    /** 인증 코드 유효 시간 단위 */
     private static final TimeUnit CODE_EXPIRE_UNIT = TimeUnit.MINUTES;
-    
-    /** Redis 키 접두사 - 이메일 인증 코드 */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private static final String EMAIL_CODE_PREFIX = "email:code:";
-    
-    /** Redis 키 접두사 - 전화번호 인증번호 */
     private static final String PHONE_CODE_PREFIX = "phone:code:";
+    private static final String PHONE_VERIFIED_PREFIX = "phone:verified:";
 
+    // Redis 장애 대비 인메모리 폴백 저장소
+    private final Map<String, CodeEntry> fallbackStore = new ConcurrentHashMap<>();
 
-    // 6자리 랜덤 숫자 인증 코드 생성
+    private record CodeEntry(String code, long expiresAtEpochMillis) {
+    }
+
     public String generateCode() {
-        Random random = new Random();
         StringBuilder code = new StringBuilder();
         for (int i = 0; i < CODE_LENGTH; i++) {
-            code.append(random.nextInt(10));
+            code.append(SECURE_RANDOM.nextInt(10));
         }
         return code.toString();
     }
 
-    // 이메일 인증 코드를 Redis에 저장
     public void saveEmailCode(String email, String code) {
         String key = EMAIL_CODE_PREFIX + email;
-        redisTemplate.opsForValue().set(
-                key,
-                code,
-                CODE_EXPIRE_TIME,
-                CODE_EXPIRE_UNIT
-        );
+        saveCode(key, code);
     }
 
-    // 전화번호 인증번호를 Redis에 저장
     public void savePhoneCode(String phoneNumber, String code) {
         String key = PHONE_CODE_PREFIX + phoneNumber;
-        redisTemplate.opsForValue().set(
-                key,
-                code,
-                CODE_EXPIRE_TIME,
-                CODE_EXPIRE_UNIT
-        );
+        saveCode(key, code);
     }
 
-    // 이메일 인증 코드 검증
     public boolean verifyEmailCode(String email, String code) {
         String key = EMAIL_CODE_PREFIX + email;
-        String storedCode = redisTemplate.opsForValue().get(key);
-        
-        if (storedCode == null) {
-            // 디버깅: 인증 코드가 없거나 만료됨
-            System.out.println("[DEBUG] 인증 코드 없음 또는 만료됨. 이메일: " + email + ", 키: " + key);
-            return false;
-        }
-        
-        // 디버깅: 저장된 코드와 입력된 코드 비교
-        System.out.println("[DEBUG] 저장된 코드: " + storedCode + ", 입력된 코드: " + code);
-        
-        if (storedCode.equals(code)) {
-            // 검증 성공 시 인증 코드 삭제 (1회용)
-            redisTemplate.delete(key);
-            return true;
-        }
-        
-        return false;
+        return verifyCode(key, code);
     }
 
-    // 전화번호 인증번호 검증
     public boolean verifyPhoneCode(String phoneNumber, String code) {
         String key = PHONE_CODE_PREFIX + phoneNumber;
-        String storedCode = redisTemplate.opsForValue().get(key);
-        
-        if (storedCode == null) {
-            return false; // 인증번호가 없거나 만료됨
+        boolean verified = verifyCode(key, code);
+        if (verified) {
+            markPhoneVerified(phoneNumber);
         }
-        
-        if (storedCode.equals(code)) {
-            // 검증 성공 시 인증번호 삭제 (1회용)
-            redisTemplate.delete(key);
-            return true;
-        }
-        
-        return false;
+        return verified;
     }
 
-    // 이메일 인증 코드 존재 여부 확인
     public boolean hasEmailCode(String email) {
         String key = EMAIL_CODE_PREFIX + email;
-        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        return hasCode(key);
     }
 
-    // 전화번호 인증번호 존재 여부 확인
     public boolean hasPhoneCode(String phoneNumber) {
         String key = PHONE_CODE_PREFIX + phoneNumber;
-        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        return hasCode(key);
+    }
+
+    public boolean consumePhoneVerified(String phoneNumber) {
+        String key = PHONE_VERIFIED_PREFIX + phoneNumber;
+        try {
+            Boolean exists = redisTemplate.hasKey(key);
+            if (Boolean.TRUE.equals(exists)) {
+                redisTemplate.delete(key);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void markPhoneVerified(String phoneNumber) {
+        String key = PHONE_VERIFIED_PREFIX + phoneNumber;
+        try {
+            redisTemplate.opsForValue().set(key, "1", 10, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.warn("휴대폰 인증 상태 저장 실패: phone={}, cause={}", phoneNumber, e.getMessage());
+        }
+    }
+
+    private void saveCode(String key, String code) {
+        try {
+            redisTemplate.opsForValue().set(key, code, CODE_EXPIRE_TIME, CODE_EXPIRE_UNIT);
+        } catch (Exception e) {
+            long expireAt = Instant.now()
+                    .plusSeconds(TimeUnit.MINUTES.toSeconds(CODE_EXPIRE_TIME))
+                    .toEpochMilli();
+            fallbackStore.put(key, new CodeEntry(code, expireAt));
+            log.warn("Redis 저장 실패, 메모리 폴백으로 처리: key={}, cause={}", key, e.getMessage());
+        }
+    }
+
+    private boolean verifyCode(String key, String inputCode) {
+        String storedCode = null;
+        boolean fromRedis = true;
+
+        try {
+            storedCode = redisTemplate.opsForValue().get(key);
+        } catch (Exception e) {
+            fromRedis = false;
+            storedCode = getFromFallback(key);
+            log.warn("Redis 조회 실패, 메모리 폴백으로 처리: key={}, cause={}", key, e.getMessage());
+        }
+
+        if (storedCode == null) {
+            return false;
+        }
+        if (!storedCode.equals(inputCode)) {
+            return false;
+        }
+
+        if (fromRedis) {
+            try {
+                redisTemplate.delete(key);
+            } catch (Exception e) {
+                fallbackStore.remove(key);
+                log.warn("Redis 삭제 실패, 메모리 폴백 정리: key={}, cause={}", key, e.getMessage());
+            }
+        } else {
+            fallbackStore.remove(key);
+        }
+        return true;
+    }
+
+    private boolean hasCode(String key) {
+        try {
+            return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+        } catch (Exception e) {
+            return getFromFallback(key) != null;
+        }
+    }
+
+    private String getFromFallback(String key) {
+        CodeEntry entry = fallbackStore.get(key);
+        if (entry == null) {
+            return null;
+        }
+        if (entry.expiresAtEpochMillis() < System.currentTimeMillis()) {
+            fallbackStore.remove(key);
+            return null;
+        }
+        return entry.code();
     }
 }

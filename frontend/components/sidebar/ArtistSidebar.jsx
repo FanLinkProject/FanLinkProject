@@ -3,38 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { BASE_URL } from "@/lib/api";
 
 const personalMenuItems = [
-  {
-    id: "ARTIST_ME",
-    label: "My Studio",
-    icon: "person",
-    href: "/home",
-  },
-  {
-    id: "ARTIST_POSTS",
-    label: "게시물 관리",
-    icon: "article",
-    href: "/artist-console/posts",
-  },
-  {
-    id: "ARTIST_LIVE_MGMT",
-    label: "라이브 관리",
-    icon: "sensors",
-    href: "/artist-console/live",
-  },
-  {
-    id: "ARTIST_MILESTONES",
-    label: "등급 관리",
-    icon: "military_tech",
-    href: "/milestone",
-  },
-  {
-    id: "ARTIST_DM",
-    label: "DM",
-    icon: "mail",
-    href: "/dm/artist",
-  },
+  { id: "ARTIST_ME", label: "My Studio", icon: "person", href: "/home" },
+  { id: "ARTIST_POSTS", label: "게시물 관리", icon: "article", href: "/artist-console/posts" },
+  { id: "ARTIST_LIVE_MGMT", label: "라이브 관리", icon: "sensors", href: "/artist-console/live" },
+  { id: "ARTIST_MILESTONES", label: "등급 관리", icon: "military_tech", href: "/milestone" },
+  { id: "ARTIST_DM", label: "DM", icon: "mail", href: "/dm/artist" },
 ];
 
 const businessMenuItems = [
@@ -73,23 +49,17 @@ export default function ArtistSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [canSeeMemberMenu, setCanSeeMemberMenu] = useState(false);
-  const [showMarketMenu, setShowMarketMenu] = useState(true);
+  const [isGroupMember, setIsGroupMember] = useState(false);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
     if (!token) return;
-    const authHeader = token.startsWith("Bearer") ? token : `Bearer ${token}`;
-    fetch("http://localhost:8080/api/artist/mypage", { headers: { Authorization: authHeader } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.teamInfo) return;
-        const type = data.teamInfo.type;
-        const groupName = data.teamInfo.groupName;
-        const isGroup = type === "GROUP";
-        const isSoloArtist = type === "ARTIST" && !groupName;
-        setShowMarketMenu(isGroup || isSoloArtist);
+    fetch(`${BASE_URL}/api/user/profile`, { headers: { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (profile && profile.groupId != null && profile.id !== profile.groupId) setIsGroupMember(true);
       })
-      .catch(() => setShowMarketMenu(true));
+      .catch(() => {});
   }, []);
 
   const isActive = (href) =>
@@ -100,8 +70,8 @@ export default function ArtistSidebar() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
+      window.location.href = "/home";
     }
-    router.push("/login");
   };
 
   return (
@@ -114,7 +84,9 @@ export default function ArtistSidebar() {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {personalMenuItems.map((item) => (
+            {personalMenuItems
+              .filter((item) => item.id !== "ARTIST_MILESTONES" || !isGroupMember)
+              .map((item) => (
               <Link
                 key={item.id}
                 href={item.href}
@@ -139,9 +111,7 @@ export default function ArtistSidebar() {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {businessMenuItems
-              .filter((item) => item.id !== "ARTIST_MARKET_MGMT" || showMarketMenu)
-              .map((item) => (
+            {businessMenuItems.map((item) => (
               <Link
                 key={item.id}
                 href={item.href}
@@ -179,8 +149,8 @@ export default function ArtistSidebar() {
       <div className="mt-4 pt-3 border-t border-white/[0.06]">
         <button
           type="button"
-          onClick={handleLogout}
-          className="w-full text-left text-[11px] text-white/55 hover:text-white/80 hover:bg-white/[0.06] px-3 py-2 rounded-xl flex items-center gap-2 transition-colors"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleLogout(); }}
+          className="w-full text-left text-[11px] text-white/55 hover:text-white/80 hover:bg-white/[0.06] px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
         >
           <span className="material-symbols-outlined text-sm">logout</span>
           <span className="font-medium">로그아웃</span>

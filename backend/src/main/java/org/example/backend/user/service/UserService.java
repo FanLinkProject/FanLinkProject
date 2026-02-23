@@ -3,6 +3,7 @@ package org.example.backend.user.service;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
 import org.example.backend.user.dto.request.BlockRequest;
+import org.example.backend.user.dto.request.OAuthProfileCompleteRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
@@ -18,7 +19,6 @@ import org.example.backend.like.entity.Like;
 import org.example.backend.like.enums.LikeTarget;
 import org.example.backend.like.repository.LikeRepository;
 import org.example.backend.media_asset.service.MediaAssetService;
-import org.example.backend.user.dto.response.ArtistGroupCardResponse;
 import org.example.backend.user.dto.response.ArtistSearchResponse;
 import org.example.backend.user.dto.response.BlockedResponse;
 import org.example.backend.user.dto.response.GuestHomeResponse;
@@ -138,6 +138,38 @@ public class UserService {
         return UserProfileResponse.from(savedUser);
     }
 
+    /** OAuth 간편가입 후 부족한 추가 정보(name, gender, birth, phoneNumber) 저장 */
+    public UserProfileResponse updateOAuthProfileComplete(User user, OAuthProfileCompleteRequest request) {
+        User currentUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        if (request.name() != null && !request.name().isBlank()) {
+            currentUser.setName(request.name());
+        }
+        if (request.gender() != null && !request.gender().isBlank()) {
+            currentUser.setGender(request.gender());
+        }
+        if (request.birth() != null && !request.birth().isBlank()) {
+            currentUser.setBirth(request.birth());
+        }
+        if (request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
+            String newPhone = request.phoneNumber().trim();
+            String currentPhone = currentUser.getPhoneNumber();
+            boolean isPlaceholder = currentPhone == null || currentPhone.isBlank()
+                    || currentPhone.startsWith("kakao_") || currentPhone.startsWith("google_")
+                    || currentPhone.startsWith("naver_") || currentPhone.startsWith("instagram_");
+            if (isPlaceholder || !currentPhone.equals(newPhone)) {
+                if (userRepository.existsByPhoneNumber(newPhone)) {
+                    throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
+                }
+                currentUser.setPhoneNumber(newPhone);
+            }
+        }
+
+        User saved = userRepository.save(currentUser);
+        return getProfile(saved);
+    }
+
     // 비밀번호 변경
     public void updatePassword(User user, PasswordUpdateRequest request) {
         User currentUser = userRepository.findById(user.getId())
@@ -153,102 +185,35 @@ public class UserService {
         userRepository.save(currentUser);
     }
 
-    // 아티스트 목록 조회 및 검색
+    // 아티스트 목록 조회: GROUP 계정 + GroupMember에 속하지 않은 개인 ARTIST만 노출
     @Transactional(readOnly = true)
     public Page<ArtistSearchResponse> getArtists(String nickname, Pageable pageable) {
-        Page<User> artists;
-        
         if (nickname != null && !nickname.trim().isEmpty()) {
-            // 닉네임 또는 그룹명으로 검색
-            artists = userRepository.findArtistsByNicknameOrGroupName(
-                    UserRole.ARTIST,
-                    UserStatus.ACTIVE,
-                    nickname.trim(),
-                    pageable
-            );
-        } else {
-            // 전체 목록 조회
-            artists = userRepository.findByRoleAndStatusAndDeletedAtIsNull(
-                    UserRole.ARTIST,
-                    UserStatus.ACTIVE,
-                    pageable
-            );
+            Page<User> artists = userRepository.findArtistsByNicknameOrGroupName(
+                    UserRole.ARTIST, UserStatus.ACTIVE, nickname.trim(), Pageable.unpaged());
+            Page<User> groups = userRepository.findArtistsByNicknameOrGroupName(
+                    UserRole.GROUP, UserStatus.ACTIVE, nickname.trim(), Pageable.unpaged());
+            var artistNotInGroup = artists.getContent().stream()
+                    .filter(user -> groupMemberRepository.findByMember(user).isEmpty())
+                    .toList();
+            var merged = java.util.stream.Stream.concat(artistNotInGroup.stream(), groups.getContent().stream())
+                    .sorted(java.util.Comparator.comparing(User::getNickname, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+            long total = merged.size();
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), merged.size());
+            var pageContent = start >= merged.size() ? java.util.List.<User>of() : merged.subList(start, end);
+            var responses = pageContent.stream().map(ArtistSearchResponse::from).toList();
+            return new org.springframework.data.domain.PageImpl<>(responses, pageable, total);
         }
-
-        // 그룹에 속한 아티스트(멤버)는 추천 리스트에서 제외하고,
-        // 그룹이 없는 개인 아티스트(또는 그룹 계정으로만 쓰이는 아티스트)만 노출
-        var filteredUsers = artists.getContent().stream()
-                .filter(user -> groupMemberRepository.findByMember(user).isEmpty())
-                .toList();
-
-        var responses = filteredUsers.stream()
-                .map(ArtistSearchResponse::from)
-                .toList();
-
-        return new org.springframework.data.domain.PageImpl<>(responses, pageable, artists.getTotalElements());
-    }
-
-    // 비로그인/팬 홈 공통: 추천 그룹 (랜덤, GROUP·ACTIVE만)
-    @Transactional(readOnly = true)
-    public Page<User> getRecommendedGroups(Pageable pageable) {
-        return userRepository.findRecommendedGroups(
-                UserRole.GROUP.name(),
-                UserStatus.ACTIVE.name(),
+        Page<User> listable = userRepository.findListableArtists(
+                java.util.List.of(UserRole.ARTIST, UserRole.GROUP),
+                UserStatus.ACTIVE,
+                UserRole.GROUP,
                 pageable
         );
-    }
-
-    // 팬 홈용: 아티스트 그룹만 조회 (추천은 getRecommendedGroups 재사용, 검색 시에만 별도 조회)
-    @Transactional(readOnly = true)
-    public Page<ArtistSearchResponse> getArtistsGroupsOnly(String nickname, Pageable pageable) {
-        Page<User> groups;
-        if (nickname != null && !nickname.trim().isEmpty()) {
-            groups = userRepository.findArtistsByNicknameOrGroupName(
-                    UserRole.GROUP,
-                    UserStatus.ACTIVE,
-                    nickname.trim(),
-                    pageable
-            );
-        } else {
-            groups = getRecommendedGroups(pageable);
-        }
-        var responses = groups.getContent().stream()
-                .map(ArtistSearchResponse::from)
-                .toList();
-        return new org.springframework.data.domain.PageImpl<>(responses, pageable, groups.getTotalElements());
-    }
-
-    // /artists 페이지용: 그룹만 조회 + 팬 수·포스트 수(그룹+멤버 합계)
-    @Transactional(readOnly = true)
-    public Page<ArtistGroupCardResponse> getArtistGroupsWithStats(String nickname, Pageable pageable) {
-        Page<User> groups;
-        if (nickname != null && !nickname.trim().isEmpty()) {
-            groups = userRepository.findArtistsByNicknameOrGroupName(
-                    UserRole.GROUP,
-                    UserStatus.ACTIVE,
-                    nickname.trim(),
-                    pageable
-            );
-        } else {
-            groups = getRecommendedGroups(pageable);
-        }
-        List<ArtistGroupCardResponse> cards = groups.getContent().stream()
-                .map(group -> {
-                    long followerCount = followRepository.countByArtist(group);
-                    long artistPostCount = artistPostRepository.countByGroupId(group.getId());
-                    long fanPostCount = fanPostRepository.countByGroupId(group.getId());
-                    long postCount = artistPostCount + fanPostCount;
-                    return new ArtistGroupCardResponse(
-                            group.getId(),
-                            group.getNickname(),
-                            group.getName(),
-                            group.getProfileImageUrl(),
-                            followerCount,
-                            postCount
-                    );
-                })
-                .toList();
-        return new org.springframework.data.domain.PageImpl<>(cards, pageable, groups.getTotalElements());
+        var responses = listable.getContent().stream().map(ArtistSearchResponse::from).toList();
+        return new org.springframework.data.domain.PageImpl<>(responses, pageable, listable.getTotalElements());
     }
 
     // 유저 차단
@@ -474,6 +439,7 @@ public class UserService {
         Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
         var purchaseHistory = ordersPage.map(order -> new UserMyPageResponse.PurchaseHistory(
                 order.getId(),
+                order.getDelivery() != null ? order.getDelivery().getId() : null,
                 order.getOrderNo(),
                 order.getName(),
                 order.getTotalAmount(),
@@ -518,11 +484,18 @@ public class UserService {
                 "/api/auth/signup"
         );
 
-        // 2) 추천 아티스트 그룹 (비로그인/팬 홈 공통 메소드 사용)
+        // 2) 추천 아티스트 (랜덤, 최대 10개) — 그룹에 속한 개인 아티스트 제외
         Pageable recommendedPageable = PageRequest.of(0, 10);
-        List<User> recommendedGroups = getRecommendedGroups(recommendedPageable).getContent();
+        List<User> recommendedArtists = userRepository.findRecommendedArtists(
+                UserRole.ARTIST.name(),
+                UserRole.GROUP.name(),
+                UserStatus.ACTIVE.name(),
+                recommendedPageable
+        ).getContent().stream()
+                .filter(u -> u.getRole() == UserRole.GROUP || groupMemberRepository.findByMember(u).isEmpty())
+                .toList();
 
-        List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedGroups.stream()
+        List<GuestHomeResponse.ArtistCard> recommendedCards = recommendedArtists.stream()
                 .map(artist -> {
                     long followerCount = followRepository.countByArtist(artist);
                     return new GuestHomeResponse.ArtistCard(
@@ -534,15 +507,29 @@ public class UserService {
                 })
                 .toList();
 
-        // 3) 새로운 아티스트 그룹 (최근 가입한 순서, 최대 10개, 비로그인 홈은 그룹만 노출)
+        // 3) 새로운 아티스트 (최근 가입한 순서, 최대 10개) — 그룹에 속한 개인 아티스트 제외
         Pageable newArtistsPageable = PageRequest.of(0, 10);
+        List<User> newArtists = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
+                UserRole.ARTIST,
+                UserStatus.ACTIVE,
+                newArtistsPageable
+        ).getContent().stream()
+                .filter(u -> groupMemberRepository.findByMember(u).isEmpty())
+                .toList();
+
         List<User> newGroups = userRepository.findByRoleAndStatusAndDeletedAtIsNullOrderByCreatedAtDesc(
                 UserRole.GROUP,
                 UserStatus.ACTIVE,
                 newArtistsPageable
         ).getContent();
 
-        List<GuestHomeResponse.ArtistCard> newArtistsCards = newGroups.stream()
+        List<User> allNewArtists = new java.util.ArrayList<>();
+        allNewArtists.addAll(newArtists);
+        allNewArtists.addAll(newGroups);
+        allNewArtists.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        allNewArtists = allNewArtists.stream().limit(10).toList();
+
+        List<GuestHomeResponse.ArtistCard> newArtistsCards = allNewArtists.stream()
                 .map(artist -> {
                     long followerCount = followRepository.countByArtist(artist);
                     return new GuestHomeResponse.ArtistCard(
@@ -564,22 +551,16 @@ public class UserService {
     // 로그인 유저 메인 홈 화면 조회
     @Transactional(readOnly = true)
     public UserHomeResponse getUserHome(User user) {
-        // 팬 홈: 내 아티스트는 그룹 계정만 노출
-        List<Follow> followedGroups = followRepository.findByFollowerAndArtist_Role(
-                user, UserRole.GROUP, PageRequest.of(0, 10)
-        ).getContent();
+        List<Follow> follows = followRepository.findByFollower(user, PageRequest.of(0, 10))
+                .getContent();
 
-        List<UserHomeResponse.FollowedArtist> followedArtists = followedGroups.stream()
+        List<UserHomeResponse.FollowedArtist> followedArtists = follows.stream()
                 .map(f -> new UserHomeResponse.FollowedArtist(
                         f.getArtist().getId(),
                         f.getArtist().getNickname(),
                         f.getArtist().getProfileImageUrl()
                 ))
                 .collect(Collectors.toList());
-
-        // DM 알림용으로는 팔로우 전체 조회 (기존 동작 유지)
-        List<Follow> follows = followRepository.findByFollower(user, PageRequest.of(0, 10))
-                .getContent();
 
         List<UserHomeResponse.DmNotification> dmNotifications = follows.stream()
                 .map(Follow::getArtist)

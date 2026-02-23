@@ -27,9 +27,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        // Preflight(OPTIONS): 토큰 검증 없이 통과 (CORS preflight가 인증 없이 처리되도록)
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         // OAuth2 관련 경로는 JWT 필터를 건너뛰기
         String requestPath = request.getRequestURI();
-        if (requestPath.startsWith("/oauth2/") || 
+        if (requestPath.startsWith("/oauth2/") ||
             requestPath.startsWith("/login/oauth2/")) {
             filterChain.doFilter(request, response);
             return;

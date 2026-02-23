@@ -64,4 +64,4 @@ presign 시 `requiredHeaders`(Content-Type)를 그대로 PUT 요청 헤더에 �
 ## 공통
 
 - **인증**: `lib/api.js`의 `request()`가 `localStorage.accessToken`을 Bearer로 붙여 요청.
-- **BASE_URL**: `http://localhost:8080` (필요 시 환경변수로 교체).
+- **BASE_URL**: 환경 변수 `NEXT_PUBLIC_API_BASE_URL` 사용, 미설정 시 기본값 사용.
