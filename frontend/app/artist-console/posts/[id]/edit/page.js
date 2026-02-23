@@ -6,6 +6,7 @@ import { request } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
+import { uploadFile, MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
 function EditPostContent() {
   const router = useRouter();
@@ -17,6 +18,8 @@ function EditPostContent() {
   const [content, setContent] = useState("");
   const [isMembershipOnly, setIsMembershipOnly] = useState(false);
   const [isNotice, setIsNotice] = useState(false);
+  const [mediaAssetIds, setMediaAssetIds] = useState([]);
+  const [attachmentPreviews, setAttachmentPreviews] = useState([]);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [initialImageUrl, setInitialImageUrl] = useState(null);
@@ -25,8 +28,11 @@ function EditPostContent() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [isIndividualArtist, setIsIndividualArtist] = useState(false);
+  const [groupId, setGroupId] = useState(null);
   const fileInputRef = useRef(null);
+
+  const postGroupId = groupId;
+  const canAddAttachment = !!postGroupId && mediaAssetIds.length < 5;
 
   // 기존 게시물 로드
   useEffect(() => {
@@ -42,9 +48,9 @@ function EditPostContent() {
         setIsNotice(!!data.isNotice);
         setWriterNickname(data.writerNickname || "");
         setWriterAvatar(data.writerProfileImageUrl || "");
-        const imgUrl = data.attachments?.[0]?.url || null;
-        setInitialImageUrl(imgUrl);
-        setImagePreview(imgUrl);
+        const atts = data.attachments || [];
+        setMediaAssetIds(atts.map((a) => a.mediaAssetId).filter(Boolean));
+        setAttachmentPreviews(atts.map((a) => ({ mediaAssetId: a.mediaAssetId, url: a.url, isVideo: a.contentType?.startsWith?.("video/") })));
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -62,18 +68,46 @@ function EditPostContent() {
       .catch(() => {});
   }, []);
 
-  const handleImageChange = (e) => {
+  useEffect(() => {
+    request("/api/user/profile").then((d) => setGroupId(d?.groupId ?? d?.id ?? null)).catch(() => {});
+  }, []);
+
+  const handleAttachmentChange = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    if (!file || !postGroupId || mediaAssetIds.length >= 5) {
+      e.target.value = "";
+      return;
+    }
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      e.target.value = "";
+      return;
+    }
+    try {
+      const presignItem = {
+        category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
+        scope: MediaAssetScope.PUBLIC,
+        artistId: postGroupId,
+        postIdOrTemp: String(numericId),
+        attachmentCountInPost: mediaAssetIds.length + 1,
+      };
+      if (isVideo) presignItem.durationSecondsRequested = 600;
+      const result = await uploadFile(file, presignItem);
+      if (result?.status === "READY" && result?.mediaAssetId && result?.url) {
+        setMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
+        setAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url, isVideo }]);
+      }
+    } catch (err) {
+      console.error("업로드 실패", err);
+      alert(err?.data?.message || err?.message || "업로드에 실패했습니다.");
+    }
+    e.target.value = "";
   };
 
-  const removeImage = () => {
-    if (imagePreview && imageFile) URL.revokeObjectURL(imagePreview);
-    setImageFile(null);
-    setImagePreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const removeAttachment = (mediaAssetId) => {
+    setMediaAssetIds((prev) => prev.filter((id) => id !== mediaAssetId));
+    setAttachmentPreviews((prev) => prev.filter((p) => p.mediaAssetId !== mediaAssetId));
   };
 
   const handleSubmit = async (e) => {
@@ -88,7 +122,8 @@ function EditPostContent() {
           content: content.trim(),
           isMembershipOnly,
           isNotice,
-          mediaAssetIds: [],
+          mediaAssetIds,
+          representativeMediaAssetId: mediaAssetIds[0] ?? null,
         },
       });
       router.push("/artist-console/posts");
@@ -215,44 +250,35 @@ function EditPostContent() {
             </label>
           )}
 
-          {/* 사진 첨부 */}
+          {/* 첨부 (최대 5개, 미리보기 첫 장으로 목록 노출) */}
           <div className="mt-6">
             <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-              사진 첨부
+              첨부 (이미지·영상 최대 5개, 목록 미리보기 첫 장)
             </span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-            {!imagePreview ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-4xl">
-                  add_photo_alternate
-                </span>
-                <span className="text-sm font-bold">클릭하여 사진 추가</span>
-              </button>
-            ) : (
-              <div className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                <img
-                  src={imagePreview}
-                  alt="미리보기"
-                  className="w-full max-h-80 object-contain bg-black/20"
-                />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
-                >
-                  <span className="material-symbols-outlined text-lg">close</span>
-                </button>
+            <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleAttachmentChange} className="hidden" />
+            {attachmentPreviews.length > 0 ? (
+              <div className="space-y-3">
+                {attachmentPreviews.map((p) => (
+                  <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
+                    {p.isVideo ? (
+                      <video src={p.url} controls className="w-full max-h-80 object-contain bg-black/20" />
+                    ) : (
+                      <img src={p.url} alt="미리보기" className="w-full max-h-80 object-contain bg-black/20" />
+                    )}
+                    <button type="button" onClick={() => removeAttachment(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+                      <span className="material-symbols-outlined text-lg">close</span>
+                    </button>
+                  </div>
+                ))}
+                {canAddAttachment && (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">+ 추가</button>
+                )}
               </div>
+            ) : (
+              <button type="button" onClick={() => canAddAttachment && fileInputRef.current?.click()} disabled={!canAddAttachment} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
+                <span className="material-symbols-outlined text-4xl">add_photo_alternate</span>
+                <span className="text-sm font-bold">{!postGroupId ? "프로필 로딩 중…" : "이미지 또는 영상 추가 (최대 5개)"}</span>
+              </button>
             )}
           </div>
         </Surface>
