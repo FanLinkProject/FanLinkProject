@@ -6,12 +6,16 @@ import org.example.backend.global.exception.BusinessException;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.user.dto.request.ArtistProfileUpdateRequest;
+import org.example.backend.user.dto.response.ArtistDashboardKpiResponse;
 import org.example.backend.user.dto.response.ArtistHomeResponse;
 import org.example.backend.user.dto.response.ArtistMyPageResponse;
 import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
+import org.example.backend.product.repository.ProductRepository;
+import org.example.backend.settlement.repository.SettlementPendingRepository;
+import org.example.backend.settlement.service.SettlementDashboardService;
 import org.example.backend.user.exception.UserException;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
@@ -20,8 +24,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +44,9 @@ public class ArtistService {
     private final GroupMemberRepository groupMemberRepository;
     private final ArtistPostRepository artistPostRepository;
     private final UserRepository userRepository;
+    private final SettlementDashboardService settlementDashboardService;
+    private final SettlementPendingRepository settlementPendingRepository;
+    private final ProductRepository productRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -94,12 +104,14 @@ public class ArtistService {
                 points
         );
 
-        // 3) 멤버/팀 정보
+        // 3) 멤버/팀 정보 (그룹 계정은 제외, ARTIST 역할만 멤버로 표시)
         ArtistMyPageResponse.TeamInfo teamInfo;
-        // group 전용 계정이면 멤버 아티스트 정보 알려줌
+        // group 전용 계정이면 멤버 아티스트 정보 알려줌 (네이티브 쿼리로 member_id≠group_id, role=ARTIST만 조회)
         if (artistOrGroup.getRole() == UserRole.GROUP) {
-            List<GroupMember> members = groupMemberRepository.findByGroup(artistOrGroup);
+            Long groupId = artistOrGroup.getId();
+            List<GroupMember> members = groupMemberRepository.findArtistMembersExcludingGroupSelf(groupId);
             List<ArtistMyPageResponse.Member> memberDtos = members.stream()
+                    .filter(gm -> gm.getMember() != null && !gm.getMember().getId().equals(groupId))
                     .map(gm -> new ArtistMyPageResponse.Member(
                             gm.getMember().getId(),
                             gm.getMember().getNickname(),
@@ -113,13 +125,15 @@ public class ArtistService {
                     memberDtos
             );
         } else {
-            // 개인 아티스트: 소속 그룹이 있으면 그 그룹의 멤버 정보까지 조회 (단, 권한 변경은 불가)
+            // 개인 아티스트: 소속 그룹이 있으면 그 그룹의 멤버 정보까지 조회 (네이티브 쿼리로 그룹 본인 제외)
             if (membership != null) {
                 String groupName = membership.getGroupName();
                 User group = membership.getGroup();
+                Long groupId = group.getId();
 
-                List<GroupMember> members = groupMemberRepository.findByGroup(group);
+                List<GroupMember> members = groupMemberRepository.findArtistMembersExcludingGroupSelf(groupId);
                 List<ArtistMyPageResponse.Member> memberDtos = members.stream()
+                        .filter(gm -> gm.getMember() != null && !gm.getMember().getId().equals(groupId))
                         .map(gm -> new ArtistMyPageResponse.Member(
                                 gm.getMember().getId(),
                                 gm.getMember().getNickname(),
@@ -237,6 +251,35 @@ public class ArtistService {
                 .collect(Collectors.toList());
 
         return new ArtistHomeResponse(followerCount, postCount, postStatistics);
+    }
+
+    /**
+     * 운영 요약(대시보드) KPI: 이번 달 총 매출, 정산 가능 금액, 배송 대기 건수, 등록 상품 수
+     */
+    @Transactional(readOnly = true)
+    public ArtistDashboardKpiResponse getDashboardKpis(User artistOrGroup) {
+        if (artistOrGroup.getRole() != UserRole.ARTIST && artistOrGroup.getRole() != UserRole.GROUP) {
+            throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
+        }
+        Long artistId = artistOrGroup.getId();
+
+        Instant now = Instant.now();
+        ZoneId zone = ZoneId.systemDefault();
+        Instant startOfMonth = LocalDate.now(zone).atStartOfDay(zone).toInstant();
+        Instant endOfMonth = startOfMonth.plus(1, ChronoUnit.MONTHS);
+
+        long monthlySales = settlementPendingRepository.sumAmountByArtistIdAndPaidAtBetween(
+                artistId, startOfMonth, endOfMonth);
+        Long estimated = settlementDashboardService.getEstimatedAmount(artistId).getEstimatedAmount();
+        long estimatedSettlement = estimated != null ? estimated : 0L;
+        int productCount = (int) productRepository.countByArtistId(artistId);
+
+        return new ArtistDashboardKpiResponse(
+                monthlySales,
+                estimatedSettlement,
+                0,  // pendingShipmentCount (주문/배송 미사용)
+                productCount
+        );
     }
 
 	@Transactional(readOnly = true)

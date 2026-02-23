@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { MOCK_ARTISTS } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
@@ -19,7 +19,7 @@ function getAuthHeaders() {
 
 export default function NewPostPage() {
   const router = useRouter();
-  const artist = MOCK_ARTISTS[0];
+  const [profile, setProfile] = useState(null);
   const [artistId, setArtistId] = useState(null);
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -51,8 +51,12 @@ export default function NewPostPage() {
     const headers = getAuthHeaders();
     if (!headers.Authorization) return;
     axios.get(`${BASE_URL}/api/artist/mypage`, { headers })
-      .then((res) => { const id = res.data?.profile?.id; if (id != null) setArtistId(id); })
-      .catch(() => setArtistId(null));
+      .then((res) => {
+        const p = res.data?.profile;
+        if (p?.id != null) setArtistId(p.id);
+        setProfile(p ?? null);
+      })
+      .catch(() => { setArtistId(null); setProfile(null); });
   }, []);
 
   return (
@@ -68,13 +72,15 @@ export default function NewPostPage() {
       </header>
       <form onSubmit={handleSubmit} className="space-y-6">
         <Surface variant="primary" className="p-8">
-          <div className="flex items-center gap-4 mb-6">
-            <img src={artist.avatar} className="size-12 rounded-full border border-white/[0.08]" alt="" />
-            <div>
-              <p className="font-bold text-white">{artist.name}</p>
-              <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Official Artist</p>
+          {profile && (
+            <div className="flex items-center gap-4 mb-6">
+              <img src={profile.profileImageUrl || getDefaultAvatarUrl(profile.nickname)} className="size-12 rounded-full border border-white/[0.08] object-cover" alt="" />
+              <div>
+                <p className="font-bold text-white">{profile.nickname ?? profile.name}</p>
+                <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Official Artist</p>
+              </div>
             </div>
-          </div>
+          )}
           <label className="block">
             <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">내용</span>
             <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="팬들에게 전할 말을 적어주세요." className="w-full min-h-[200px] bg-[#16102a] border border-white/[0.08] rounded-2xl p-4 text-white placeholder:text-white/40 font-medium outline-none focus:ring-2 focus:ring-violet-500/20 resize-y" required />

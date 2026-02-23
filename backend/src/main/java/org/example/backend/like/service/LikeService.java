@@ -168,7 +168,7 @@ public class LikeService {
                     .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
 
             case COMMENT -> commentRepository.findById(targetId)
-                    .filter(comment -> comment.getStatus() == 1) // status가 1인 것만 (활성 상태)
+                    .filter(comment -> Boolean.FALSE.equals(comment.getStatus())) // status가 false인 것만 (활성 상태)
                     .orElseThrow(() -> new LikeException(LikeErrorCode.TARGET_NOT_FOUND));
 
             case MEDIA -> artistMusicVideoRepository.findById(targetId)

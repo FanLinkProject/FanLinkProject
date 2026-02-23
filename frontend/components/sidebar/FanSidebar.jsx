@@ -15,7 +15,7 @@ function getAuthHeaders() {
   return pure ? { Authorization: `Bearer ${pure}` } : {};
 }
 
-export default function FanSidebar() {
+export default function FanSidebar({ hideDm = false }) {
   const pathname = usePathname();
   const router = useRouter();
   const [followingArtists, setFollowingArtists] = useState([]);

@@ -2,6 +2,7 @@ package org.example.backend.user.repository;
 
 import org.example.backend.user.entity.Follow;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,9 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     Optional<Follow> findByFollowerAndArtist(User follower, User artist);
 
     Page<Follow> findByFollower(User follower, Pageable pageable);
+
+    // 팬 홈용: 팔로우 중인 아티스트 중 그룹 계정만 조회
+    Page<Follow> findByFollowerAndArtist_Role(User follower, UserRole artistRole, Pageable pageable);
 
     long countByArtist(User artist);
 

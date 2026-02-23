@@ -1,8 +1,8 @@
 "use client";
 
-/** Group/스튜디오 영역 Sidebar. FanSidebar와 동일 구성(팔로잉·DM) 사용. */
-import FanSidebar from "./FanSidebar";
+/** Group 계정 사이드바: 아티스트와 동일 메뉴, DM 제외 */
+import ArtistSidebar from "./ArtistSidebar";
 
 export default function GroupSidebar() {
-  return <FanSidebar />;
+  return <ArtistSidebar hideDm />;
 }

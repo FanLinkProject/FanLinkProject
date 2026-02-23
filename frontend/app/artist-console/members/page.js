@@ -12,7 +12,7 @@ import { BASE_URL } from "@/lib/api";
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("accessToken");
-  const pure = token?.replace(/^Bearer\\s+/i, "").trim();
+  const pure = token?.replace(/^Bearer\s+/i, "").trim();
   return pure ? { Authorization: `Bearer ${pure}` } : {};
 }
 

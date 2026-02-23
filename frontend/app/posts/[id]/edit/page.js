@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
-import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
+import { request } from "@/lib/api";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
@@ -22,23 +23,30 @@ export default function EditPostPage() {
   const router = useRouter();
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : null;
-  const artist = MOCK_ARTISTS[0];
+  const [profile, setProfile] = useState(null);
   const [artistId, setArtistId] = useState(null);
+  const [post, setPost] = useState(null);
+  const [postLoaded, setPostLoaded] = useState(false);
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [initialImage, setInitialImage] = useState(null);
   const fileInputRef = useRef(null);
 
-  const post = id ? MOCK_POSTS.find((p) => p.id === id && p.artistId === artist.id && p.type === "ARTIST") : null;
-
   useEffect(() => {
-    if (post) {
-      setContent(post.content || "");
-      setInitialImage(post.image || null);
-      setImagePreview(post.image || null);
-    }
-  }, [post]);
+    if (!id) return;
+    setPostLoaded(false);
+    request(`/api/artist-posts/${id}`)
+      .then((data) => {
+        setPost(data);
+        setContent(data?.content ?? "");
+        const img = data?.attachments?.[0]?.url ?? null;
+        setInitialImage(img);
+        setImagePreview(img);
+      })
+      .catch(() => setPost(null))
+      .finally(() => setPostLoaded(true));
+  }, [id]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -71,13 +79,21 @@ export default function EditPostPage() {
     axios
       .get(`${BASE_URL}/api/artist/mypage`, { headers })
       .then((res) => {
-        const idFromApi = res.data?.profile?.id;
-        if (idFromApi != null) setArtistId(idFromApi);
+        const p = res.data?.profile;
+        if (p?.id != null) setArtistId(p.id);
+        setProfile(p ?? null);
       })
-      .catch(() => setArtistId(null));
+      .catch(() => { setArtistId(null); setProfile(null); });
   }, []);
 
-  if (id && !post) {
+  if (id && !postLoaded) {
+    return (
+      <div className="p-8 lg:p-12 max-w-3xl mx-auto">
+        <p className="text-white/55">불러오는 중...</p>
+      </div>
+    );
+  }
+  if (id && postLoaded && !post) {
     return (
       <div className="p-8 lg:p-12 max-w-3xl mx-auto">
         <p className="text-white/55">게시물을 찾을 수 없습니다.</p>
@@ -102,13 +118,15 @@ export default function EditPostPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Surface variant="primary" className="p-8">
-          <div className="flex items-center gap-4 mb-6">
-            <img src={artist.avatar} className="size-12 rounded-full border border-white/[0.08]" alt="" />
-            <div>
-              <p className="font-bold text-white">{artist.name}</p>
-              <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Official Artist</p>
+          {profile && (
+            <div className="flex items-center gap-4 mb-6">
+              <img src={profile.profileImageUrl || getDefaultAvatarUrl(profile.nickname)} className="size-12 rounded-full border border-white/[0.08] object-cover" alt="" />
+              <div>
+                <p className="font-bold text-white">{profile.nickname ?? profile.name}</p>
+                <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Official Artist</p>
+              </div>
             </div>
-          </div>
+          )}
 
           <label className="block">
             <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">내용</span>

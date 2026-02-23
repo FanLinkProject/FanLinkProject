@@ -9,6 +9,8 @@ public record ArtistDashboardResponse(
         FollowStatus followStatus,
         MembershipInfo membershipInfo,
         boolean isGroupMember,
+        boolean isGroup,
+        List<MemberItem> members,
         List<PostItem> posts,
         List<LiveNotification> liveNotifications,
         List<ShopItem> shopItems
@@ -36,6 +38,15 @@ public record ArtistDashboardResponse(
             boolean hasActiveMembership,
             String membershipButtonText,  // "멤버십 가입" 또는 "멤버십 관리"
             String membershipButtonUrl
+    ) {
+    }
+
+    // 소속 멤버 (그룹/팀 멤버 목록, DM 상품 연결용)
+    public record MemberItem(
+            Long memberId,
+            String nickname,
+            String profileImageUrl,
+            Long dmProductId  // 아티스트 DM 상품 ID, 없으면 null
     ) {
     }
 

@@ -69,4 +69,16 @@ public interface SettlementPendingRepository extends JpaRepository<SettlementPen
             "FROM SettlementPending sp " +
             "GROUP BY sp.artistId, sp.sourceType")
     List<Object[]> findAllEstimatedAmountsGroupByArtist();
+
+    /**
+     * 이번 달(현재 월 1일 00:00 ~ 현재) 해당 아티스트의 매출 합계 (원)
+     */
+    @Query("SELECT COALESCE(SUM(sp.amount), 0) FROM SettlementPending sp " +
+            "WHERE sp.artistId = :artistId " +
+            "AND sp.paidAt >= :startOfMonth AND sp.paidAt < :endOfMonth")
+    long sumAmountByArtistIdAndPaidAtBetween(
+            @Param("artistId") Long artistId,
+            @Param("startOfMonth") Instant startOfMonth,
+            @Param("endOfMonth") Instant endOfMonth
+    );
 }
