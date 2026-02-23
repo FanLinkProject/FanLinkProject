@@ -11,3 +11,11 @@ import { request } from "./api";
 export async function getDelivery(deliveryId) {
   return request(`/api/deliveries/${deliveryId}`);
 }
+
+/**
+ * 배송 상태 변경 이력 조회
+ * @param {number} deliveryId
+ */
+export async function getDeliveryHistory(deliveryId) {
+  return request(`/api/deliveries/${deliveryId}/history`);
+}

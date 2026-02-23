@@ -10,7 +10,13 @@ import org.example.backend.order.entity.Order; // Order 위치 주의
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "delivery")
+@Table(
+        name = "delivery",
+        indexes = {
+                @Index(name = "idx_delivery_tracking_number", columnList = "tracking_number"),
+                @Index(name = "idx_delivery_courier_tracking", columnList = "courier_code,tracking_number")
+        }
+)
 public class Delivery {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,7 +35,10 @@ public class Delivery {
     private String country;        // 국가 코드 (예: "KR", "US") - 해외/국내 판단용
 
     // --- 배송 추적 정보 (나중에 업데이트됨) ---
+    @Column(name = "courier_code")
     private String courierCode;    // 택배사 코드 (cj-gls, 04 등)
+
+    @Column(name = "tracking_number")
     private String trackingNumber; // 운송장 번호
 
     @Enumerated(EnumType.STRING)
