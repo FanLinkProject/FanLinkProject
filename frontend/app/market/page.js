@@ -108,6 +108,7 @@ export default function MarketPage() {
     ? allProducts.filter(searchFilter)
     : [];
 
+  // 그룹 스토어 (groupId 있는 상품만)
   const groupStores = [];
   const seenGroups = new Set();
   for (const p of artistProducts) {
@@ -121,6 +122,21 @@ export default function MarketPage() {
       });
     }
   }
+  // 개인 아티스트 스토어 (groupId 없고 artistId만 있는 상품)
+  const individualStores = [];
+  const seenArtists = new Set();
+  for (const p of artistProducts) {
+    if (p.artistId != null && !p.groupId && !seenArtists.has(p.artistId)) {
+      seenArtists.add(p.artistId);
+      individualStores.push({
+        id: p.artistId,
+        name: p.artistName || "아티스트",
+        type: "artist",
+        products: artistProducts.filter((x) => x.artistId === p.artistId && !x.groupId),
+      });
+    }
+  }
+  const allStores = [...groupStores, ...individualStores];
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
@@ -207,14 +223,15 @@ export default function MarketPage() {
             </section>
           )}
 
-          {groupStores.length > 0 && (
+          {allStores.length > 0 && (
             <section className="space-y-10 pt-12 border-t border-white/10">
               <SectionTitle className="px-2 mb-8">그룹별 스토어</SectionTitle>
-              {groupStores.map((store) => {
+              {allStores.map((store) => {
                 const preview = store.products.slice(0, 4);
                 if (preview.length === 0) return null;
+                const isGroup = store.type === "group";
                 return (
-                  <div key={`group-${store.id}`} className="space-y-8">
+                  <div key={`store-${store.type}-${store.id}`} className="space-y-8">
                     <div className="flex items-center justify-between px-2">
                       <Link
                         href={`/artists/${store.id}/market`}
@@ -226,14 +243,16 @@ export default function MarketPage() {
                         className="flex items-center gap-4 group"
                       >
                         <div className="size-10 rounded-2xl border border-white/[0.08] bg-white/5 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-white/50">groups</span>
+                          <span className="material-symbols-outlined text-white/50">
+                            {isGroup ? "groups" : "person"}
+                          </span>
                         </div>
                         <div>
                           <h3 className="text-xl font-black text-white group-hover:text-violet-300 transition-colors">
                             {store.name}
                           </h3>
                           <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">
-                            그룹 공식 스토어
+                            {isGroup ? "그룹 공식 스토어" : "아티스트 스토어"}
                           </p>
                         </div>
                         <span className="material-symbols-outlined text-white/55 group-hover:text-violet-300 group-hover:translate-x-1 transition-all">
