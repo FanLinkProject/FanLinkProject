@@ -57,6 +57,7 @@ public class SecurityConfig {
                     .requestMatchers(
                         "/api/auth/**",           // 인증 관련 API (로그인, 회원가입 등)
                         "/api/verification/**",   // 인증 코드 발송/검증 API
+                        "/api/deliveries/webhook/**", // 배송 webhook (서명 검증은 컨트롤러/서비스에서 처리)
                         "/api/home",               // 통합 홈 화면 API (역할별 응답)
                         "/api/guest/**",          // 비로그인 유저 메인 홈 화면 API (하위 호환)
                         "/api/user/artists/*/dashboard",  // 특정 아티스트 대시보드 (비로그인 접근 가능)
@@ -68,7 +69,14 @@ public class SecurityConfig {
                     .requestMatchers(GET, "/api/artists/*/music-videos").permitAll()
                     .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
+                    .requestMatchers(GET, "/api/payments/config").permitAll()
                     .requestMatchers("/api/artist-posts/notices").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/deliveries/*/start")
+                    .hasAnyRole("ADMIN", "ARTIST", "GROUP")
+                    .requestMatchers(HttpMethod.GET, "/api/deliveries/*")
+                    .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/deliveries/*/history")
+                    .authenticated()
                     // 상품 목록/상세/아티스트별 조회 - 마켓 페이지용 (비로그인 접근 허용)
                     .requestMatchers(GET, "/api/products").permitAll()
                     .requestMatchers(GET, "/api/products/by-artist/*").permitAll()

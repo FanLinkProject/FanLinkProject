@@ -6,7 +6,7 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { getMypage } from "@/lib/userApi";
-import { getDelivery } from "@/lib/deliveryApi";
+import { getDelivery, getDeliveryHistory } from "@/lib/deliveryApi";
 
 const orderStatusLabel = (s) => {
   if (!s) return "준비 중";
@@ -24,6 +24,7 @@ export default function ShippingInfoPage() {
   const [orders, setOrders] = useState([]);
   const [trackingDeliveryId, setTrackingDeliveryId] = useState(null);
   const [trackingDetail, setTrackingDetail] = useState(null);
+  const [trackingHistory, setTrackingHistory] = useState([]);
   const [trackingLoading, setTrackingLoading] = useState(false);
 
   useEffect(() => {
@@ -39,16 +40,24 @@ export default function ShippingInfoPage() {
     if (!deliveryId) return;
     setTrackingDeliveryId(deliveryId);
     setTrackingDetail(null);
+    setTrackingHistory([]);
     setTrackingLoading(true);
-    getDelivery(deliveryId)
-      .then((res) => setTrackingDetail(res))
-      .catch(() => setTrackingDetail(null))
+    Promise.all([getDelivery(deliveryId), getDeliveryHistory(deliveryId)])
+      .then(([deliveryRes, historyRes]) => {
+        setTrackingDetail(deliveryRes);
+        setTrackingHistory(Array.isArray(historyRes) ? historyRes : []);
+      })
+      .catch(() => {
+        setTrackingDetail(null);
+        setTrackingHistory([]);
+      })
       .finally(() => setTrackingLoading(false));
   };
 
   const closeTracking = () => {
     setTrackingDeliveryId(null);
     setTrackingDetail(null);
+    setTrackingHistory([]);
   };
 
   const defaultAddress = trackingDetail
@@ -138,6 +147,21 @@ export default function ShippingInfoPage() {
                           <p className="text-white/70">주소: {trackingDetail.address} {trackingDetail.detailAddress}</p>
                           <p className="text-white/70">택배사: {trackingDetail.courierCode || "—"} / 운송장: {trackingDetail.trackingNumber || "—"}</p>
                           <p className="text-violet-300 font-bold">상태: {trackingDetail.status} ({trackingDetail.trackingStatus})</p>
+                          <div className="pt-2">
+                            <p className="text-white/80 font-semibold mb-2">상태 변경 이력</p>
+                            {trackingHistory.length === 0 ? (
+                              <p className="text-white/45 text-xs">이력이 아직 없습니다.</p>
+                            ) : (
+                              <ul className="space-y-1">
+                                {trackingHistory.map((h, idx) => (
+                                  <li key={`${h.createdAt || "na"}-${idx}`} className="text-xs text-white/65">
+                                    [{h.createdAt ? new Date(h.createdAt).toLocaleString() : "시간 없음"}]{" "}
+                                    {h.fromStatus || "-"} → {h.toStatus || "-"} ({h.reason || "N/A"})
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                           <button
                             type="button"
                             onClick={closeTracking}

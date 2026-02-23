@@ -191,7 +191,10 @@ function ArtistDetailPageInner({ paramsId }) {
         setCurrentUser(user);
         if (!user) return;
         axios.get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
-            .then(res => setFanProfiles(res.data || []))
+            .then(res => {
+                const list = Array.isArray(res.data) ? res.data : (res.data?.content ?? []);
+                setFanProfiles(list);
+            })
             .catch(() => {});
     }, []);
 
@@ -228,15 +231,33 @@ function ArtistDetailPageInner({ paramsId }) {
     };
 
     const handleAttendance = async () => {
-        const fanProfile = fanProfiles.find(p => String(p.artistId) === String(paramsId) || p.artistName === artist?.name);
-        if (!fanProfile || attendanceLoading) return;
+        let fanProfile = fanProfiles.find(p => String(p.groupId) === String(paramsId) || String(p.artistId) === String(paramsId) || (artist?.name && p.groupName === artist.name));
+        if (!fanProfile && !attendanceLoading && isRealGroup && groupId) {
+            try {
+                const { data } = await axios.post(`${FAN_PROFILES_API}`, { groupId }, { headers: getAuthHeaders() });
+                if (data?.id) {
+                    setFanProfiles(prev => [...prev, data]);
+                    fanProfile = data;
+                }
+            } catch (e) { /* 이미 있거나 실패 시 아래에서 알림 */ }
+        }
+        if (!fanProfile || attendanceLoading) {
+            if (!fanProfile) alert("이 아티스트에 대한 출석 정보를 불러올 수 없습니다. 잠시 후 새로고침 후 다시 시도해 주세요.");
+            return;
+        }
+        const todayStr = new Date().toLocaleDateString("en-CA");
+        const lastVisit = fanProfile.lastVisitDate != null ? String(fanProfile.lastVisitDate).slice(0, 10) : null;
+        if (lastVisit === todayStr) return;
         setAttendanceLoading(true);
         try {
             await axios.post(`${FAN_PROFILES_API}/${fanProfile.id}/increase-visit`, {}, { headers: getAuthHeaders() });
-            setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, visitCount: (p.visitCount || 0) + 1 } : p));
+            setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, visitCount: (p.visitCount || 0) + 1, lastVisitDate: todayStr } : p));
             alert("출석 완료!");
         } catch (err) {
-            console.error(err);
+            if (err?.response?.data?.code === "ALREADY_VISITED_TODAY") {
+                setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, lastVisitDate: todayStr } : p));
+                alert("오늘 이미 출석했습니다.");
+            } else console.error(err);
         } finally {
             setAttendanceLoading(false);
         }
@@ -285,6 +306,11 @@ function ArtistDetailPageInner({ paramsId }) {
 
     if (!artist) return null;
 
+    const todayStr = new Date().toLocaleDateString("en-CA");
+    const currentFanProfile = fanProfiles.find(p => String(p.groupId) === String(paramsId) || String(p.artistId) === String(paramsId) || (artist?.name && p.groupName === artist.name));
+    const lastVisitStr = currentFanProfile?.lastVisitDate != null ? String(currentFanProfile.lastVisitDate).slice(0, 10) : null;
+    const attendanceDoneToday = !!currentFanProfile && lastVisitStr === todayStr;
+
     const tabs = [
         { id: "ARTIST", label: "Artist" },
         { id: "FAN", label: "Fan" },
@@ -300,7 +326,7 @@ function ArtistDetailPageInner({ paramsId }) {
         <div className="flex flex-col min-h-full relative pb-20">
             {/* 커버 섹션 */}
             <div className="h-64 w-full relative overflow-hidden shrink-0">
-                <img src={artist.cover} className="w-full h-full object-cover" alt="" />
+                {artist.cover ? <img src={artist.cover} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-white/5" />}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
             </div>
 
@@ -309,7 +335,7 @@ function ArtistDetailPageInner({ paramsId }) {
                 <Surface variant="primary" className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]">
                     <div className="flex items-end gap-6">
                         <div className="rounded-2xl border-2 border-white/[0.08] shadow-2xl -mt-24 overflow-hidden bg-[#201a33] size-40">
-                            <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} />
+                            {artist.avatar ? <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} /> : <div className="w-full h-full bg-white/10" />}
                         </div>
                         <div className="pb-1">
                             <div className="flex items-center gap-2">
@@ -325,8 +351,8 @@ function ArtistDetailPageInner({ paramsId }) {
                         {artist.isSubscribed ? (
                             <>
                                 <Button variant="ghost" className="px-8" disabled>구독 중</Button>
-                                <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading}>
-                                    {attendanceLoading ? "..." : "출석"}
+                                <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
+                                    {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
                                 </Button>
                             </>
                         ) : artist.isFollowing ? (
@@ -357,8 +383,8 @@ function ArtistDetailPageInner({ paramsId }) {
                 <div className="max-w-6xl w-full mx-auto px-8 mt-12">
                     <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {artistConcerts.map((c) => (
-                            <Link key={c.id} href={`/concerts/${c.id}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
+                        {artistConcerts.map((c, i) => (
+                            <Link key={c.id ?? `concert-${i}`} href={`/concerts/${c.id}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
                                 <div className="aspect-[16/10] overflow-hidden">
                                     <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                 </div>
