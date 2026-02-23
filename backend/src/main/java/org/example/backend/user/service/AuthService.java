@@ -44,6 +44,7 @@ public class AuthService {
     public SignupResponse signup(SignupRequest request) {
         try {
             verifySignupCode(request);
+            String normalizedPhone = normalizePhone(request.phoneNumber());
 
             if (userRepository.existsByEmail(request.email())) {
                 throw new BusinessException(UserErrorCode.EMAIL_ALREADY_EXISTS);
@@ -51,7 +52,7 @@ public class AuthService {
             if (userRepository.existsByNickname(request.nickname())) {
                 throw new BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
             }
-            if (userRepository.existsByPhoneNumber(request.phoneNumber())) {
+            if (userRepository.existsByPhoneNumber(normalizedPhone)) {
                 throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
             }
 
@@ -62,7 +63,7 @@ public class AuthService {
                     passwordEncoder.encode(request.password()),
                     request.gender(),
                     request.birth(),
-                    request.phoneNumber(),
+                    normalizedPhone,
                     request.privacyPolicyAgreed(),
                     UserRole.USER
             );
@@ -74,7 +75,12 @@ public class AuthService {
             String refreshToken = jwtTokenProvider.createRefreshToken(
                     savedUser.getEmail(), savedUser.getRole().getValue());
 
-            refreshTokenStore.save(savedUser.getEmail(), refreshToken);
+            try {
+                refreshTokenStore.save(savedUser.getEmail(), refreshToken);
+            } catch (Exception e) {
+                // Redis unavailable should not break signup itself.
+                log.warn("Signup succeeded, but failed to store refresh token in Redis: {}", e.getMessage());
+            }
 
             return SignupResponse.from(savedUser, accessToken, refreshToken);
         } catch (BusinessException e) {
@@ -88,12 +94,13 @@ public class AuthService {
     private void verifySignupCode(SignupRequest request) {
         // In the current signup flow, prefer phone verification when provided.
         if (!isBlank(request.phoneVerificationCode())) {
+            String normalizedPhone = normalizePhone(request.phoneNumber());
             boolean ok = verificationCodeService.verifyPhoneCode(
-                    request.phoneNumber(),
+                    normalizedPhone,
                     request.phoneVerificationCode()
             );
             if (!ok) {
-                ok = verificationCodeService.consumePhoneVerified(request.phoneNumber());
+                ok = verificationCodeService.consumePhoneVerified(normalizedPhone);
             }
             if (!ok) {
                 throw new BusinessException(UserErrorCode.PHONE_VERIFICATION_FAILED);
@@ -118,6 +125,10 @@ public class AuthService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String normalizePhone(String phoneNumber) {
+        return phoneNumber == null ? "" : phoneNumber.replaceAll("[^0-9]", "");
     }
 
     @Transactional(readOnly = true)
