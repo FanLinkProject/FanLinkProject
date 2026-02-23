@@ -59,7 +59,7 @@ export default function AdminDashboardPage() {
     pendingSettlements: 0,
   });
   const [kpiLoading, setKpiLoading] = useState(true);
-  const [recentSettlements, setRecentSettlements] = useState([]);
+  const [abandonedLogs, setAbandonedLogs] = useState([]);
 
   useEffect(() => {
     const headers = getAuthHeaders();
@@ -72,9 +72,9 @@ export default function AdminDashboardPage() {
     Promise.all([
       axios.get(`${BASE_URL}/api/admin/home`, { headers }),
       settlementApi.getAdminSummaries(),
-      settlementApi.getAdminHistory({ page: "0", size: "3", sort: "settledAt,desc" }),
+      settlementApi.getFailureLogs({ page: "0", size: "50", sort: "createdAt,desc" }),
     ])
-      .then(([homeRes, summaries, history]) => {
+      .then(([homeRes, summaries, failuresRes]) => {
         const home = homeRes?.data ?? {};
         const users = home.userStatistics?.totalUsers ?? 0;
         const artists = home.artistStatistics?.totalArtists ?? 0;
@@ -90,7 +90,9 @@ export default function AdminDashboardPage() {
           pendingReports,
           pendingSettlements,
         });
-        setRecentSettlements(Array.isArray(history?.content) ? history.content : []);
+        const allFailures = Array.isArray(failuresRes?.content) ? failuresRes.content : [];
+        const abandoned = allFailures.filter(f => f.errorMessage?.includes("[ABANDONED]")).slice(0, 3);
+        setAbandonedLogs(abandoned);
       })
       .catch(() => {
         setKpi({
@@ -99,7 +101,7 @@ export default function AdminDashboardPage() {
           pendingReports: 0,
           pendingSettlements: 0,
         });
-        setRecentSettlements([]);
+        setAbandonedLogs([]);
       })
       .finally(() => setKpiLoading(false));
   }, []);
@@ -141,31 +143,36 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <section className="lg:col-span-8 space-y-8">
           <Surface variant="primary" className="overflow-hidden">
-            <h3 className="text-lg font-black text-white mb-6 px-8 pt-8">최근 정산 요청</h3>
+            <h3 className="text-lg font-black text-red-400 mb-6 px-8 pt-8 flex items-center gap-2">
+              <span className="material-symbols-outlined text-2xl">error</span>
+              해결 요망: ABANDONED 정산 내역
+            </h3>
             <div className="space-y-0">
               {kpiLoading ? (
                 <div className="px-8 py-10 text-white/55 text-sm">불러오는 중...</div>
-              ) : recentSettlements.length === 0 ? (
-                <div className="px-8 py-10 text-white/50 text-sm">최근 정산 요청이 없습니다.</div>
+              ) : abandonedLogs.length === 0 ? (
+                <div className="px-8 py-10 text-emerald-400/70 text-sm flex items-center gap-2">
+                  <span className="material-symbols-outlined text-xl">check_circle</span>
+                  현재 미처리/ABANDONED 정산 내역이 없습니다. (안전)
+                </div>
               ) : (
-                recentSettlements.map((row) => (
+                abandonedLogs.map((row) => (
                   <div
                     key={row.id}
-                    className="flex items-center justify-between p-4 px-8 border-t border-white/[0.06] first:border-t-0 hover:bg-white/[0.03] transition-colors"
+                    className="flex justify-between items-center p-4 px-8 border-t border-red-500/20 bg-red-500/5 first:border-t-0 hover:bg-red-500/10 transition-colors"
                   >
-                    <div className="min-w-0">
-                      <p className="font-bold text-white truncate">{row.artistName || "-"}</p>
-                      <p className="text-[10px] text-white/55 font-black uppercase">
-                        지급일: {formatDate(row.settledAt)}
+                    <div className="min-w-0 pr-4">
+                      <p className="font-bold text-red-400 truncate text-sm">주문번호: {row.orderNo || "-"}</p>
+                      <p className="text-[11px] text-red-400/70 font-medium mt-1 line-clamp-1">
+                        {row.errorMessage?.replace("[ABANDONED]", "").trim() || "원인 불명 오류"}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-black text-white tabular-nums">{formatKRW(row.finalAmount)}</p>
                       <Link
                         href="/admin/settlements"
-                        className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
+                        className="text-[10px] font-black text-white/70 bg-red-500/20 px-3 py-1.5 rounded uppercase tracking-widest hover:bg-red-500/40 transition-colors whitespace-nowrap inline-block"
                       >
-                        정산 관리
+                        상세 확인
                       </Link>
                     </div>
                   </div>
