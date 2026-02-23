@@ -116,7 +116,7 @@ public class FanPostService {
 
         // 게시물 생성 시 팬 프로필 게시글 수 증가
         if (group != null) {
-            fanProfileRepository.findByFan_IdAndArtist_Id(userId, group.getId())
+            fanProfileRepository.findByFan_IdAndGroup_Id(userId, group.getId())
                     .map(FanProfile::getId)
                     .ifPresent(fanProfileService::increasePostCount);
         }
@@ -186,8 +186,8 @@ public class FanPostService {
         // 게시글 삭제 시 팬 프로필 게시글 수 감소
         Long fanUserId = fanPost.getUser().getId();
         if (fanPost.getGroup() != null) {
-            Long artistId = fanPost.getGroup().getId();
-            fanProfileRepository.findByFan_IdAndArtist_Id(fanUserId, artistId)
+            Long groupId = fanPost.getGroup().getId();
+            fanProfileRepository.findByFan_IdAndGroup_Id(fanUserId, groupId)
                     .map(FanProfile::getId)
                     .ifPresent(fanProfileService::decreasePostCount);
         }

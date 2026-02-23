@@ -42,34 +42,34 @@ public class FanGradeAutoUpgradeService {
         if (autoUpgradeMilestones.isEmpty()) {
             log.debug("자동승급 대상 마일스톤이 없습니다.");
             return AutoUpgradeResultResponse.builder()
-                    .artistCount(0)
+                    .groupCount(0)
                     .fanProcessedCount(0)
                     .build();
         }
 
-        Set<User> artistsWithAutoUpgrade = autoUpgradeMilestones.stream()
-                .map(Milestone::getArtist)
+        Set<User> groupsWithAutoUpgrade = autoUpgradeMilestones.stream()
+                .map(Milestone::getGroup)
                 .collect(Collectors.toCollection(HashSet::new));
 
         int totalProcessed = 0;
-        for (User artist : artistsWithAutoUpgrade) {
-            List<FanProfile> fans = fanProfileRepository.findAllByArtist(artist);
+        for (User group : groupsWithAutoUpgrade) {
+            List<FanProfile> fans = fanProfileRepository.findAllByGroup(group);
             for (FanProfile fan : fans) {
                 try {
                     milestoneService.checkAndUpgradeFanGrade(fan);
                     totalProcessed++;
                 } catch (Exception e) {
-                    log.warn("팬 등급 승급 체크 실패: fanProfileId={}, artistId={}, error={}",
-                            fan.getId(), artist.getId(), e.getMessage());
+                    log.warn("팬 등급 승급 체크 실패: fanProfileId={}, groupId={}, error={}",
+                            fan.getId(), group.getId(), e.getMessage());
                 }
             }
         }
 
-        log.info("팬 등급 자동승급 완료: 대상 아티스트 {}명, 처리 팬 {}명",
-                artistsWithAutoUpgrade.size(), totalProcessed);
+        log.info("팬 등급 자동승급 완료: 대상 그룹 {}개, 처리 팬 {}명",
+                groupsWithAutoUpgrade.size(), totalProcessed);
 
         return AutoUpgradeResultResponse.builder()
-                .artistCount(artistsWithAutoUpgrade.size())
+                .groupCount(groupsWithAutoUpgrade.size())
                 .fanProcessedCount(totalProcessed)
                 .build();
     }

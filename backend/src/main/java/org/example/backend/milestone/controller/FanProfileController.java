@@ -22,7 +22,7 @@ public class FanProfileController {
     private final JoinDaysScheduler joinDaysScheduler;
 
     /**
-     * 내 팬 프로필 목록 조회 (아티스트별)
+     * 내 팬 프로필 목록 조회 (그룹별)
      */
     @GetMapping("/me")
     public ResponseEntity<List<FanProfileResponse>> getMyFanProfiles(
@@ -33,18 +33,18 @@ public class FanProfileController {
     }
 
     /**
-     * 팬 프로필 생성 (테스트용 - artistId로 해당 아티스트에 대한 프로필 생성)
+     * 팬 프로필 생성 (테스트용 - groupId로 해당 그룹에 대한 프로필 생성)
      */
     @PostMapping
     public ResponseEntity<FanProfileResponse> createFanProfile(
             @AuthenticationPrincipal PrincipalDetails principal,
             @RequestBody Map<String, Long> body
     ) {
-        Long artistId = body.get("artistId");
-        if (artistId == null) {
+        Long groupId = body.get("groupId");
+        if (groupId == null) {
             return ResponseEntity.badRequest().build();
         }
-        FanProfileResponse response = fanProfileService.createFanProfile(principal.getUserId(), artistId);
+        FanProfileResponse response = fanProfileService.createFanProfile(principal.getUserId(), groupId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

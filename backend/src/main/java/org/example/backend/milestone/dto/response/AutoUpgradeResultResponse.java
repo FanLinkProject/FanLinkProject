@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class AutoUpgradeResultResponse {
-    private int artistCount;
+    private int groupCount;
     private int fanProcessedCount;
 }

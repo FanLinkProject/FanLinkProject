@@ -14,7 +14,6 @@ import org.example.backend.chat.repository.ChatMessageRepository;
 import org.example.backend.chat.repository.ChatRoomMemberRepository;
 import org.example.backend.chat.repository.ChatRoomRepository;
 import org.example.backend.user.entity.User;
-import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -43,21 +42,25 @@ public class ChatDMService {
                 .getId();
 	}
 
-    //chatroom 생성
+    //chatroom 생성 (아티스트 본인 방 생성 시 해당 아티스트를 ChatRoomMember로 자동 가입)
     @Transactional
     public ChatRoomResponse createChatDMRoom(Long artistId) {
         User user = userRepository.findById(artistId)
                 .orElseThrow(() -> new ChatException(DMChatErrorCode.USER_NOT_FOUND));
 
-        if (user.getRole() == UserRole.ARTIST) {
-            throw new ChatException(DMChatErrorCode.HOST_CANNOT_BE_ARTIST);
-        }
-
         ChatRoom chatRoom = ChatRoom.builder()
                 .owner(user)
                 .build();
+        ChatRoom savedRoom = chatRoomRepository.save(chatRoom);
 
-        return ChatRoomResponse.of(chatRoomRepository.save(chatRoom));
+        // ARTIST 본인 방에 자동 가입: ChatRoomMember 생성 (joined_at = room.created_at)
+        ChatRoomMember ownerMember = ChatRoomMember.builder()
+                .user(user)
+                .chatRoom(savedRoom)
+                .build();
+        chatRoomMemberRepository.save(ownerMember);
+
+        return ChatRoomResponse.of(savedRoom);
     }
 
 
