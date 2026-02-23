@@ -29,7 +29,7 @@ public class SmsService {
     @Value("${sms.api.secret:}")
     private String apiSecret;
 
-    @Value("${sms.api.from:}")
+    @Value("${spring.sms.api.from:}")
     private String fromNumber;
 
     private DefaultMessageService messageService;
