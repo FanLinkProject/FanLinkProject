@@ -14,7 +14,7 @@ import java.time.Instant;
 
 @Entity
 @Table(
-        name = "delivery_status_history",
+        name = "delivery_status_historys",
         indexes = {
                 @Index(name = "idx_delivery_status_history_delivery_created", columnList = "delivery_id,created_at")
         }

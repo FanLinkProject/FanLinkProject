@@ -11,7 +11,10 @@ import org.example.backend.order.entity.Order; // Order 위치 주의
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
-        name = "delivery",
+        name = "deliverys",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_delivery_courier_tracking", columnNames = {"courier_code", "tracking_number"})
+        },
         indexes = {
                 @Index(name = "idx_delivery_tracking_number", columnList = "tracking_number"),
                 @Index(name = "idx_delivery_courier_tracking", columnList = "courier_code,tracking_number")
