@@ -14,6 +14,9 @@ import org.example.backend.subscription.entity.Subscription;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.repository.FollowRepository;
+import org.example.backend.order.exception.OrderErrorCode;
+import org.example.backend.order.exception.OrderException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.product.enums.ProductPaymentMethod;
@@ -36,6 +39,7 @@ public class SubscriptionService {
         private final UserRepository userRepository;
         private final ProductRepository productRepository;
         private final PaymentService paymentService;
+        private final FollowRepository followRepository;
 
         /**
          * 현금 정기결제 구독을 생성합니다. (캔디 정기 충전)
@@ -140,6 +144,14 @@ public class SubscriptionService {
                 }
                 if (!Boolean.TRUE.equals(product.getIsSubscription())) {
                         throw new IllegalArgumentException("구독 상품만 구독할 수 있습니다. 단건 상품은 마켓에서 구매해 주세요.");
+                }
+
+                // 아티스트 상품: 팔로우 필수
+                if (product.getArtistId() != null) {
+                        User artist = userRepository.findById(product.getArtistId()).orElse(null);
+                        if (artist != null && !followRepository.existsByFollowerAndArtist(user, artist)) {
+                                throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                        }
                 }
 
                 // 3. 중복 구독 확인

@@ -7,6 +7,7 @@ import { getProduct, getProductsByArtist } from "@/lib/productApi";
 import { getProfile } from "@/lib/userApi";
 import { createCandyOrder } from "@/lib/orderApi";
 import { createCandySubscription } from "@/lib/subscriptionApi";
+import { request } from "@/lib/api";
 
 function getProductImageUrl(product) {
   const rep = product.attachments?.find(
@@ -34,6 +35,7 @@ export default function ProductDetailPage({ params }) {
   const [candyBalance, setCandyBalance] = useState(null);
   const [candyModalLoading, setCandyModalLoading] = useState(false);
   const [candyPaying, setCandyPaying] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(null); // null: 로딩/플랫폼상품, true/false: 아티스트 상품
 
   useEffect(() => {
     const saved = sessionStorage.getItem("productDetailReturnPath");
@@ -57,11 +59,30 @@ export default function ProductDetailPage({ params }) {
       .catch(() => setProduct(null));
   }, [id]);
 
+  // 아티스트 상품인 경우 팔로우 여부 조회 (artistId가 null이면 플랫폼 상품 → 구매 가능)
+  useEffect(() => {
+    if (!product) {
+      setIsFollowing(null);
+      return;
+    }
+    if (product.artistId == null) {
+      setIsFollowing(true); // 플랫폼 상품은 항상 구매 가능
+      return;
+    }
+    request(`/api/user/artists/${product.artistId}/dashboard`)
+      .then((data) => setIsFollowing(data?.followStatus?.isFollowing ?? false))
+      .catch(() => setIsFollowing(false));
+  }, [product?.id, product?.artistId]);
+
   const handleBack = () => {
     router.push(returnPath);
   };
 
+  const canPurchase = product?.artistId == null || isFollowing === true;
+  const followTooltip = "해당 아티스트(그룹)를 팔로우한 후 구매 및 장바구니 담기가 가능합니다.";
+
   const handleAddToCart = () => {
+    if (!canPurchase) return;
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     const existing = cart.find((c) => c.productId === product.id);
     if (existing) {
@@ -87,6 +108,7 @@ export default function ProductDetailPage({ params }) {
   const isCandySufficient = candyBalance != null && candyBalance >= candyTotal;
 
   const handleBuyNowClick = () => {
+    if (!canPurchase) return;
     if (isCandyOnly) {
       const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       if (!token) {
@@ -189,11 +211,20 @@ export default function ProductDetailPage({ params }) {
           )}
           <h1 className="text-4xl font-black text-white mb-3 tracking-tight">{product.name}</h1>
           <p className="text-3xl font-black text-violet-300 mb-10">{formatPrice(product)}</p>
-          <div className="mt-12 flex gap-4">
+          <div
+            className={`mt-12 flex gap-4 ${!canPurchase ? "cursor-not-allowed" : ""}`}
+            title={!canPurchase ? followTooltip : undefined}
+          >
             <button
               type="button"
               onClick={handleBuyNowClick}
-              className="flex-1 py-5 bg-violet-500/90 text-white rounded-3xl font-black text-base hover:brightness-110 transition-all uppercase tracking-widest text-center"
+              disabled={!canPurchase}
+              title={!canPurchase ? followTooltip : undefined}
+              className={`flex-1 py-5 rounded-3xl font-black text-base uppercase tracking-widest text-center transition-all ${
+                canPurchase
+                  ? "bg-violet-500/90 text-white hover:brightness-110"
+                  : "bg-white/10 text-white/40 cursor-not-allowed"
+              }`}
             >
               지금 바로 구매하기
             </button>
@@ -201,12 +232,31 @@ export default function ProductDetailPage({ params }) {
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="size-16 rounded-3xl border border-white/[0.08] flex items-center justify-center text-white/55 hover:bg-white/[0.06] hover:text-violet-300 transition-all"
+                disabled={!canPurchase}
+                title={!canPurchase ? followTooltip : undefined}
+                className={`size-16 rounded-3xl border flex items-center justify-center transition-all ${
+                  canPurchase
+                    ? "border-white/[0.08] text-white/55 hover:bg-white/[0.06] hover:text-violet-300"
+                    : "border-white/[0.06] text-white/30 cursor-not-allowed"
+                }`}
               >
                 <span className="material-symbols-outlined">shopping_cart</span>
               </button>
             )}
           </div>
+          {!canPurchase && product.artistId != null && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-amber-400/90 flex items-start gap-2">
+                <span className="material-symbols-outlined text-lg shrink-0">info</span>
+                <span>{followTooltip}</span>
+              </p>
+              <p className="text-sm">
+                <Link href={`/artists/${product.artistId}`} className="text-amber-400/90 underline hover:text-amber-300">
+                  아티스트 페이지에서 팔로우하기 →
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

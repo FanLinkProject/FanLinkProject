@@ -14,7 +14,9 @@ public enum OrderErrorCode implements ErrorCode {
     INVALID_SHIPPING_ADDRESS(HttpStatus.BAD_REQUEST, "INVALID_SHIPPING_ADDRESS", "배송지 정보가 올바르지 않습니다."),
     INVALID_COUNTRY_CODE(HttpStatus.BAD_REQUEST, "INVALID_COUNTRY_CODE", "국가 코드는 ISO 2자리 대문자여야 합니다."),
     DUPLICATE_MEMBERSHIP_ORDER(HttpStatus.BAD_REQUEST, "DUPLICATE_MEMBERSHIP_ORDER",
-            "이미 유효한 멤버십이 존재합니다. (10개월 내 중복 구매 불가)");
+            "이미 유효한 멤버십이 존재합니다. (10개월 내 중복 구매 불가)"),
+    FOLLOW_REQUIRED(HttpStatus.FORBIDDEN, "FOLLOW_REQUIRED",
+            "해당 아티스트(그룹)를 팔로우한 후 구매할 수 있습니다.");
 
     private final HttpStatus status;
     private final String code;
