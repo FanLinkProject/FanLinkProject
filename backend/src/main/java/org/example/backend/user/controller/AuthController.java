@@ -39,8 +39,8 @@ public class AuthController {
         TokenResponse token = authService.login(request);
         return ResponseEntity.ok(token);
     }
-  
-    //oauth2 임시교환토큰
+
+    // 소셜 로그인(OAuth2) 콜백에서 전달된 임시 코드로 JWT 토큰(access/refresh) 발급
     @PostMapping("/oauth/exchange")
     public ResponseEntity<TokenResponse> exchangeOAuthCode(@Valid @RequestBody OAuthCodeExchangeRequest request) {
         TokenResponse token = authService.exchangeOAuthCode(request.code());
