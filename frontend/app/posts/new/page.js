@@ -8,8 +8,7 @@ import { getDefaultAvatarUrl } from "@/lib/avatar";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { BASE_URL, request } from "@/lib/api";
-import { useMediaUpload } from "@/lib/useMediaUpload";
-import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
+import { uploadFile, MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};
@@ -27,26 +26,50 @@ export default function NewPostPage() {
   const [mediaAssetIds, setMediaAssetIds] = useState([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState([]);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef(null);
 
-  const presignItem = {
-    category: MediaAssetCategory.POST_IMAGE,
-    scope: MediaAssetScope.PUBLIC,
-    artistId: groupId ?? artistId ?? undefined,
-    postIdOrTemp: "new",
-    attachmentCountInPost: mediaAssetIds.length + 1,
-  };
-  const { upload } = useMediaUpload(presignItem);
+  const postGroupId = groupId ?? artistId;
+  const canAddAttachment = postGroupId != null && mediaAssetIds.length < 5;
 
-  const handleImageChange = async (e) => {
+  const handleAttachmentChange = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/") || !upload) return;
-    const result = await upload(file);
-    if (result?.mediaAssetId && result?.url) {
-      setMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
-      setAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url }]);
+    if (!file || !postGroupId || mediaAssetIds.length >= 5) {
+      e.target.value = "";
+      return;
     }
-    e.target.value = "";
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      setUploadError("이미지 또는 영상 파일만 첨부할 수 있습니다.");
+      e.target.value = "";
+      return;
+    }
+    setUploadError("");
+    setUploading(true);
+    try {
+      const presignItem = {
+        category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
+        scope: MediaAssetScope.PUBLIC,
+        artistId: postGroupId,
+        postIdOrTemp: "new",
+        attachmentCountInPost: mediaAssetIds.length + 1,
+      };
+      if (isVideo) presignItem.durationSecondsRequested = 600;
+      const result = await uploadFile(file, presignItem);
+      if (result?.status === "READY" && result?.mediaAssetId && result?.url) {
+        setMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
+        setAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url, isVideo }]);
+      } else {
+        setUploadError(result?.errorCode || "업로드 검증 실패");
+      }
+    } catch (err) {
+      setUploadError(err?.data?.message || err?.message || "업로드 실패");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
   const removeImage = (mediaAssetId) => {
@@ -74,7 +97,8 @@ export default function NewPostPage() {
           content: content.trim(),
           isMembershipOnly: false,
           isNotice: false,
-          mediaAssetIds,
+          mediaAssetIds: mediaAssetIds.length ? mediaAssetIds : null,
+          representativeMediaAssetId: mediaAssetIds[0] ?? null,
         },
       });
       router.push("/posts");
@@ -129,26 +153,34 @@ export default function NewPostPage() {
             <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="팬들에게 전할 말을 적어주세요." className="w-full min-h-[200px] bg-[#16102a] border border-white/[0.08] rounded-2xl p-4 text-white placeholder:text-white/40 font-medium outline-none focus:ring-2 focus:ring-violet-500/20 resize-y" required />
           </label>
           <div className="mt-6">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">사진 첨부</span>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">첨부 (이미지·영상 최대 5개, 목록 미리보기용 첫 장 표시)</span>
+            {uploadError && <p className="text-red-400 text-xs mb-2">{uploadError}</p>}
+            <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleAttachmentChange} className="hidden" />
             {attachmentPreviews.length > 0 ? (
               <div className="space-y-3">
                 {attachmentPreviews.map((p) => (
                   <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                    <img src={p.url} alt="미리보기" className="w-full max-h-80 object-contain bg-black/20" />
+                    {p.isVideo ? (
+                      <video src={p.url} controls className="w-full max-h-80 object-contain bg-black/20" />
+                    ) : (
+                      <img src={p.url} alt="미리보기" className="w-full max-h-80 object-contain bg-black/20" />
+                    )}
                     <button type="button" onClick={() => removeImage(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
                       <span className="material-symbols-outlined text-lg">close</span>
                     </button>
                   </div>
                 ))}
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">
-                  + 추가
-                </button>
+                {canAddAttachment && (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm disabled:opacity-50">
+                    {uploading ? "업로드 중..." : "+ 추가"}
+                  </button>
+                )}
+                {attachmentPreviews.length >= 5 && <p className="text-white/50 text-xs">최대 5개까지 첨부 가능합니다.</p>}
               </div>
             ) : (
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2">
+              <button type="button" onClick={() => canAddAttachment && fileInputRef.current?.click()} disabled={!canAddAttachment || uploading} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
                 <span className="material-symbols-outlined text-4xl">add_photo_alternate</span>
-                <span className="text-sm font-bold">클릭하여 사진 추가</span>
+                <span className="text-sm font-bold">{!postGroupId ? "프로필 로딩 중…" : "이미지 또는 영상 추가 (최대 5개)"}</span>
               </button>
             )}
           </div>
