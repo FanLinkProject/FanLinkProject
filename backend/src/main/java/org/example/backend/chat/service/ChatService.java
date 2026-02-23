@@ -33,9 +33,6 @@ import java.util.List;
  * 3) 메시지 타입 결정(ARTIST/FAN)
  * 4) ChatMessage 저장
  * 5) ChatMessageEvent로 변환 후 Kafka 발행
- *
- * 참고:
- * - 구독/권한(ArtistSubscription) 체크는 추후 추가 예정
  */
 @Service
 @RequiredArgsConstructor
@@ -50,13 +47,7 @@ public class ChatService {
 
     /**
 	 * 채팅 메시지 처리
-	 *
-	 * 주의:
-	 * - request.senderId는 임시로 사용 중(테스트용)
-	 * - 실제 운영에서는 WebSocket 세션/JWT(SecurityContext)에서 사용자 식별해야 함
 	 */
-
-
     /** 팬 → 아티스트 */
     public void sendToArtist(User sender, ChatMessageRequest request) {
         // 1) 채팅방 조회

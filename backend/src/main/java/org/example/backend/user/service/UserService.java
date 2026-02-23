@@ -185,6 +185,16 @@ public class UserService {
         userRepository.save(currentUser);
     }
 
+    // 공연 등록용 아티스트 검색: ARTIST만 (그룹 계정 제외). 개인 아티스트 + 그룹 소속 멤버 아티스트만 노출
+    @Transactional(readOnly = true)
+    public Page<ArtistSearchResponse> getArtistsForConcert(String nickname, Pageable pageable) {
+        String keyword = (nickname != null && !nickname.trim().isEmpty()) ? nickname.trim() : null;
+        Page<User> list = userRepository.findArtistsOnlyForConcertSearch(
+                UserRole.ARTIST, UserStatus.ACTIVE, keyword, pageable);
+        var responses = list.getContent().stream().map(ArtistSearchResponse::from).toList();
+        return new org.springframework.data.domain.PageImpl<>(responses, pageable, list.getTotalElements());
+    }
+
     // 아티스트 목록 조회: GROUP 계정 + GroupMember에 속하지 않은 개인 ARTIST만 노출
     @Transactional(readOnly = true)
     public Page<ArtistSearchResponse> getArtists(String nickname, Pageable pageable) {
