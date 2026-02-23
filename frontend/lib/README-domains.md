@@ -56,7 +56,7 @@ presign 시 `requiredHeaders`(Content-Type)를 그대로 PUT 요청 헤더에 �
 
 **화면**
 
-- `app/live/[id]/page.js` — URL에 `?liveSessionId=12345` 있고 LIVE일 때 토큰 요청 후 상단에 결과 표시.  
+- `app/live/[id]/page.js` — URL 경로의 [id]가 liveSessionId이고 LIVE일 때 토큰 요청 후 상단에 결과 표시.  
   실제 IVS 플레이어 연동 시 발급받은 `token`을 플레이어에 전달.
 
 ---

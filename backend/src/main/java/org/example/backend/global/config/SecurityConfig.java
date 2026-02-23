@@ -160,7 +160,13 @@ public class SecurityConfig {
             )
 
             // CORS 설정 적용 (CorsConfig에서 생성한 단일 Bean 사용)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource));
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))
+
+            // X-Frame-Options: SockJS 채팅이 iframe 폴백 사용 시 "Refused to display in a frame" 방지
+            // 프론트(fanlink.site)와 API(api.fanlink.site)가 다른 origin이라 SAMEORIGIN으로는 부족 → disable
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.disable())
+            );
 
         return http.build();
     }

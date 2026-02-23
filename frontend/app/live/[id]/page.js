@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
@@ -15,6 +15,7 @@ import {
     WS_CHAT_URL,
 } from "@/lib/api";
 import { createPlaybackToken } from "@/lib/ivsApi";
+import IvsPlayer from "@/components/ivs/IvsPlayer";
 
 import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 import { MOCK_ARTISTS } from "@/lib/mockData";
@@ -106,10 +107,6 @@ export default function LiveSessionPage({ params }) {
     const resolvedParams = React.use(params);
     const id = resolvedParams?.id;
 
-    // ✅ dev: URL query로 liveSessionId 받기(IVS 토큰 발급용)
-    const searchParams = useSearchParams();
-    const liveSessionIdParam = searchParams?.get("liveSessionId");
-
     const [live, setLive] = useState(null);
     const [accessError, setAccessError] = useState("");
     const [loading, setLoading] = useState(true);
@@ -133,7 +130,6 @@ export default function LiveSessionPage({ params }) {
     const [subscriptionDeniedArtistName, setSubscriptionDeniedArtistName] =
         useState(null);
 
-    // ✅ dev: IVS playback token 상태
     const [ivsToken, setIvsToken] = useState(null);
     const [ivsError, setIvsError] = useState(null);
 
@@ -337,25 +333,26 @@ export default function LiveSessionPage({ params }) {
         };
     }, []);
 
-    // ✅ dev: IVS Playback Token 발급 (URL query liveSessionId가 있고, LIVE일 때)
-    // - API 사용 시: liveSessionIdParam 우선, 없으면 numericId 사용
+    // IVS Playback Token 발급 (LIVE일 때) + 만료 전 자동 갱신
     useEffect(() => {
-        const sessionId =
-            liveSessionIdParam && Number(liveSessionIdParam)
-                ? Number(liveSessionIdParam)
-                : numericId;
-
-        if (!sessionId || !live || live.status !== "LIVE") return;
+        if (!numericId || !live || live.status !== "LIVE") return;
 
         setIvsError(null);
         setIvsToken(null);
 
-        createPlaybackToken(sessionId, 300)
-            .then((res) => setIvsToken(res))
-            .catch((e) =>
-                setIvsError(e?.data?.message || e.message || "IVS 토큰 발급 실패")
-            );
-    }, [liveSessionIdParam, numericId, live?.status]);
+        const fetchToken = () =>
+            createPlaybackToken(numericId, 300)
+                .then((res) => setIvsToken(res))
+                .catch((e) =>
+                    setIvsError(e?.data?.message || e.message || "IVS 토큰 발급 실패")
+                );
+
+        fetchToken();
+
+        const refreshMs = 240 * 1000; // recommendedRefreshInSeconds 기본값
+        const timer = setInterval(fetchToken, refreshMs);
+        return () => clearInterval(timer);
+    }, [numericId, live?.status]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -517,15 +514,13 @@ export default function LiveSessionPage({ params }) {
 
     return (
         <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
-            {/* ✅ dev: 토큰 발급 상태 표시(옵션) */}
-            {(liveSessionIdParam || numericId) && isLive && (
+            {numericId && isLive && (
                 <div className="absolute top-2 left-2 right-2 z-10 flex justify-center">
                     <div className="bg-black/80 rounded-lg px-3 py-2 text-xs text-white/90">
-                        {ivsToken ? (
-                            <span>
-                IVS 토큰 발급됨 (만료: {ivsToken.expiresAt?.slice(0, 19)}) — 플레이어에
-                token 전달 시 재생 가능
-              </span>
+                        {ivsToken?.playbackUrl && ivsToken?.token ? (
+                            <span>라이브 재생 중 (만료: {ivsToken.expiresAt?.slice(0, 19)})</span>
+                        ) : ivsToken ? (
+                            <span>IVS 토큰 발급됨 — 재생 URL 대기 중</span>
                         ) : ivsError ? (
                             <span className="text-red-400">{ivsError}</span>
                         ) : (
@@ -558,11 +553,19 @@ export default function LiveSessionPage({ params }) {
                         </div>
                     ) : (
                         <>
-                            <img
-                                src={live.thumbnail}
-                                className="h-full w-full object-contain bg-black"
-                                alt="Live stream"
-                            />
+                            {useApi && isLive && ivsToken?.playbackUrl && ivsToken?.token ? (
+                                <IvsPlayer
+                                    playbackUrl={ivsToken.playbackUrl}
+                                    token={ivsToken.token}
+                                    className="aspect-video w-full"
+                                />
+                            ) : (
+                                <img
+                                    src={live.thumbnail}
+                                    className="h-full w-full object-contain bg-black"
+                                    alt="Live stream"
+                                />
+                            )}
 
                             {isRecorded && (
                                 <div
