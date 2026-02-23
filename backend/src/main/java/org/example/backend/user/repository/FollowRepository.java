@@ -25,6 +25,9 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
 
     long countByArtist(User artist);
 
+    @Query("SELECT f.follower.id FROM Follow f WHERE f.artist.id = :artistId")
+    List<Long> findFollowerUserIdsByArtistId(@Param("artistId") Long artistId);
+
     // 아티스트/그룹의 일별 신규 팔로워 수 (그래프용)
     @Query(value = """
         select date(f.created_at) as date, count(*) as count
