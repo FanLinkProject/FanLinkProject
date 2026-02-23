@@ -6,11 +6,10 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { list, create, remove } from "@/lib/musicVideoApi";
-
-const DEFAULT_ARTIST_ID = 1;
+import { request } from "@/lib/api";
 
 export default function ArtistMusicVideosPage() {
-  const [artistId, setArtistId] = useState(DEFAULT_ARTIST_ID);
+  const [artistId, setArtistId] = useState(null);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,6 +18,7 @@ export default function ArtistMusicVideosPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadList = () => {
+    if (!artistId) return;
     setLoading(true);
     setError(null);
     list(artistId)
@@ -29,6 +29,15 @@ export default function ArtistMusicVideosPage() {
       })
       .finally(() => setLoading(false));
   };
+
+  useEffect(() => {
+    request("/api/artist/mypage")
+      .then((data) => {
+        const id = data?.profile?.groupId ?? data?.profile?.id;
+        setArtistId(id ?? null);
+      })
+      .catch(() => setArtistId(null));
+  }, []);
 
   useEffect(() => {
     loadList();
@@ -79,18 +88,9 @@ export default function ArtistMusicVideosPage() {
         </Button>
       </header>
 
-      <label className="block">
-        <span className="text-[10px] font-black uppercase tracking-widest text-white/55">
-          artistId
-        </span>
-        <input
-          type="number"
-          min="1"
-          value={artistId}
-          onChange={(e) => setArtistId(Number(e.target.value) || 1)}
-          className="mt-1 w-24 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
-        />
-      </label>
+      {!artistId && !loading && (
+        <p className="text-white/55 text-sm">아티스트 정보를 불러오는 중...</p>
+      )}
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 

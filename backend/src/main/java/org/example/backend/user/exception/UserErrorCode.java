@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 public enum UserErrorCode implements ErrorCode {
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 회원입니다."),
+    USER_EMAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_EMAIL_NOT_FOUND", "존재하지 않는 회원 이메일입니다."),
     USER_ACCESS_DENIED(HttpStatus.FORBIDDEN, "USER_ACCESS_DENIED", "해당 정산 내역에 접근할 권한이 없습니다."),
     USER_DETAIL_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_DETAIL_NOT_FOUND", "정산 상세 내역을 찾을 수 없습니다."),
 
@@ -19,6 +20,7 @@ public enum UserErrorCode implements ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", "유효하지 않은 토큰입니다."),
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "인증된 사용자가 없습니다."),
     ACCOUNT_ALREADY_DELETED(HttpStatus.BAD_REQUEST, "ACCOUNT_ALREADY_DELETED", "이미 탈퇴한 계정입니다."),
+    OAUTH_ACCOUNT_NO_PASSWORD(HttpStatus.BAD_REQUEST, "OAUTH_ACCOUNT_NO_PASSWORD", "소셜 로그인 계정은 비밀번호 확인으로 탈퇴할 수 없습니다. 고객센터로 문의해주세요."),
     LOGIN_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_ATTEMPTS_EXCEEDED", "로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요."),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
 
@@ -36,6 +38,7 @@ public enum UserErrorCode implements ErrorCode {
 
     // 인증 코드 관련
     EMAIL_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "EMAIL_VERIFICATION_FAILED", "이메일 인증이 완료되지 않았습니다. 인증 코드를 확인해주세요."),
+    VERIFICATION_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "VERIFICATION_CODE_MISMATCH", "인증번호가 일치하지 않습니다."),
     PHONE_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "PHONE_VERIFICATION_FAILED", "전화번호 인증이 완료되지 않았습니다. 인증번호를 확인해주세요."),
     PHONE_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "PHONE_NUMBER_ALREADY_EXISTS", "이미 사용 중인 전화번호입니다."),
 

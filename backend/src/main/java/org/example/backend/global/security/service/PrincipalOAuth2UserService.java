@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.Map;
 import java.util.UUID;
 
@@ -102,12 +103,26 @@ public class PrincipalOAuth2UserService extends DefaultOAuth2UserService {
     }
 
     private String generateUniqueNickname(String baseNickname) {
-        String nickname = baseNickname;
-        int suffix = 1;
+        String normalized = baseNickname == null ? "" : baseNickname.trim();
+        if (normalized.isBlank()) {
+            normalized = "user";
+        }
+        // 공백 제거 (닉네임은 연속 문자열로)
+        normalized = normalized.replaceAll("\\s+", "");
+
+        String nickname = normalized;
+        SecureRandom random = new SecureRandom();
+        int attempts = 0;
 
         while (userRepository.existsByNickname(nickname)) {
-            nickname = baseNickname + suffix;
-            suffix++;
+            // 0000~9999 랜덤 4자리 숫자 suffix
+            String suffix = String.format("%04d", random.nextInt(10_000));
+            nickname = normalized + suffix;
+            attempts++;
+            // 극단적인 충돌 방지를 위한 백업 플랜
+            if (attempts > 20) {
+                nickname = normalized + "_" + UUID.randomUUID().toString().substring(0, 8);
+            }
         }
 
         return nickname;

@@ -74,8 +74,8 @@ public class VerificationController {
         enforceRateLimit("verification:phone:send:" + phone, SEND_LIMIT_PER_HOUR, SEND_WINDOW);
 
         String code = verificationCodeService.generateCode();
-        verificationCodeService.savePhoneCode(phone, code);
         smsService.sendVerificationCode(phone, code);
+        verificationCodeService.savePhoneCode(phone, code);
 
         return ResponseEntity.ok(VerificationResponse.success("Phone verification code sent."));
     }
@@ -87,7 +87,7 @@ public class VerificationController {
         String phone = normalizePhone(request.phoneNumber());
         enforceRateLimit("verification:phone:verify:" + phone, VERIFY_LIMIT_PER_10_MIN, VERIFY_WINDOW);
 
-        boolean isValid = verificationCodeService.verifyPhoneCode(phone, request.code());
+        boolean isValid = verificationCodeService.checkPhoneCode(phone, request.code());
         if (isValid) {
             return ResponseEntity.ok(new VerificationResponse("Phone verification completed."));
         }
@@ -107,6 +107,6 @@ public class VerificationController {
     }
 
     private String normalizePhone(String phoneNumber) {
-        return phoneNumber == null ? "" : phoneNumber.replaceAll("\\s+", "");
+        return phoneNumber == null ? "" : phoneNumber.replaceAll("[^0-9]", "");
     }
 }
