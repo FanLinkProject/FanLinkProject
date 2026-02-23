@@ -64,7 +64,7 @@ spring:
     api:
       # false: 개발 모드 (로그만 출력, 실제 SMS 발송 안 함)
       # true: 실제 SMS 발송
-      enabled: ${SMS_API_ENABLED:false}
+      enabled: ${SMS_API_ENABLED:true}
       key: ${SMS_API_KEY}
       secret: ${SMS_API_SECRET}
       # 발신번호 (CoolSMS에 등록된 번호)
@@ -103,7 +103,7 @@ spring:
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
             # OAuth2 인증 후 리다이렉트될 백엔드 URI (Spring Security 기본 형식)
-            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+            redirect-uri: ${KAKAO_REDIRECT_URI}
             # 클라이언트 인증 방식: POST 방식으로 Client Secret 전송
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
@@ -123,7 +123,7 @@ spring:
           google:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
-            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
+            redirect-uri: ${GOOGLE_REDIRECT_URI}
             client-authentication-method: client_secret_post
             scope:
               - email
@@ -135,7 +135,7 @@ spring:
             client-secret: ${NAVER_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8080/login/oauth2/code/naver}
+            redirect-uri: ${NAVER_REDIRECT_URI}
             scope:
               - name
               - email
@@ -149,7 +149,7 @@ spring:
             client-secret: ${INSTAGRAM_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: http://localhost:8080/login/oauth2/code/instagram
+            redirect-uri: ${INSTAGRAM_REDIRECT_URI}
             scope:
               - user_profile
               - user_media
@@ -182,7 +182,7 @@ spring:
 
 #커스텀설정-root레벨
 aws:
-  region: ${AWS_REGION:ap-northeast-2}
+  region: ${AWS_REGION}
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
   cloudfront:
