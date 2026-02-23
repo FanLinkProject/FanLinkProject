@@ -5,6 +5,10 @@ import { BASE_URL, normalizeToken, request } from "@/lib/api";
 
 export const ReplayAccessType = { FREE: "FREE", PAID: "PAID" };
 
+export function listByArtist(artistId) {
+  return request("/api/replays", { query: { artistId } });
+}
+
 export function getCandidates(artistId) {
   return request("/api/replays/candidates", { query: { artistId } });
 }

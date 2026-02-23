@@ -25,7 +25,9 @@ import org.example.backend.replay.service.MediaConvertJobService;
 import org.example.backend.replay.entity.ReplayStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.repository.UserRepository;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -51,6 +53,8 @@ public class MediaAssetService {
     private final VideoMetadataExtractor videoMetadataExtractor;
     private final ReplayRepository replayRepository;
     private final MediaConvertJobService mediaConvertJobService;
+    private final ArtistPermissionService artistPermissionService;
+    private final UserRepository userRepository;
 
     // 업로드용 presigned URL을 배치 발급하고 INITIATED 상태를 저장한다.
     @Transactional
@@ -231,6 +235,46 @@ public class MediaAssetService {
         }
         if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
             throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 프로필 이미지만 사용할 수 있습니다.");
+        }
+        return buildCdnUrl(mediaAsset.getObjectKey());
+    }
+
+    /**
+     * 아티스트 프로필 이미지용 MediaAsset의 공개 CDN URL을 반환한다.
+     * 소유자가 해당 아티스트 페이지를 관리할 수 있는 경우에만 허용.
+     */
+    @Transactional(readOnly = true)
+    public String getPublicUrlForArtistProfileImage(Long mediaAssetId, Long artistId) {
+        MediaAsset mediaAsset = mediaAssetRepository.findById(mediaAssetId)
+                .orElseThrow(() -> new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_NOT_FOUND));
+        if (mediaAsset.getCategory() != MediaAssetCategory.PROFILE_IMAGE) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED, "프로필 이미지가 아닌 미디어입니다.");
+        }
+        if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
+            throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 프로필 이미지만 사용할 수 있습니다.");
+        }
+        Long ownerUserId = mediaAsset.getOwnerUserId();
+        User owner = userRepository.findById(ownerUserId).orElse(null);
+        UserRole ownerRole = owner != null ? owner.getRole() : null;
+        if (!artistPermissionService.canManagePage(artistId, ownerUserId, ownerRole, true)) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        }
+        return buildCdnUrl(mediaAsset.getObjectKey());
+    }
+
+    /**
+     * 아티스트 커버 이미지용 MediaAsset의 공개 CDN URL을 반환한다.
+     * ARTIST_COVER_IMAGE 카테고리 및 아티스트 관리 권한 검증 후 URL을 생성한다.
+     */
+    @Transactional(readOnly = true)
+    public String getPublicUrlForArtistCover(Long mediaAssetId, Long artistId) {
+        MediaAsset mediaAsset = mediaAssetRepository.findById(mediaAssetId)
+                .orElseThrow(() -> new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_NOT_FOUND));
+        if (mediaAsset.getCategory() != MediaAssetCategory.ARTIST_COVER_IMAGE) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED, "커버 이미지가 아닌 미디어입니다.");
+        }
+        if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
+            throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 커버 이미지만 사용할 수 있습니다.");
         }
         return buildCdnUrl(mediaAsset.getObjectKey());
     }
