@@ -29,7 +29,7 @@ public class SmsService {
     @Value("${sms.api.secret:}")
     private String apiSecret;
 
-    @Value("${sms.api.from:}")
+    @Value("${spring.sms.api.from:}")
     private String fromNumber;
 
     private DefaultMessageService messageService;
@@ -84,7 +84,14 @@ public class SmsService {
     // CoolSMS API를 통한 실제 SMS 발송
     private void sendSmsViaApi(String phoneNumber, String code) {
         if (messageService == null) {
-            throw new BusinessException(UserErrorCode.SMS_SEND_FAILED);
+            log.warn("CoolSMS 미초기화: SMS_API_KEY, SMS_API_SECRET 확인 필요. 개발 모드로 대체합니다.");
+            log.info("=== SMS 인증번호 (발송 생략) 수신: {} / 인증번호: {} ===", phoneNumber, code);
+            return;
+        }
+        if (fromNumber == null || fromNumber.isBlank()) {
+            log.warn("발신번호(SMS_FROM) 미설정: CoolSMS 발송 불가. 개발 모드로 대체합니다.");
+            log.info("=== SMS 인증번호 (발송 생략) 수신: {} / 인증번호: {} ===", phoneNumber, code);
+            return;
         }
 
         try {
@@ -100,7 +107,7 @@ public class SmsService {
             messageService.send(message);
             log.info("SMS 인증번호 발송 완료: {} -> {}", phoneNumber, code);
         } catch (Exception e) {
-            log.error("CoolSMS 발송 실패: {}", phoneNumber, e);
+            log.error("CoolSMS 발송 실패: {} (발신번호: {})", phoneNumber, fromNumber, e);
             throw new BusinessException(UserErrorCode.SMS_SEND_FAILED);
         }
     }

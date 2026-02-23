@@ -22,7 +22,9 @@ public record ArtistDashboardResponse(
             String nickname,
             String profileImageUrl,
             String bannerImageUrl,
-            String bio
+            String bio,
+            long followerCount,
+            int postCount
     ) {
     }
 

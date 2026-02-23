@@ -49,7 +49,10 @@ export function NotificationProvider({ children }) {
 
             try {
                 const res = await fetch(`${API_BASE}/subscribe`, {
-                    headers: { Authorization: `Bearer ${pure}` },
+                    headers: {
+                        Authorization: `Bearer ${pure}`,
+                        Accept: "text/event-stream",
+                    },
                     signal: abortRef.current.signal,
                 });
 
@@ -101,6 +104,9 @@ export function NotificationProvider({ children }) {
 
             try {
                 const parsed = JSON.parse(data);
+                if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+                    console.log("[SSE] 알림 수신:", parsed.id, parsed.content);
+                }
 
                 setNotifications((prev) => {
                     if (prev.some((n) => n.id === parsed.id)) return prev;

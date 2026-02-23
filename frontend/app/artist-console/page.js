@@ -116,8 +116,6 @@ export default function ArtistConsolePage() {
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostIsMembershipOnly, setNewPostIsMembershipOnly] = useState(false);
     const [newPostIsNotice, setNewPostIsNotice] = useState(false);
-    const [newPostImagePreview, setNewPostImagePreview] = useState(null);
-    const [newPostImageFile, setNewPostImageFile] = useState(null);
     const [createPostLoading, setCreatePostLoading] = useState(false);
     const newPostFileInputRef = useRef(null);
 
@@ -187,11 +185,11 @@ export default function ArtistConsolePage() {
             .catch(() => setEndedLives([]));
     }, [groupId]);
 
-    // Concerts 탭 활성화 시 공연 목록 로드
+    // Concerts 탭 활성화 시 공연 목록 로드 (그룹/소속 아티스트면 그룹 공연 전체, 아니면 본인 공연만)
     useEffect(() => {
         if (activeTab !== "CONCERTS") return;
         setConcertsLoading(true);
-        request("/api/concerts")
+        request("/api/artist/concerts")
             .then((data) => setConcertsList(Array.isArray(data) ? data : []))
             .catch(() => setConcertsList([]))
             .finally(() => setConcertsLoading(false));
@@ -393,23 +391,7 @@ export default function ArtistConsolePage() {
         return () => observer.disconnect();
     }, [fanPostsHasNext, fanPostsLastId, loadMoreFanPosts, fanPostsLoading]);
 
-    // 새 글 이미지 핸들러
-    const handleNewPostImageChange = (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !file.type.startsWith("image/")) return;
-        setNewPostImageFile(file);
-        setNewPostImagePreview(URL.createObjectURL(file));
-    };
-
-    const removeNewPostImage = () => {
-        if (newPostImagePreview && newPostImageFile) URL.revokeObjectURL(newPostImagePreview);
-        setNewPostImageFile(null);
-        setNewPostImagePreview(null);
-        if (newPostFileInputRef.current) newPostFileInputRef.current.value = "";
-    };
-
     const closeCreateModal = () => {
-        removeNewPostImage();
         setNewPostContent("");
         setNewPostIsMembershipOnly(false);
         setNewPostIsNotice(false);
@@ -706,23 +688,13 @@ export default function ArtistConsolePage() {
                 {/* CONCERTS 탭 — 인라인 목록 */}
                 {activeTab === "CONCERTS" && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <p className="text-white/55 text-sm">등록한 공연 목록입니다.</p>
-                            <Button variant="primary" href="/artist-console/concerts/new" className="text-xs uppercase tracking-widest">
-                                <span className="material-symbols-outlined text-sm mr-1.5">add</span>
-                                새 공연 등록
-                            </Button>
-                        </div>
                         {concertsLoading ? (
                             <Surface variant="primary" className="py-12 text-center">
                                 <p className="text-white/55">로딩 중...</p>
                             </Surface>
                         ) : concertsList.length === 0 ? (
                             <Surface variant="primary" className="p-12 text-center">
-                                <p className="text-white/55 font-medium mb-4">등록된 공연이 없습니다.</p>
-                                <Button variant="primary" href="/artist-console/concerts/new" className="text-xs uppercase tracking-widest">
-                                    첫 공연 등록하기
-                                </Button>
+                                <p className="text-white/55 font-medium">등록된 공연이 없습니다.</p>
                             </Surface>
                         ) : (
                             concertsList.map((concert) => {
@@ -855,45 +827,20 @@ export default function ArtistConsolePage() {
                             </label>
                         )}
 
-                        {/* 사진 첨부 */}
+                        {/* 사진 첨부 버튼 */}
                         <div className="mt-5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-                사진 첨부
-              </span>
-                            <input
-                                ref={newPostFileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleNewPostImageChange}
-                                className="hidden"
-                            />
-                            {!newPostImagePreview ? (
-                                <button
-                                    type="button"
-                                    onClick={() => newPostFileInputRef.current?.click()}
-                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
-                                >
-                  <span className="material-symbols-outlined text-3xl">
-                    add_photo_alternate
-                  </span>
-                                    <span className="text-xs font-bold">클릭하여 사진 추가</span>
-                                </button>
-                            ) : (
-                                <div className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                                    <img
-                                        src={newPostImagePreview}
-                                        alt="미리보기"
-                                        className="w-full max-h-56 object-contain bg-black/20"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={removeNewPostImage}
-                                        className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
-                                    >
-                                        <span className="material-symbols-outlined text-lg">close</span>
-                                    </button>
-                                </div>
-                            )}
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+                                사진 첨부
+                            </span>
+                            <input ref={newPostFileInputRef} type="file" accept="image/*" className="hidden" />
+                            <button
+                                type="button"
+                                onClick={() => newPostFileInputRef.current?.click()}
+                                className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                                <span className="text-xs font-bold">클릭하여 사진 추가</span>
+                            </button>
                         </div>
 
                         {/* 버튼 */}

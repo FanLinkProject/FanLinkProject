@@ -8,6 +8,7 @@ import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.dto.response.NotificationResponse;
 import org.example.backend.notification.service.NotificationService;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,14 +25,16 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    // SSE 구독
+    // SSE 구독 (프록시 버퍼링 끄기 + 스트림 유지)
 	@GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public ResponseEntity<SseEmitter> subscribe(@AuthenticationPrincipal PrincipalDetails principal) {
 		SseEmitter emitter = notificationService.subscribe(principal.getUserId());
-		return ResponseEntity.ok(emitter);
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("X-Accel-Buffering", "no");
+		return ResponseEntity.ok().headers(headers).body(emitter);
 	}
 
-    // 알림 테스트용(실제론 서비스에서 호출)
+    // 알림 발송 (서비스에서 호출)
 	@PostMapping("/send")
 	public ResponseEntity<Void> sendNotification(
 		@RequestBody @Valid NotificationSendRequest request

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import axios from "axios";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
@@ -29,20 +28,6 @@ function KPIBox({ label, value, icon, color }) {
       </div>
       <p className="text-2xl font-black text-white tabular-nums">{value}</p>
     </Surface>
-  );
-}
-
-function TodoItem({ label, count, href }) {
-  return (
-    <Link
-      href={href}
-      className="block w-full flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] transition-colors"
-    >
-      <span className="text-sm font-bold text-white/80">{label}</span>
-      <span className="text-sm font-black text-violet-300 bg-violet-500/20 px-2.5 py-1 rounded-lg tabular-nums">
-        {count}
-      </span>
-    </Link>
   );
 }
 
@@ -111,7 +96,7 @@ export default function BusinessDashboardPage() {
         )}
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <KPIBox
           label="이번 달 총 매출"
           value={kpiData != null ? formatKRW(kpiData.monthlySales) : "—"}
@@ -123,12 +108,6 @@ export default function BusinessDashboardPage() {
           value={kpiData != null ? formatKRW(kpiData.estimatedSettlement) : "—"}
           icon="account_balance_wallet"
           color="text-emerald-400"
-        />
-        <KPIBox
-          label="배송 대기 상품"
-          value={kpiData != null ? `${kpiData.pendingShipmentCount}건` : "—"}
-          icon="local_shipping"
-          color="text-white/70"
         />
         <KPIBox
           label="등록 상품 수"
@@ -158,10 +137,6 @@ export default function BusinessDashboardPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-white truncate">{member.nickname ?? member.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="size-1.5 rounded-full bg-emerald-400" />
-                        <span className="text-[10px] text-white/55 font-black uppercase">Active</span>
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -169,25 +144,9 @@ export default function BusinessDashboardPage() {
             </Surface>
           )}
 
-          <Surface variant="primary" className="p-8">
-            <h3 className="text-lg font-black text-white mb-6">오늘의 비즈니스 할 일</h3>
-            <div className="space-y-4">
-              <TodoItem label="새로운 주문 알림" count={kpiData?.pendingShipmentCount ?? 0} href="/artist-console/orders" />
-              <TodoItem label="배송 송장 입력 대기" count={kpiData?.pendingShipmentCount ?? 0} href="/artist-console/orders" />
-              <TodoItem label="미답변 상품 문의" count={0} href="/artist-console/market" />
-            </div>
-          </Surface>
         </section>
 
         <aside className="lg:col-span-4 space-y-8">
-          <Surface variant="primary" className="p-8 border border-violet-500/20">
-            <h3 className="text-xl font-black text-white mb-2">정산 신청하기</h3>
-            <p className="text-white/60 text-sm mb-8">지난 달의 수익 정산이 준비되었습니다. 지금 신청하여 지급을 받으세요.</p>
-            <Button href="/artist-console/settlement" variant="primary" className="w-full py-4 text-xs uppercase tracking-widest">
-              정산 신청 바로가기
-            </Button>
-          </Surface>
-
           <Surface variant="secondary" className="p-8">
             <h3 className="text-lg font-black text-white mb-6">최근 정산 내역</h3>
             <div className="space-y-3">
