@@ -3,6 +3,7 @@ package org.example.backend.ivs.service;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.ivs.client.AwsIvsPlaybackClient;
 import org.example.backend.ivs.client.IvsPlaybackTokenResult;
+import org.example.backend.ivs.client.IvsPlaybackUrlResolver;
 import org.example.backend.ivs.dto.CreatePlaybackTokenRequest;
 import org.example.backend.ivs.dto.CreatePlaybackTokenResponse;
 import org.example.backend.ivs.exception.IvsErrorCode;
@@ -24,6 +25,7 @@ public class IvsPlaybackTokenService {
     private final LiveSessionGateway liveSessionGateway;
     private final SubscriptionGateway subscriptionGateway;
     private final AwsIvsPlaybackClient awsIvsPlaybackClient;
+    private final IvsPlaybackUrlResolver ivsPlaybackUrlResolver;
     private final IvsTimeUtil ivsTimeUtil;
 
     // IVS Playback Token 발급을 처리한다.
@@ -46,8 +48,7 @@ public class IvsPlaybackTokenService {
 
         if (liveSession.isPaid()) {
             if (userId.equals(liveSession.artistId())) {
-                // 아티스트 본인은 구독 여부와 무관하게 접근 가능
-                return buildResponse(liveSession.channelArn(), ttlSeconds, userId);
+                return buildResponse(liveSession, ttlSeconds, userId);
             }
             boolean subscribed = subscriptionGateway.isSubscribed(userId, liveSession.artistId());
             if (!subscribed) {
@@ -55,7 +56,7 @@ public class IvsPlaybackTokenService {
             }
         }
 
-        return buildResponse(liveSession.channelArn(), ttlSeconds, userId);
+        return buildResponse(liveSession, ttlSeconds, userId);
     }
 
     // ttlSeconds 정책(60~600)을 검증한다.
@@ -67,12 +68,18 @@ public class IvsPlaybackTokenService {
     }
 
     // IVS 호출 결과로 응답 DTO를 구성한다.
-    private CreatePlaybackTokenResponse buildResponse(String channelArn, int ttlSeconds, Long userId) {
+    private CreatePlaybackTokenResponse buildResponse(LiveSessionInfo liveSession, int ttlSeconds, Long userId) {
+        String channelArn = liveSession.channelArn();
         IvsPlaybackTokenResult result = awsIvsPlaybackClient.createPlaybackToken(channelArn, ttlSeconds, userId);
+        String playbackUrl = liveSession.playbackUrl();
+        if (playbackUrl == null || playbackUrl.isBlank()) {
+            playbackUrl = ivsPlaybackUrlResolver.getPlaybackUrl(channelArn);
+        }
         Instant expiresAt = result.expiresAt();
         int refreshHint = ivsTimeUtil.recommendedRefreshSeconds(ttlSeconds);
         return new CreatePlaybackTokenResponse(
                 result.token(),
+                playbackUrl,
                 expiresAt,
                 ttlSeconds,
                 refreshHint

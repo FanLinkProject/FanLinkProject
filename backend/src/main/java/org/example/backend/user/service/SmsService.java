@@ -34,6 +34,7 @@ public class SmsService {
 
     private DefaultMessageService messageService;
 
+    // CoolSMS SDK 초기화
     @PostConstruct
     public void init() {
         if (!smsApiEnabled) {
@@ -58,6 +59,7 @@ public class SmsService {
         }
     }
 
+    // 전화번호로 인증번호 발송
     public void sendVerificationCode(String phoneNumber, String code) {
         try {
             if (!smsApiEnabled) {
@@ -86,6 +88,7 @@ public class SmsService {
         }
     }
 
+    // CoolSMS API를 통한 실제 SMS 발송
     private void sendSmsViaApi(String phoneNumber, String code) {
         if (messageService == null || !StringUtils.hasText(fromNumber)) {
             throw new BusinessException(UserErrorCode.SMS_SEND_FAILED);

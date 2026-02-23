@@ -24,6 +24,8 @@ public class AppCorsProperties {
             "http://localhost:3001",
             "http://127.0.0.1:3001",
             "http://192.168.0.19:3000",
+            "https://fan-link-project.vercel.app",
+            "https://fanlink.site",
             "https://*.vercel.app"
     );
 }

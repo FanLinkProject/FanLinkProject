@@ -6,6 +6,7 @@ import { login as loginApi } from "@/lib/authApi";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import ForgotPasswordModal from "@/components/common/ForgotPasswordModal";
 
 function SocialLoginButton({ provider, onClick }) {
   const configs = {
@@ -62,6 +63,7 @@ export default function LoginClient() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // ✅ OAuth 실패 등 쿼리로 전달된 에러 메시지 표시 후 URL 정리
   //    (searchParams는 렌더마다 객체가 바뀔 수 있어 get 결과만 쓰는 편이 안전)
@@ -212,16 +214,31 @@ export default function LoginClient() {
             <SocialLoginButton provider="instagram" onClick={() => handleOAuth("instagram")} />
           </div>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center space-y-2">
             <p className="text-xs font-bold text-white/55">
               계정이 없으신가요?{" "}
               <Link href="/signup" className="text-violet-300 hover:underline">
                 회원가입
               </Link>
             </p>
+            <p className="text-xs font-bold text-white/55">
+              비밀번호를 잃어버리셨나요?{" "}
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-violet-300 hover:underline"
+              >
+                비밀번호 찾기
+              </button>
+            </p>
           </div>
         </div>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 }

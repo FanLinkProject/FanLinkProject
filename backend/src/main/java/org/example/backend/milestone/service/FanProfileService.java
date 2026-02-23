@@ -77,15 +77,6 @@ public class FanProfileService {
         fanGradeAutoUpgradeService.checkAndUpgradeForFan(fanProfileId);
     }
 
-    /**
-     * 가입일수 1 증가 후 자동승급 조건 즉시 체크 (테스트용)
-     */
-    public void increaseJoinDays(Long fanProfileId) {
-        FanProfile fan = getFan(fanProfileId);
-        fan.increaseJoinDays();
-        fanGradeAutoUpgradeService.checkAndUpgradeForFan(fanProfileId);
-    }
-
     private FanProfile getFan(Long id) {
         return fanProfileRepository.findById(id)
                 .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.FANPROFILE_NOT_FOUND));
@@ -103,7 +94,7 @@ public class FanProfileService {
     }
 
     /**
-     * 팬 프로필 생성 (테스트용 - 그룹 구독 시 등으로 대체 예정)
+     * 팬 프로필 생성 (groupId로 해당 그룹에 대한 프로필 생성)
      */
     public FanProfileResponse createFanProfile(Long fanUserId, Long groupId) {
         User fan = userRepository.findById(fanUserId)

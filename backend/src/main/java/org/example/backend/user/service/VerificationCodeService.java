@@ -20,6 +20,8 @@ public class VerificationCodeService {
     private final StringRedisTemplate redisTemplate;
 
     private static final int CODE_LENGTH = 6;
+    private static final long CODE_EXPIRE_TIME = 5;
+    private static final TimeUnit CODE_EXPIRE_UNIT = TimeUnit.MINUTES;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private static final String EMAIL_CODE_PREFIX = "email:code:";
@@ -61,6 +63,18 @@ public class VerificationCodeService {
         return verifyCode(key, code, true);
     }
 
+    /** 이메일 인증코드 검증만 (소비하지 않음). 비밀번호 찾기 확인용 */
+    public boolean validateEmailCodeWithoutConsume(String email, String code) {
+        String key = EMAIL_CODE_PREFIX + email;
+        String storedCode = null;
+        try {
+            storedCode = redisTemplate.opsForValue().get(key);
+        } catch (Exception e) {
+            storedCode = getFromFallback(key);
+        }
+        return storedCode != null && storedCode.equals(code);
+    }
+
     public boolean verifyPhoneCode(String phoneNumber, String code) {
         String normalizedPhone = normalizePhone(phoneNumber);
         String key = PHONE_CODE_PREFIX + normalizedPhone;
@@ -80,6 +94,18 @@ public class VerificationCodeService {
             markPhoneVerified(normalizedPhone);
         }
         return verified;
+    }
+
+    /** 코드 검증만 (소비하지 않음). 회원가입 전 프론트 확인용 */
+    public boolean validatePhoneCodeWithoutConsume(String phoneNumber, String code) {
+        String key = PHONE_CODE_PREFIX + phoneNumber;
+        String storedCode = null;
+        try {
+            storedCode = redisTemplate.opsForValue().get(key);
+        } catch (Exception e) {
+            storedCode = getFromFallback(key);
+        }
+        return storedCode != null && storedCode.equals(code);
     }
 
     public boolean hasEmailCode(String email) {

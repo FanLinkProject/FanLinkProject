@@ -9,7 +9,7 @@ import { request } from "@/lib/api";
  * IVS Playback Token 발급 (라이브 시청 시 플레이어에 전달)
  * @param {number} liveSessionId
  * @param {number} [ttlSeconds=300] - 60~600
- * @returns {Promise<{ token: string; expiresAt: string; ttlSeconds: number; recommendedRefreshInSeconds: number }>}
+ * @returns {Promise<{ token: string; playbackUrl: string|null; expiresAt: string; ttlSeconds: number; recommendedRefreshInSeconds: number }>}
  */
 export function createPlaybackToken(liveSessionId, ttlSeconds = 300) {
   return request("/api/ivs/playback-token", {

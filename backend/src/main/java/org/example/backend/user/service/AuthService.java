@@ -8,6 +8,8 @@ import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.jwt.RefreshTokenStore;
 import org.example.backend.global.security.oauth2.OAuthAuthorizationCodeStore;
 import org.example.backend.user.dto.request.LoginRequest;
+import org.example.backend.user.dto.request.PasswordResetRequest;
+import org.example.backend.user.dto.request.SignoutRequest;
 import org.example.backend.user.dto.request.SignupRequest;
 import org.example.backend.user.dto.response.SignupResponse;
 import org.example.backend.user.dto.response.TokenResponse;
@@ -40,6 +42,7 @@ public class AuthService {
     private final VerificationCodeService verificationCodeService;
     private final OAuthAuthorizationCodeStore oauthAuthorizationCodeStore;
     private final RateLimitService rateLimitService;
+    private final EmailService emailService;
 
     public SignupResponse signup(SignupRequest request) {
         try {
@@ -92,15 +95,18 @@ public class AuthService {
     }
 
     private void verifySignupCode(SignupRequest request) {
+        String phone = normalizePhone(request.phoneNumber());
         // In the current signup flow, prefer phone verification when provided.
         if (!isBlank(request.phoneVerificationCode())) {
             String normalizedPhone = normalizePhone(request.phoneNumber());
             boolean ok = verificationCodeService.verifyPhoneCode(
                     normalizedPhone,
+                    phone,
                     request.phoneVerificationCode()
             );
             if (!ok) {
                 ok = verificationCodeService.consumePhoneVerified(normalizedPhone);
+                ok = verificationCodeService.consumePhoneVerified(phone);
             }
             if (!ok) {
                 throw new BusinessException(UserErrorCode.PHONE_VERIFICATION_FAILED);
@@ -214,7 +220,62 @@ public class AuthService {
         SecurityContextHolder.clearContext();
     }
 
-    public void signout(Long userId) {
+    private static final int PASSWORD_RESET_SEND_LIMIT = 5;
+    private static final Duration PASSWORD_RESET_SEND_WINDOW = Duration.ofHours(1);
+
+    /** 비밀번호 찾기: 이메일로 인증 코드 발송 (회원 존재 시에만) */
+    public void passwordResetSend(String email) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+        if (normalizedEmail.isBlank()) {
+            throw new BusinessException(UserErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+        if (!rateLimitService.tryAcquire("auth:password-reset:send:" + normalizedEmail,
+                PASSWORD_RESET_SEND_LIMIT, PASSWORD_RESET_SEND_WINDOW)) {
+            throw new BusinessException(UserErrorCode.TOO_MANY_REQUESTS);
+        }
+        if (!userRepository.existsByEmail(normalizedEmail)) {
+            throw new BusinessException(UserErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+        User user = userRepository.findByEmail(normalizedEmail).orElseThrow();
+        if (user.getDeletedAt() != null) {
+            throw new BusinessException(UserErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+        String code = verificationCodeService.generateCode();
+        verificationCodeService.saveEmailCode(normalizedEmail, code);
+        emailService.sendVerificationCode(normalizedEmail, code);
+    }
+
+    /** 비밀번호 찾기: 인증 코드 검증만 (소비하지 않음) */
+    public void passwordResetVerify(String email, String code) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+        if (normalizedEmail.isBlank()) {
+            throw new BusinessException(UserErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+        boolean isValid = verificationCodeService.validateEmailCodeWithoutConsume(normalizedEmail, code);
+        if (!isValid) {
+            throw new BusinessException(UserErrorCode.VERIFICATION_CODE_MISMATCH);
+        }
+    }
+
+    /** 비밀번호 찾기: 인증 코드 검증 후 비밀번호 변경 */
+    public void passwordReset(PasswordResetRequest request) {
+        String normalizedEmail = request.email() == null ? "" : request.email().trim().toLowerCase();
+        if (normalizedEmail.isBlank()) {
+            throw new BusinessException(UserErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+        boolean isValid = verificationCodeService.verifyEmailCode(normalizedEmail, request.code());
+        if (!isValid) {
+            throw new BusinessException(UserErrorCode.VERIFICATION_CODE_MISMATCH);
+        }
+        User user = userRepository.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+        if (user.getDeletedAt() != null) {
+            throw new BusinessException(UserErrorCode.USER_EMAIL_NOT_FOUND);
+        }
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+    }
+
+    public void signout(Long userId, SignoutRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof PrincipalDetails)) {
             throw new BusinessException(UserErrorCode.UNAUTHENTICATED);
@@ -227,6 +288,14 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
         if (currentUser.getDeletedAt() != null) {
             throw new BusinessException(UserErrorCode.ACCOUNT_ALREADY_DELETED);
+        }
+
+        String encodedPassword = currentUser.getPassword();
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new BusinessException(UserErrorCode.OAUTH_ACCOUNT_NO_PASSWORD);
+        }
+        if (!passwordEncoder.matches(request.password(), encodedPassword)) {
+            throw new BusinessException(UserErrorCode.PASSWORD_MISMATCH);
         }
 
         currentUser.delete();
