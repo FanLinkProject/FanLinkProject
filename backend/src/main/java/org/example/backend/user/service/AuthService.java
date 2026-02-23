@@ -100,9 +100,8 @@ public class AuthService {
         if (!isBlank(request.phoneVerificationCode())) {
             String normalizedPhone = normalizePhone(request.phoneNumber());
             boolean ok = verificationCodeService.verifyPhoneCode(
-                    normalizedPhone,
-                    phone,
-                    request.phoneVerificationCode()
+                normalizedPhone,
+                        request.phoneVerificationCode()
             );
             if (!ok) {
                 ok = verificationCodeService.consumePhoneVerified(normalizedPhone);
