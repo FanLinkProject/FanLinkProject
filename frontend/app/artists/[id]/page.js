@@ -560,7 +560,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                 <span className="material-symbols-outlined text-violet-300 text-2xl">verified</span>
                             </div>
                             <p className="text-white/55 font-medium mt-2">
-                                아티스트 팔로우 수 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트(게시글) 수 {Number(artist.postCount ?? 0).toLocaleString()}개
+                                팔로우 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트 {Number(artist.postCount ?? 0).toLocaleString()}개
                             </p>
                         </div>
                     </div>
