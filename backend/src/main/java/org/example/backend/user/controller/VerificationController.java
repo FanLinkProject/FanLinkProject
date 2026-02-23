@@ -87,7 +87,7 @@ public class VerificationController {
         String phone = normalizePhone(request.phoneNumber());
         enforceRateLimit("verification:phone:verify:" + phone, VERIFY_LIMIT_PER_10_MIN, VERIFY_WINDOW);
 
-        boolean isValid = verificationCodeService.verifyPhoneCode(phone, request.code());
+        boolean isValid = verificationCodeService.validatePhoneCodeWithoutConsume(phone, request.code());
         if (isValid) {
             return ResponseEntity.ok(new VerificationResponse("Phone verification completed."));
         }
@@ -107,6 +107,6 @@ public class VerificationController {
     }
 
     private String normalizePhone(String phoneNumber) {
-        return phoneNumber == null ? "" : phoneNumber.replaceAll("\\s+", "");
+        return phoneNumber == null ? "" : phoneNumber.replaceAll("\\D", "");
     }
 }

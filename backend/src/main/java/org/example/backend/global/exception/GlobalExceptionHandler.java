@@ -232,6 +232,28 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    // RuntimeException (AuthService 등에서 래핑한 예외) - 원인 메시지 노출로 디버깅 용이
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<?> handleRuntimeException(
+            RuntimeException e, HttpServletRequest request, HttpServletResponse response
+    ) {
+        log.error("RuntimeException", e);
+        if (shouldSkipJsonErrorBody(request, response)) {
+            return ResponseEntity.status(500).build();
+        }
+        String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+        if (msg == null) msg = "서버 오류가 발생했습니다.";
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(Instant.now())
+                .status(500)
+                .error("Internal Server Error")
+                .code("INTERNAL_ERROR")
+                .message(msg)
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(500).body(body);
+    }
+
     // 예상하지 못한 예외: 내부 로그는 상세, 클라이언트 메시지는 단순
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleException(

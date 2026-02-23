@@ -21,7 +21,7 @@ public record SignupRequest(
 
         @NotBlank(message = "이름은 필수입니다.")
         @Pattern(
-                regexp = "^[a-zA-Z가-힣]{2,}$",
+                regexp = "^[a-zA-Z가-힣\\s]{2,}$",
                 message = "이름은 한글/영문 2자 이상이어야 합니다."
         )
         String name,
@@ -40,12 +40,12 @@ public record SignupRequest(
         @NotBlank(message = "휴대폰 번호는 필수입니다.")
         String phoneNumber,
 
-        // 하위호환: 기존 이메일 인증코드
-        @Pattern(regexp = "^\\d{6}$", message = "이메일 인증코드는 6자리 숫자여야 합니다.")
+        // 하위호환: 기존 이메일 인증코드 (null/blank 시 미검증)
+        @Pattern(regexp = "^$|^\\d{6}$", message = "이메일 인증코드는 6자리 숫자여야 합니다.")
         String emailVerificationCode,
 
-        // 신규: 휴대폰 인증코드
-        @Pattern(regexp = "^\\d{6}$", message = "휴대폰 인증코드는 6자리 숫자여야 합니다.")
+        // 신규: 휴대폰 인증코드 (null/blank 시 미검증)
+        @Pattern(regexp = "^$|^\\d{6}$", message = "휴대폰 인증코드는 6자리 숫자여야 합니다.")
         String phoneVerificationCode,
 
         // 기본 USER
