@@ -8,7 +8,8 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 import { BASE_URL } from "@/lib/api";
-const CONCERTS_API = `${BASE_URL}/api/concerts`;
+const CONCERTS_LIST_API = `${BASE_URL}/api/artist/concerts`;
+const CONCERTS_CRUD_API = `${BASE_URL}/api/concerts`;
 
 function getAuthHeaders() {
   const token =
@@ -35,7 +36,7 @@ export default function ArtistConcertsPage() {
     try {
       setLoading(true);
       setError("");
-      const res = await axios.get(CONCERTS_API, { headers: getAuthHeaders() });
+      const res = await axios.get(CONCERTS_LIST_API, { headers: getAuthHeaders() });
       setConcerts(res.data || []);
     } catch (err) {
       setError(
@@ -51,7 +52,7 @@ export default function ArtistConcertsPage() {
     if (!confirm("정말 이 공연을 삭제하시겠습니까?")) return;
     setDeletingId(concertId);
     try {
-      await axios.delete(`${CONCERTS_API}/${concertId}`, {
+      await axios.delete(`${CONCERTS_CRUD_API}/${concertId}`, {
         headers: getAuthHeaders(),
       });
       setConcerts((prev) =>

@@ -279,5 +279,38 @@ public class ArtistService {
                 productCount
         );
     }
+
+    /**
+     * 공연관리 목록용: 그룹/그룹 소속 아티스트면 그룹+멤버 ID 목록, 그 외에는 본인 ID만
+     */
+    @Transactional(readOnly = true)
+    public List<Long> getArtistIdsForConcertListing(User user) {
+        if (user.getRole() == UserRole.GROUP) {
+            List<Long> ids = new ArrayList<>();
+            ids.add(user.getId());
+            for (GroupMember gm : groupMemberRepository.findByGroup(user)) {
+                if (!gm.getMember().getId().equals(user.getId())) {
+                    ids.add(gm.getMember().getId());
+                }
+            }
+            return ids;
+        }
+        if (user.getRole() == UserRole.ARTIST) {
+            var membership = groupMemberRepository.findByMember(user).orElse(null);
+            if (membership != null && membership.getGroup() != null) {
+                User group = membership.getGroup();
+                List<Long> ids = new ArrayList<>();
+                ids.add(group.getId());
+                for (GroupMember gm : groupMemberRepository.findByGroup(group)) {
+                    if (!gm.getMember().getId().equals(group.getId())) {
+                        ids.add(gm.getMember().getId());
+                    }
+                }
+                return ids;
+            }
+            return List.of(user.getId());
+        }
+        return List.of();
+    }
 }
 

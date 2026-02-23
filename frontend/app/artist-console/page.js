@@ -187,11 +187,11 @@ export default function ArtistConsolePage() {
             .catch(() => setEndedLives([]));
     }, [groupId]);
 
-    // Concerts 탭 활성화 시 공연 목록 로드
+    // Concerts 탭 활성화 시 공연 목록 로드 (그룹/소속 아티스트면 그룹 공연 전체, 아니면 본인 공연만)
     useEffect(() => {
         if (activeTab !== "CONCERTS") return;
         setConcertsLoading(true);
-        request("/api/concerts")
+        request("/api/artist/concerts")
             .then((data) => setConcertsList(Array.isArray(data) ? data : []))
             .catch(() => setConcertsList([]))
             .finally(() => setConcertsLoading(false));
@@ -706,23 +706,13 @@ export default function ArtistConsolePage() {
                 {/* CONCERTS 탭 — 인라인 목록 */}
                 {activeTab === "CONCERTS" && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <p className="text-white/55 text-sm">등록한 공연 목록입니다.</p>
-                            <Button variant="primary" href="/artist-console/concerts/new" className="text-xs uppercase tracking-widest">
-                                <span className="material-symbols-outlined text-sm mr-1.5">add</span>
-                                새 공연 등록
-                            </Button>
-                        </div>
                         {concertsLoading ? (
                             <Surface variant="primary" className="py-12 text-center">
                                 <p className="text-white/55">로딩 중...</p>
                             </Surface>
                         ) : concertsList.length === 0 ? (
                             <Surface variant="primary" className="p-12 text-center">
-                                <p className="text-white/55 font-medium mb-4">등록된 공연이 없습니다.</p>
-                                <Button variant="primary" href="/artist-console/concerts/new" className="text-xs uppercase tracking-widest">
-                                    첫 공연 등록하기
-                                </Button>
+                                <p className="text-white/55 font-medium">등록된 공연이 없습니다.</p>
                             </Surface>
                         ) : (
                             concertsList.map((concert) => {

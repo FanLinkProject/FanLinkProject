@@ -15,6 +15,8 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long> {
     // 아티스트가 작성한 글 조회 (삭제되지 않은 글만, 최신순)
     Page<ArtistPost> findByUserAndStatusOrderByCreatedAtDesc(User user, Boolean status, Pageable pageable);
 
+    long countByUserAndStatus(User user, Boolean status);
+
     @Query("SELECT a FROM ArtistPost a " +
             "JOIN FETCH a.user u " +
             "LEFT JOIN FETCH a.group g " +
