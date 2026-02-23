@@ -31,6 +31,14 @@ public class ReplayController {
     private final ReplayQueryService replayQueryService;
     private final ReplayCommandService replayCommandService;
 
+    // 아티스트별 발행된 Replay 목록을 조회한다. (공개용)
+    @GetMapping
+    public ResponseEntity<List<ReplayResponse>> listByArtist(
+            @RequestParam("artistId") Long artistId
+    ) {
+        return ResponseEntity.ok(replayQueryService.listByArtist(artistId));
+    }
+
     // Replay 후보 목록을 조회한다.
     @GetMapping("/candidates")
     public ResponseEntity<List<ReplayCandidateResponse>> listCandidates(
