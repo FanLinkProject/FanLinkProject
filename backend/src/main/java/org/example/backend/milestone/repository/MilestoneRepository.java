@@ -7,11 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
-    boolean existsByArtist_IdAndName(Long artistId, String name);
+    boolean existsByGroup_IdAndName(Long groupId, String name);
 
-    boolean existsByArtist_IdAndSortOrder(Long artistId, Integer sortOrder);
+    boolean existsByGroup_IdAndSortOrder(Long groupId, Integer sortOrder);
 
-    List<Milestone> findAllByArtistOrderBySortOrderDesc(User artist);
+    List<Milestone> findAllByGroupOrderBySortOrderDesc(User group);
 
     List<Milestone> findByAutoUpgradeTrueAndActiveTrue();
 }
