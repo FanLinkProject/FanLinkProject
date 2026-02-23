@@ -53,8 +53,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		registry.addEndpoint("/ws-chat")
-                // 로컬 + Vercel 배포 도메인 허용 (프로덕션에서는 와일드카드 대신 구체적 패턴 권장)
-                .setAllowedOriginPatterns("http://localhost:3000", "https://*.vercel.app")
+                .setAllowedOriginPatterns(
+                        "http://localhost:3000",
+                        "https://fan-link-project.vercel.app",
+                        "https://fanlink.site",
+                        "https://*.vercel.app"
+                )
                 .withSockJS(); // SockJS 활성화
 	}
 
