@@ -54,8 +54,12 @@ function formatTimestamp(dateStr) {
 }
 
 function getLink(notification) {
-  const { type, roomId } = notification;
-  if (type === "LIVE_STARTED") return "/live";
+  const { type, roomId, targetId } = notification;
+  if (type === "LIVE_STARTED") {
+    if (targetId != null && targetId !== "") return `/live/${targetId}`;
+    console.warn("[notifications] LIVE_STARTED 알림에 targetId가 없어 라우팅하지 않습니다.", notification);
+    return "#";
+  }
   if (type === "ARTIST_MESSAGE" || type === "FAN_MESSAGE") {
     return roomId ? `/dm/fan?roomId=${roomId}` : "/dm/fan";
   }

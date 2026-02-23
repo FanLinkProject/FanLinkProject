@@ -13,6 +13,7 @@ import org.example.backend.notification.entity.NotificationType;
 @Builder
 public class NotificationSendRequest {
     private Long receiverId;
+	private Long targetId;
     private Long senderId;
     private NotificationType type;
     private String content;

@@ -35,6 +35,8 @@ public class NotificationResponse {
     private Instant createdAt;
     /** DM 알림 시 해당 아티스트 roomId. ARTIST_MESSAGE, FAN_MESSAGE에서만 사용. */
     private Long roomId;
+    /** 알림 클릭 시 이동할 대상 ID (예: LIVE_STARTED → liveSessionId) */
+    private Long targetId;
 
     public static NotificationResponse from(Notification n) {
         return from(n, null);
@@ -48,6 +50,7 @@ public class NotificationResponse {
                 .isRead(n.isRead())
                 .createdAt(n.getCreatedAt())
                 .roomId(roomId)
+                .targetId(n.getTargetId())
                 .build();
     }
 }

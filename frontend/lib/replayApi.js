@@ -6,7 +6,11 @@ import { BASE_URL, normalizeToken, request } from "@/lib/api";
 export const ReplayAccessType = { FREE: "FREE", PAID: "PAID" };
 
 export function getCandidates(artistId) {
-  return request("/api/replays/candidates", { query: { artistId } });
+  const id = artistId != null ? Number(artistId) : NaN;
+  if (Number.isNaN(id) || id < 1) {
+    return Promise.reject(new Error("유효한 artistId가 필요합니다."));
+  }
+  return request("/api/replays/candidates", { query: { artistId: id } });
 }
 
 export function publish(body) {

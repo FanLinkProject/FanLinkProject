@@ -30,6 +30,9 @@ public class Notification {
 
     private String content;  // 메시지 내용
 
+    /** 알림 클릭 시 이동할 대상 ID (예: LIVE_STARTED → liveSessionId) */
+    private Long targetId;
+
     @Builder.Default
     private boolean isRead = false;
 
