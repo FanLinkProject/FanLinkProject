@@ -53,8 +53,10 @@ function getLayoutVariant(pathname, role) {
     pathname.startsWith("/dm/artist") ||
     pathname.startsWith("/group") ||
     pathname.startsWith("/studio")
-  )
+  ) {
+    if (role === "ROLE_GROUP") return "group";
     return "artist";
+  }
   return "fan";
 }
 
@@ -153,6 +155,15 @@ export default function AppShell({ children }) {
             {layoutVariant === "group" && <GroupSidebar />}
             {layoutVariant === "fan" && <FanSidebar />}
           </div>
+        )}
+
+        {showSidebar && sidebarOpen && (
+          <button
+            type="button"
+            aria-label="사이드바 닫기"
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 z-30 bg-black/40 md:left-64 md:top-16 md:bottom-0 md:right-0 md:bg-black/20"
+          />
         )}
 
         <main
