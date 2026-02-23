@@ -38,12 +38,6 @@ const businessMenuItems = [
     icon: "account_balance_wallet",
     href: "/artist-console/settlement",
   },
-  {
-    id: "ARTIST_ACCOUNT",
-    label: "정산 계좌",
-    icon: "payments",
-    href: "/artist-console/account",
-  },
 ];
 
 export default function ArtistSidebar({ hideDm = false }) {
@@ -115,7 +109,7 @@ export default function ArtistSidebar({ hideDm = false }) {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {businessMenuItems.map((item) => (
+            {(isGroupMember ? businessMenuItems.filter((item) => item.id === "ARTIST_SETTLEMENT") : businessMenuItems).map((item) => (
               <Link
                 key={item.id}
                 href={item.href}

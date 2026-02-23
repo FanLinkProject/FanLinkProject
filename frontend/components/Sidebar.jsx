@@ -17,7 +17,6 @@ const businessMenuItems = [
   { id: "ARTIST_MARKET_MGMT", label: "상품 관리", icon: "shopping_bag", href: "/artist-console/market" },
   { id: "ARTIST_ORDERS", label: "주문/배송", icon: "local_shipping", href: "/artist-console/orders" },
   { id: "ARTIST_SETTLEMENT", label: "정산 관리", icon: "account_balance_wallet", href: "/artist-console/settlement" },
-  { id: "ARTIST_ACCOUNT", label: "정산 계좌", icon: "payments", href: "/artist-console/account" },
 ];
 
 const adminMenuItems = [
