@@ -2,6 +2,7 @@ package org.example.backend.global.security.oauth2;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -16,10 +17,12 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class OAuthAuthorizationCodeStore {
     private static final String CODE_PREFIX = "oauth:code:";
-    private static final long CODE_EXPIRE_SECONDS = 120L;
 
     private final StringRedisTemplate redisTemplate;
     private final Map<String, CodeEntry> fallbackStore = new ConcurrentHashMap<>();
+
+    @Value("${app.redis.ttl.oauth-code-seconds:120}")
+    private long oauthCodeExpireSeconds;
 
     public record OAuthCodePayload(String email, String role) {
     }
@@ -65,9 +68,9 @@ public class OAuthAuthorizationCodeStore {
 
     private void save(String key, String value) {
         try {
-            redisTemplate.opsForValue().set(key, value, CODE_EXPIRE_SECONDS, TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(key, value, oauthCodeExpireSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
-            long expiresAt = Instant.now().plusSeconds(CODE_EXPIRE_SECONDS).toEpochMilli();
+            long expiresAt = Instant.now().plusSeconds(oauthCodeExpireSeconds).toEpochMilli();
             fallbackStore.put(key, new CodeEntry(value, expiresAt));
             log.warn("OAuth code Redis save fallback: key={}, cause={}", key, e.getMessage());
         }

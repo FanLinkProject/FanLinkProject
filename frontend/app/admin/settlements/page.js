@@ -557,7 +557,7 @@ export default function AdminSettlementsPage() {
                   <td className="px-6 py-5 whitespace-nowrap">
                     {f.isAbandoned ? (
                       <span className="inline-flex flex-col items-center justify-center px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest leading-tight bg-red-500/20 text-red-400 border border-red-500/30">
-                        <span>포기됨</span>
+                        <span>ABANDONED</span>
                         <span className="text-[9px] opacity-80">(해결 요망)</span>
                       </span>
                     ) : (
