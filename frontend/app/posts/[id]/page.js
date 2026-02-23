@@ -62,6 +62,7 @@ function PostDetailContent({ id }) {
   const type = searchParams.get("type"); // "ARTIST" | "FAN" | null
   const groupId = searchParams.get("groupId");
   const fromArtistConsole = searchParams.get("from") === "artist-console";
+  const fromNotices = searchParams.get("from") === "notices";
 
   const numericId = Number(id);
   const isRealPost = !!(type && !isNaN(numericId) && numericId > 0);
@@ -608,7 +609,9 @@ function PostDetailContent({ id }) {
         const endpoint = type === "FAN" ? `/api/fan-posts/${numericId}` : `/api/artist-posts/${numericId}`;
         await request(endpoint, { method: "DELETE" });
       }
-      const dest = fromArtistConsole
+      const dest = fromNotices
+        ? "/notices"
+        : fromArtistConsole
         ? "/artist-console"
         : backArtistId
         ? `/artists/${backArtistId}${type === "FAN" ? "?tab=FAN" : ""}`
@@ -684,11 +687,21 @@ function PostDetailContent({ id }) {
 
   if (!post) return null;
 
-  const backHref = fromArtistConsole
+  const backHref = fromNotices
+    ? "/notices"
+    : fromArtistConsole
     ? "/home"
     : backArtistId
     ? `/artists/${backArtistId}${type === "FAN" ? "?tab=FAN" : ""}`
     : "/";
+
+  const backLabel = fromNotices
+    ? "전체 공지사항으로 돌아가기"
+    : fromArtistConsole
+    ? "아티스트 홈으로 돌아가기"
+    : type === "FAN"
+    ? "팬 페이지로 돌아가기"
+    : "아티스트 페이지로 돌아가기";
 
   return (
     <div className="max-w-6xl mx-auto p-8 flex flex-col lg:flex-row gap-8 min-h-full">
@@ -698,11 +711,7 @@ function PostDetailContent({ id }) {
           className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          {fromArtistConsole
-            ? "아티스트 홈으로 돌아가기"
-            : type === "FAN"
-            ? "팬 페이지로 돌아가기"
-            : "아티스트 페이지로 돌아가기"}
+          {backLabel}
         </Link>
 
         <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden">
@@ -734,10 +743,10 @@ function PostDetailContent({ id }) {
               </div>
             ) : (
             <div className="prose max-w-none">
-                <p className="text-white/85 text-xl leading-relaxed font-light">
-                  &quot;{post.content}&quot;
+                <p className="text-white/85 text-xl leading-relaxed font-light whitespace-pre-wrap">
+                  {post.content}
                 </p>
-              </div>
+            </div>
             )}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.06]">
               <button

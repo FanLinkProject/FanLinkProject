@@ -1,9 +1,9 @@
 package org.example.backend.post.dto.response;
 
+import org.example.backend.user.enums.UserRole;
 import lombok.Builder;
 import lombok.Getter;
 import org.example.backend.post.entity.ArtistPost;
-import org.example.backend.user.enums.UserRole;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -23,16 +23,12 @@ public class ArtistPostResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private List<PostMediaAssetResponse> attachments;
-    /** 서비스 관리자 공지(ADMIN + group null) 또는 그룹 계정 공지(ROLE_GROUP) 여부 */
+    /** 공지 여부 (DB isNotice 필드 기준) */
     private Boolean isNotice;
 
-    /** 서비스/그룹 공지 여부 판별 (다른 패키지에서 빌더로 응답할 때 사용) */
+    /** 공지 여부 판별 (DB 저장값 사용) */
     public static boolean isNotice(ArtistPost post) {
-        if (Boolean.TRUE.equals(post.getIsNotice())) {
-            return true;
-        }
-        UserRole r = post.getUser().getRole();
-        return (r == UserRole.ADMIN && post.getGroup() == null) || r == UserRole.GROUP;
+        return Boolean.TRUE.equals(post.getIsNotice());
     }
 
     private static boolean isNoticePost(ArtistPost post) {

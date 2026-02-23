@@ -23,6 +23,11 @@ const NOTIFICATION_TYPE_CONFIG = {
     badgeClass: "bg-violet-500",
     label: "DM",
   },
+  SERVICE_NOTICE: {
+    icon: "campaign",
+    badgeClass: "bg-amber-500/90",
+    label: "공지",
+  },
 };
 
 function formatTimestamp(dateStr) {
@@ -54,6 +59,7 @@ function getLink(notification) {
   if (type === "ARTIST_MESSAGE" || type === "FAN_MESSAGE") {
     return roomId ? `/dm/fan?roomId=${roomId}` : "/dm/fan";
   }
+  if (type === "SERVICE_NOTICE") return "/notices";
   return "#";
 }
 
