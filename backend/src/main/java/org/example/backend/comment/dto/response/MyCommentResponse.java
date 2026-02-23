@@ -20,7 +20,7 @@ public record MyCommentResponse(
         String role,
         boolean isArtist,
         String content,
-        Integer status,
+        Boolean status,
         Instant createdAt,
         TargetType targetType,  // 어떤 게시판 타입인지
         Long targetId,          // 어떤 게시물에 달린 댓글인지

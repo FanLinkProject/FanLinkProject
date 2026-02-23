@@ -12,6 +12,7 @@ export default function PostCard({
   likeCount,
   commentCount,
   onComment,
+  showCommentButton = true,
   isLocked = false,
   onDelete,
   onEdit,
@@ -113,6 +114,7 @@ export default function PostCard({
               <span className={"material-symbols-outlined text-xl " + (isLiked ? "fill-icon text-red-400/90" : "")}>favorite</span>
               <span>{likeNum}</span>
             </button>
+            {showCommentButton && (
             <button
               type="button"
               onClick={handleComment}
@@ -122,6 +124,7 @@ export default function PostCard({
               <span className="material-symbols-outlined text-xl">chat_bubble_outline</span>
               <span>{commentNum}</span>
             </button>
+            )}
           </div>
         </>
       )}

@@ -14,6 +14,8 @@ import org.example.backend.post.entity.PostMediaAsset;
 import org.example.backend.post.entity.PostMediaAssetType;
 import org.example.backend.post.exception.PostErrorCode;
 import org.example.backend.post.exception.PostException;
+import org.example.backend.comment.enums.TargetType;
+import org.example.backend.comment.service.CommentService;
 import org.example.backend.post.repository.FanPostRepository;
 import org.example.backend.post.repository.PostMediaAssetRepository;
 import org.example.backend.milestone.entity.FanProfile;
@@ -45,6 +47,7 @@ public class FanPostService {
     private final AwsProperties awsProperties;
     private final FanProfileService fanProfileService;
     private final FanProfileRepository fanProfileRepository;
+    private final CommentService commentService;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -190,5 +193,6 @@ public class FanPostService {
         }
 
         fanPost.delete();
+        commentService.deleteAllByTarget(TargetType.FAN, postId);
     }
 }

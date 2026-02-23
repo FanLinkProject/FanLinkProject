@@ -15,6 +15,8 @@ function EditPostContent() {
 
   const [content, setContent] = useState("");
   const [isMembershipOnly, setIsMembershipOnly] = useState(false);
+  const [isNotice, setIsNotice] = useState(false);
+  const [isIndividualArtist, setIsIndividualArtist] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [initialImageUrl, setInitialImageUrl] = useState(null);
@@ -36,6 +38,7 @@ function EditPostContent() {
       .then((data) => {
         setContent(data.content || "");
         setIsMembershipOnly(data.isMembershipOnly ?? false);
+        setIsNotice(!!data.isNotice);
         setWriterNickname(data.writerNickname || "");
         setWriterAvatar(data.writerProfileImageUrl || "");
         const imgUrl = data.attachments?.[0]?.url || null;
@@ -45,6 +48,17 @@ function EditPostContent() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [numericId]);
+
+  // 개인 아티스트 여부 (공지 토글 노출용)
+  useEffect(() => {
+    request("/api/user/profile")
+      .then((data) => {
+        const role = (data.role || "").replace("ROLE_", "");
+        const gid = data.groupId ?? data.id;
+        setIsIndividualArtist(role === "ARTIST" && gid === data.id);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -71,6 +85,7 @@ function EditPostContent() {
           title: "",
           content: content.trim(),
           isMembershipOnly,
+          isNotice,
           mediaAssetIds: [],
         },
       });
@@ -173,6 +188,30 @@ function EditPostContent() {
               </span>
             )}
           </label>
+
+          {/* 공지사항 토글 (개인 아티스트만) */}
+          {isIndividualArtist && (
+            <label className="flex items-center gap-3 mt-5 cursor-pointer w-fit">
+              <div
+                className={`relative w-10 h-5 rounded-full transition-colors ${
+                  isNotice ? "bg-violet-500" : "bg-white/[0.12]"
+                }`}
+                onClick={() => setIsNotice((v) => !v)}
+              >
+                <span
+                  className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+                    isNotice ? "translate-x-5" : "translate-x-0.5"
+                  }`}
+                />
+              </div>
+              <span className="text-sm font-bold text-white/70">공지사항</span>
+              {isNotice && (
+                <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest">
+                  공지로 노출
+                </span>
+              )}
+            </label>
+          )}
 
           {/* 사진 첨부 */}
           <div className="mt-6">

@@ -12,6 +12,8 @@ public class ArtistPostRequest {
     private String title;
     private String content;
     private Boolean isMembershipOnly;
+    /** 개인 아티스트 공지 여부 (토글로 설정) */
+    private Boolean isNotice;
     private List<Long> mediaAssetIds;
     private Long representativeMediaAssetId;
 }
