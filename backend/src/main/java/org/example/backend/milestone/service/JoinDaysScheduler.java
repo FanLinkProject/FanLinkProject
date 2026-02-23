@@ -48,13 +48,4 @@ public class JoinDaysScheduler {
 
         log.info("[가입일수 스케줄러] 완료: {}개 프로필 업데이트", count);
     }
-
-    /**
-     * 테스트용: 수동으로 가입일수 증가 실행
-     */
-    @Transactional
-    public void manualIncrementJoinDays() {
-        log.info("[가입일수 수동 실행] 시작");
-        incrementJoinDays();
-    }
 }

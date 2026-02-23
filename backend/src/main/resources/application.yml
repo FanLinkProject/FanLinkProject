@@ -35,7 +35,7 @@ spring:
   # redis 디폴트(기본기능)-슬레이브(읽기만가능)모드 전환시 별도 작업필요
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
 
@@ -64,7 +64,7 @@ spring:
     api:
       # false: 개발 모드 (로그만 출력, 실제 SMS 발송 안 함)
       # true: 실제 SMS 발송
-      enabled: ${SMS_API_ENABLED:false}
+      enabled: ${SMS_API_ENABLED:true}
       key: ${SMS_API_KEY}
       secret: ${SMS_API_SECRET}
       # 발신번호 (CoolSMS에 등록된 번호)
@@ -103,7 +103,7 @@ spring:
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
             # OAuth2 인증 후 리다이렉트될 백엔드 URI (Spring Security 기본 형식)
-            redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+            redirect-uri: ${KAKAO_REDIRECT_URI:https://api.fanlink.site/login/oauth2/code/kakao}
             # 클라이언트 인증 방식: POST 방식으로 Client Secret 전송
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
@@ -123,7 +123,7 @@ spring:
           google:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
-            redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
+            redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.fanlink.site/login/oauth2/code/google}
             client-authentication-method: client_secret_post
             scope:
               - email
@@ -135,7 +135,7 @@ spring:
             client-secret: ${NAVER_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8080/login/oauth2/code/naver}
+            redirect-uri: ${NAVER_REDIRECT_URI:https://api.fanlink.site/login/oauth2/code/naver}
             scope:
               - name
               - email
@@ -149,7 +149,7 @@ spring:
             client-secret: ${INSTAGRAM_CLIENT_SECRET}
             client-authentication-method: client_secret_post
             authorization-grant-type: authorization_code
-            redirect-uri: http://localhost:8080/login/oauth2/code/instagram
+            redirect-uri: ${INSTAGRAM_REDIRECT_URI:https://api.fanlink.site/login/oauth2/code/instagram}
             scope:
               - user_profile
               - user_media
@@ -182,7 +182,7 @@ spring:
 
 #커스텀설정-root레벨
 aws:
-  region: ${AWS_REGION:ap-northeast-2}
+  region: ${AWS_REGION}
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
   cloudfront:
@@ -277,7 +277,7 @@ payment:
 #oauth2:
 #  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000}
 oauth2:
-  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/login/success}
+  redirect-uri: ${OAUTH2_REDIRECT_URI:https://fan-link-project.vercel.app/oauth2/login/success}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -295,6 +295,11 @@ delivery:
   # 개발/테스트 모드: true일 때 FakeDeliveryTracker 우선 사용 (API 키 없어도 동작)
   # 프로덕션: false로 설정하고 실제 API 키 입력
   mock-enabled: ${DELIVERY_MOCK_ENABLED:true}
+  webhook:
+    # 운영 권장: true + AFTERSHIP_WEBHOOK_SECRET 설정
+    signature-enabled: ${DELIVERY_WEBHOOK_SIGNATURE_ENABLED:true}
+    signature-header: ${DELIVERY_WEBHOOK_SIGNATURE_HEADER:as-signature-hmac-sha256}
+    aftership-secret: ${AFTERSHIP_WEBHOOK_SECRET:}
 
 external:
   aftership:
@@ -322,3 +327,9 @@ app:
   kafka:
     trusted-packages: org.example.backend.chat.dto
     live-group-id: live-chat-group
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

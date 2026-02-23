@@ -7,14 +7,9 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiPost, getToken } from "@/lib/api";
+import { apiGet, apiPost, getToken } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
-
-// IVS 채널 생성 API는 현재 없음. channelArn은 사전 프로비저닝된 값 사용.
-const DEFAULT_CHANNEL_ARN =
-  (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_IVS_CHANNEL_ARN) ||
-  "arn:aws:ivs:ap-northeast-2:000000000000:channel/dev";
 
 export default function ArtistLiveCreatePage() {
   const router = useRouter();
@@ -45,8 +40,20 @@ export default function ArtistLiveCreatePage() {
     }
 
     try {
+      // 현재 로그인한 아티스트의 channelArn 조회 후 라이브 세션 생성에 사용
+      const channelArnRaw = await apiGet("/api/artist/me/channel-arn");
+      const channelArn =
+        typeof channelArnRaw === "string"
+          ? channelArnRaw
+          : (channelArnRaw?.channelArn ?? "");
+      if (!channelArn.trim()) {
+        setError("아티스트 채널 정보를 불러올 수 없습니다. 관리자에게 문의해 주세요.");
+        setSubmitting(false);
+        return;
+      }
+
       const res = await apiPost("/api/live-sessions", {
-        channelArn: DEFAULT_CHANNEL_ARN,
+        channelArn: channelArn.trim(),
         title: title.trim(),
         isPaid: visibility === "MEMBERS_ONLY",
       });

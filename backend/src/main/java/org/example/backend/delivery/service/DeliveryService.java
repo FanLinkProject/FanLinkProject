@@ -3,6 +3,7 @@ package org.example.backend.delivery.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.delivery.dto.DeliveryResponseDto;
+import org.example.backend.delivery.dto.DeliveryStatusHistoryResponseDto;
 import org.example.backend.delivery.entity.Delivery;
 import org.example.backend.delivery.entity.DeliveryStatusHistory;
 import org.example.backend.delivery.enums.DeliveryStatus;
@@ -10,18 +11,25 @@ import org.example.backend.delivery.exception.DeliveryErrorCode;
 import org.example.backend.delivery.exception.DeliveryException;
 import org.example.backend.delivery.repository.DeliveryRepository;
 import org.example.backend.delivery.repository.DeliveryStatusHistoryRepository;
-import org.example.backend.global.integration.AfterShipService;
 import org.example.backend.global.integration.DeliveryTracker;
-import org.example.backend.global.integration.FakeDeliveryTracker;
-import org.example.backend.global.integration.SweetTrackerService;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.notification.service.NotificationService;
-import org.springframework.beans.factory.annotation.Value;
+import org.example.backend.order.entity.Order;
+import org.example.backend.order.entity.OrderItem;
+import org.example.backend.product.entity.Product;
+import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -30,45 +38,40 @@ import java.util.List;
 public class DeliveryService {
 
     private final DeliveryRepository deliveryRepository;
-
-    // ★핵심★: 모든 트래커 구현체들을 리스트로 주입받습니다. (@Order로 우선순위 정렬됨)
-    private final List<DeliveryTracker> deliveryTrackers;
-
-    // 특정 트래커 서비스 (국가별 판단용)
-    private final FakeDeliveryTracker fakeDeliveryTracker;
-    private final SweetTrackerService sweetTrackerService;
-    private final AfterShipService afterShipService;
-
+    private final DeliveryTrackerResolver deliveryTrackerResolver;
     private final DeliveryStatusHistoryRepository deliveryStatusHistoryRepository;
     private final NotificationService notificationService;
+    private final DeliveryMetricsRecorder deliveryMetricsRecorder;
+    private final ArtistPermissionService artistPermissionService;
 
-    @Value("${delivery.mock-enabled:true}")
-    private boolean mockEnabled;
-
-    /**
-     * [관리자] 배송 시작 (송장 번호 입력)
-     */
     @Transactional
-    public DeliveryResponseDto startShipping(Long deliveryId, String courierCode, String trackingNumber) {
+    public DeliveryResponseDto startShipping(
+            Long deliveryId,
+            String courierCode,
+            String trackingNumber,
+            Long operatorUserId,
+            UserRole operatorRole
+    ) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
+        authorizeStartShipping(delivery, operatorUserId, operatorRole);
+
+        String normalizedCourierCode = normalizeRequired(courierCode);
+        String normalizedTrackingNumber = normalizeRequired(trackingNumber);
+        assertTrackingUnique(deliveryId, normalizedCourierCode, normalizedTrackingNumber);
 
         DeliveryStatus before = delivery.getStatus();
-        delivery.startShipping(courierCode, trackingNumber);
-
-        // 상태 이력 기록
-        recordStatusChange(delivery, before, delivery.getStatus(), "START_SHIPPING");
+        try {
+            delivery.startShipping(normalizedCourierCode, normalizedTrackingNumber);
+            recordStatusChange(delivery, before, delivery.getStatus(), "START_SHIPPING");
+            deliveryRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new DeliveryException(DeliveryErrorCode.DUPLICATE_TRACKING_INFO);
+        }
 
         return DeliveryResponseDto.from(delivery, "Ready");
     }
 
-    /**
-     * [사용자] 배송 추적 조회
-     * 
-     * 트래커 선택 우선순위:
-     * 1. FakeDeliveryTracker (개발 모드 + courierCode = "TEST")
-     * 2. 국가별 트래커 (국내 = SweetTracker, 해외 = AfterShip)
-     */
     @Transactional
     public DeliveryResponseDto trackDelivery(Long deliveryId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
@@ -77,77 +80,149 @@ public class DeliveryService {
         String currentStatus = "Unknown";
 
         if (delivery.getTrackingNumber() == null || delivery.getCourierCode() == null) {
-            log.warn("배송 추적 정보가 없습니다. deliveryId={}", deliveryId);
+            log.warn("Delivery tracking info is missing. deliveryId={}", deliveryId);
             return DeliveryResponseDto.from(delivery, "READY");
         }
 
-        // ★전략 패턴 적용★: 우선순위에 따라 트래커 선택
-        DeliveryTracker tracker = selectTracker(delivery);
-        
+        DeliveryTracker tracker = deliveryTrackerResolver.resolve(delivery.getCountry(), delivery.getCourierCode());
         if (tracker == null) {
-            log.warn("지원하지 않는 택배사 코드입니다. courierCode={}, deliveryId={}", 
-                    delivery.getCourierCode(), deliveryId);
+            log.warn("Unsupported delivery tracker route. countryCode={}, courierCode={}, deliveryId={}",
+                    delivery.getCountry(), delivery.getCourierCode(), deliveryId);
             throw new DeliveryException(DeliveryErrorCode.UNSUPPORTED_COURIER_CODE);
         }
 
+        Instant start = Instant.now();
         try {
             currentStatus = tracker.getDeliveryStatus(delivery.getCourierCode(), delivery.getTrackingNumber());
+            deliveryMetricsRecorder.recordTrackingApiLatency(
+                    tracker.getClass().getSimpleName(),
+                    "success",
+                    Duration.between(start, Instant.now())
+            );
 
-            // 외부 상태를 내부 DeliveryStatus 로 매핑
             DeliveryStatus mappedStatus = DeliveryStatus.mapAfterShipStatus(currentStatus);
             DeliveryStatus before = delivery.getStatus();
 
             if (mappedStatus != null && before != mappedStatus) {
                 delivery.updateStatus(mappedStatus);
                 recordStatusChange(delivery, before, mappedStatus, "TRACKING_POLLING");
-
-                // 배송 이슈 발생 시 알림 발송
                 if (mappedStatus == DeliveryStatus.ISSUE) {
                     notifyDeliveryIssue(delivery, currentStatus);
                 }
             }
         } catch (Exception e) {
-            log.error("배송 추적 조회 중 오류 발생. deliveryId={}, courierCode={}", 
-                    deliveryId, delivery.getCourierCode(), e);
+            deliveryMetricsRecorder.recordTrackingApiLatency(
+                    tracker.getClass().getSimpleName(),
+                    "error",
+                    Duration.between(start, Instant.now())
+            );
+            deliveryMetricsRecorder.incrementTrackingApiFailed(
+                    tracker.getClass().getSimpleName(),
+                    e.getClass().getSimpleName()
+            );
+            log.error("Delivery tracking failed. deliveryId={}, courierCode={}", deliveryId, delivery.getCourierCode(), e);
             currentStatus = "ERROR";
         }
 
         return DeliveryResponseDto.from(delivery, currentStatus);
     }
 
-    /**
-     * 배송 정보에 맞는 트래커를 선택합니다.
-     * 우선순위: FakeDeliveryTracker > 국가별 트래커 (국내/해외)
-     */
-    private DeliveryTracker selectTracker(Delivery delivery) {
-        String courierCode = delivery.getCourierCode();
+    @Transactional
+    public DeliveryResponseDto trackDeliveryForUser(Long deliveryId, Long userId) {
+        Delivery delivery = deliveryRepository.findByIdAndOrderUserId(deliveryId, userId)
+                .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED));
+        return trackDelivery(delivery.getId());
+    }
 
-        // 1순위: FakeDeliveryTracker (개발 모드)
-        if (fakeDeliveryTracker.isSupported(courierCode)) {
-            log.debug("FakeDeliveryTracker 선택: courierCode={}", courierCode);
-            return fakeDeliveryTracker;
+    @Transactional(readOnly = true)
+    public List<DeliveryStatusHistoryResponseDto> getStatusHistoryForUser(Long deliveryId, Long userId) {
+        deliveryRepository.findByIdAndOrderUserId(deliveryId, userId)
+                .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED));
+
+        return deliveryStatusHistoryRepository.findByDelivery_IdOrderByCreatedAtAsc(deliveryId).stream()
+                .map(DeliveryStatusHistoryResponseDto::from)
+                .toList();
+    }
+
+    @Transactional
+    public void handleAfterShipWebhook(String trackingNumber, String courierCode, String externalStatus) {
+        deliveryMetricsRecorder.incrementWebhookReceived("aftership");
+        try {
+            String normalizedTrackingNumber = normalizeNullable(trackingNumber);
+            if (normalizedTrackingNumber == null) {
+                throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
+            }
+
+            Delivery delivery = resolveWebhookTargetDelivery(normalizedTrackingNumber, courierCode)
+                    .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
+
+            DeliveryStatus mapped = DeliveryStatus.mapAfterShipStatus(externalStatus);
+            DeliveryStatus before = delivery.getStatus();
+            if (before != mapped) {
+                delivery.updateStatus(mapped);
+                recordStatusChange(delivery, before, mapped, "AFTERSHIP_WEBHOOK");
+                if (mapped == DeliveryStatus.ISSUE) {
+                    notifyDeliveryIssue(delivery, externalStatus);
+                }
+            }
+            deliveryMetricsRecorder.incrementWebhookProcessed("aftership");
+        } catch (RuntimeException e) {
+            deliveryMetricsRecorder.incrementWebhookFailed("aftership", e.getClass().getSimpleName());
+            throw e;
+        }
+    }
+
+    private void authorizeStartShipping(Delivery delivery, Long operatorUserId, UserRole operatorRole) {
+        if (operatorUserId == null || operatorRole == null) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+        if (operatorRole == UserRole.ADMIN) {
+            return;
+        }
+        if (operatorRole != UserRole.ARTIST && operatorRole != UserRole.GROUP) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
         }
 
-        // 2순위: 국가별 트래커 선택
-        if (delivery.isDomestic()) {
-            // 국내 배송: SweetTracker
-            if (sweetTrackerService.isSupported(courierCode)) {
-                log.debug("SweetTrackerService 선택: 국내 배송, courierCode={}", courierCode);
-                return sweetTrackerService;
-            }
-        } else {
-            // 해외 배송: AfterShip
-            if (afterShipService.isSupported(courierCode)) {
-                log.debug("AfterShipService 선택: 해외 배송, courierCode={}", courierCode);
-                return afterShipService;
-            }
+        Order order = delivery.getOrder();
+        if (order == null || order.getOrderItems() == null || order.getOrderItems().isEmpty()) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
         }
 
-        // 3순위: 기존 로직 (isSupported로만 판단) - 하위 호환성
-        return deliveryTrackers.stream()
-                .filter(t -> t.isSupported(courierCode))
-                .findFirst()
-                .orElse(null);
+        Set<Long> shippableArtistIds = new HashSet<>();
+        for (OrderItem item : order.getOrderItems()) {
+            if (item == null) {
+                continue;
+            }
+            Product product = item.getProduct();
+            if (product == null) {
+                continue;
+            }
+            if (product.getArtistId() == null) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(product.getIsMembership())) {
+                continue;
+            }
+            if (product.getConcertId() != null) {
+                continue;
+            }
+            shippableArtistIds.add(product.getArtistId());
+        }
+
+        if (shippableArtistIds.isEmpty()) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+
+        boolean canManageAll = shippableArtistIds.stream()
+                .allMatch(artistId -> artistPermissionService.canManagePage(
+                        artistId,
+                        operatorUserId,
+                        operatorRole,
+                        true
+                ));
+        if (!canManageAll) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
     }
 
     private void recordStatusChange(Delivery delivery, DeliveryStatus from, DeliveryStatus to, String reason) {
@@ -156,6 +231,45 @@ public class DeliveryService {
         }
         DeliveryStatusHistory history = DeliveryStatusHistory.of(delivery, from, to, reason);
         deliveryStatusHistoryRepository.save(history);
+        deliveryMetricsRecorder.incrementStatusTransition(from, to, reason);
+    }
+
+    private Optional<Delivery> resolveWebhookTargetDelivery(String trackingNumber, String courierCode) {
+        String normalizedCourierCode = normalizeNullable(courierCode);
+        if (normalizedCourierCode != null) {
+            return deliveryRepository.findByTrackingNumberAndCourierCode(trackingNumber, normalizedCourierCode);
+        }
+
+        List<Delivery> byTrackingNumber = deliveryRepository.findAllByTrackingNumber(trackingNumber);
+        if (byTrackingNumber.size() > 1) {
+            throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
+        }
+        return byTrackingNumber.stream().findFirst();
+    }
+
+    private void assertTrackingUnique(Long deliveryId, String courierCode, String trackingNumber) {
+        deliveryRepository.findByTrackingNumberAndCourierCode(trackingNumber, courierCode)
+                .ifPresent(existing -> {
+                    if (!existing.getId().equals(deliveryId)) {
+                        throw new DeliveryException(DeliveryErrorCode.DUPLICATE_TRACKING_INFO);
+                    }
+                });
+    }
+
+    private String normalizeRequired(String value) {
+        String normalized = normalizeNullable(value);
+        if (normalized == null) {
+            throw new DeliveryException(DeliveryErrorCode.INVALID_TRACKING_NUMBER);
+        }
+        return normalized;
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private void notifyDeliveryIssue(Delivery delivery, String trackingStatus) {
@@ -168,14 +282,14 @@ public class DeliveryService {
         }
 
         String content = String.format(
-                "주문 '%s' 의 배송에 이슈가 발생했습니다. 현재 상태: %s",
+                "Order '%s' has a delivery issue. Current status: %s",
                 delivery.getOrder().getName(),
                 trackingStatus
         );
 
         NotificationSendRequest request = NotificationSendRequest.builder()
                 .receiverId(receiverId)
-                .senderId(receiverId) // 별도 시스템 유저가 없어서 수신자 기준으로 설정
+                .senderId(receiverId)
                 .type(NotificationType.DELIVERY_ISSUE)
                 .content(content)
                 .build();

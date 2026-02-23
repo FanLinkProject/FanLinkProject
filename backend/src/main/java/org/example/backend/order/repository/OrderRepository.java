@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import org.springframework.data.jpa.repository.Query;
+import java.util.List;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
         Optional<Order> findByOrderNo(String orderNo);
@@ -40,4 +41,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
          */
         @Query("SELECT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product WHERE o.id = :id")
         Optional<Order> findByIdWithOrderItemsAndProducts(@Param("id") Long id);
+
+        @Query("""
+                        SELECT DISTINCT o
+                        FROM Order o
+                        JOIN FETCH o.orderItems oi
+                        JOIN FETCH oi.product p
+                        LEFT JOIN FETCH o.delivery d
+                        WHERE d IS NOT NULL
+                          AND p.artistId IS NOT NULL
+                          AND p.isMembership = false
+                          AND p.concertId IS NULL
+                        ORDER BY o.createdAt DESC
+                        """)
+        List<Order> findAllShippableOrdersWithDelivery();
 }
