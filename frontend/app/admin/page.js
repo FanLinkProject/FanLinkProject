@@ -143,9 +143,9 @@ export default function AdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <section className="lg:col-span-8 space-y-8">
           <Surface variant="primary" className="overflow-hidden">
-            <h3 className="text-lg font-black text-red-400 mb-6 px-8 pt-8 flex items-center gap-2">
-              <span className="material-symbols-outlined text-2xl">error</span>
-              해결 요망: ABANDONED 정산 내역
+            <h3 className="text-lg font-black text-white mb-6 px-8 pt-8 flex items-center gap-2">
+              <span className="material-symbols-outlined text-2xl text-red-500">error</span>
+              <span>해결 요망:</span> <span className="text-red-400">ABANDONED</span> <span>정산 내역</span>
             </h3>
             <div className="space-y-0">
               {kpiLoading ? (
