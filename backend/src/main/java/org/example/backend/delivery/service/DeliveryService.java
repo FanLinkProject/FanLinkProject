@@ -18,6 +18,8 @@ import org.example.backend.notification.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +33,7 @@ public class DeliveryService {
     private final DeliveryTrackerResolver deliveryTrackerResolver;
     private final DeliveryStatusHistoryRepository deliveryStatusHistoryRepository;
     private final NotificationService notificationService;
+    private final DeliveryMetricsRecorder deliveryMetricsRecorder;
 
     /**
      * [관리자] 배송 시작 (송장 번호 입력)
@@ -78,8 +81,14 @@ public class DeliveryService {
             throw new DeliveryException(DeliveryErrorCode.UNSUPPORTED_COURIER_CODE);
         }
 
+        Instant start = Instant.now();
         try {
             currentStatus = tracker.getDeliveryStatus(delivery.getCourierCode(), delivery.getTrackingNumber());
+            deliveryMetricsRecorder.recordTrackingApiLatency(
+                    tracker.getClass().getSimpleName(),
+                    "success",
+                    Duration.between(start, Instant.now())
+            );
 
             // 외부 상태를 내부 DeliveryStatus 로 매핑
             DeliveryStatus mappedStatus = DeliveryStatus.mapAfterShipStatus(currentStatus);
@@ -95,6 +104,12 @@ public class DeliveryService {
                 }
             }
         } catch (Exception e) {
+            deliveryMetricsRecorder.recordTrackingApiLatency(
+                    tracker.getClass().getSimpleName(),
+                    "error",
+                    Duration.between(start, Instant.now())
+            );
+            deliveryMetricsRecorder.incrementTrackingApiFailed(tracker.getClass().getSimpleName(), e.getClass().getSimpleName());
             log.error("배송 추적 조회 중 오류 발생. deliveryId={}, courierCode={}", 
                     deliveryId, delivery.getCourierCode(), e);
             currentStatus = "ERROR";
@@ -122,21 +137,28 @@ public class DeliveryService {
 
     @Transactional
     public void handleAfterShipWebhook(String trackingNumber, String courierCode, String externalStatus) {
-        if (trackingNumber == null || trackingNumber.isBlank()) {
-            throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
-        }
-
-        Delivery delivery = resolveWebhookTargetDelivery(trackingNumber, courierCode)
-                .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
-
-        DeliveryStatus mapped = DeliveryStatus.mapAfterShipStatus(externalStatus);
-        DeliveryStatus before = delivery.getStatus();
-        if (before != mapped) {
-            delivery.updateStatus(mapped);
-            recordStatusChange(delivery, before, mapped, "AFTERSHIP_WEBHOOK");
-            if (mapped == DeliveryStatus.ISSUE) {
-                notifyDeliveryIssue(delivery, externalStatus);
+        deliveryMetricsRecorder.incrementWebhookReceived("aftership");
+        try {
+            if (trackingNumber == null || trackingNumber.isBlank()) {
+                throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
             }
+
+            Delivery delivery = resolveWebhookTargetDelivery(trackingNumber, courierCode)
+                    .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
+
+            DeliveryStatus mapped = DeliveryStatus.mapAfterShipStatus(externalStatus);
+            DeliveryStatus before = delivery.getStatus();
+            if (before != mapped) {
+                delivery.updateStatus(mapped);
+                recordStatusChange(delivery, before, mapped, "AFTERSHIP_WEBHOOK");
+                if (mapped == DeliveryStatus.ISSUE) {
+                    notifyDeliveryIssue(delivery, externalStatus);
+                }
+            }
+            deliveryMetricsRecorder.incrementWebhookProcessed("aftership");
+        } catch (RuntimeException e) {
+            deliveryMetricsRecorder.incrementWebhookFailed("aftership", e.getClass().getSimpleName());
+            throw e;
         }
     }
 
@@ -146,6 +168,7 @@ public class DeliveryService {
         }
         DeliveryStatusHistory history = DeliveryStatusHistory.of(delivery, from, to, reason);
         deliveryStatusHistoryRepository.save(history);
+        deliveryMetricsRecorder.incrementStatusTransition(from, to, reason);
     }
 
     private Optional<Delivery> resolveWebhookTargetDelivery(String trackingNumber, String courierCode) {
