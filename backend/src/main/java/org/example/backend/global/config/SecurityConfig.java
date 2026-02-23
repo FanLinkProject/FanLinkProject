@@ -69,6 +69,7 @@ public class SecurityConfig {
                     .requestMatchers(GET, "/api/artists/*/music-videos").permitAll()
                     .requestMatchers(GET, "/api/artists/*/music-videos/*").permitAll()
                     .requestMatchers("/api/payments/toss/**").permitAll()
+                    .requestMatchers(GET, "/api/payments/config").permitAll()
                     .requestMatchers("/api/artist-posts/notices").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/deliveries/*/start")
                     .hasAnyRole("ADMIN", "ARTIST", "GROUP")
