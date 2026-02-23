@@ -26,6 +26,18 @@ import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
 // --- 상수 및 헬퍼 함수 ---
 const CANDY_COST = 500;
+
+/** embed URL(또는 short URL)을 YouTube watch URL로 변환. 새 탭에서 열 때 153 오류 방지 */
+function toYouTubeWatchUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  const embedMatch = trimmed.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/i);
+  if (embedMatch) return `https://www.youtube.com/watch?v=${embedMatch[1]}`;
+  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/i);
+  if (shortMatch) return `https://www.youtube.com/watch?v=${shortMatch[1]}`;
+  if (/youtube\.com\/watch\?/i.test(trimmed)) return trimmed;
+  return null;
+}
 const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
 
 function getAuthHeaders() {
@@ -131,6 +143,7 @@ function ArtistDetailPageInner({ paramsId }) {
     const [fanIsLikedMap, setFanIsLikedMap] = useState({});
     const [fanCommentCountMap, setFanCommentCountMap] = useState({});
     const [myUserId, setMyUserId] = useState(null);
+    const [myGroupId, setMyGroupId] = useState(null);
     const [createPostLoading, setCreatePostLoading] = useState(false);
 
     // 참여 공연 / MV / 라이브
@@ -227,7 +240,10 @@ function ArtistDetailPageInner({ paramsId }) {
         setCurrentUser(user);
         if (!user) return;
         request("/api/user/profile")
-            .then((data) => setMyUserId(data?.id ?? null))
+            .then((data) => {
+              setMyUserId(data?.id ?? null);
+              setMyGroupId(data?.groupId ?? null);
+            })
             .catch(() => {});
         axios.get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
             .then(res => {
@@ -558,9 +574,17 @@ function ArtistDetailPageInner({ paramsId }) {
     return (
         <div className="flex flex-col min-h-full relative pb-20">
             {/* 커버 섹션 */}
-            <div className="h-64 w-full relative overflow-hidden shrink-0">
+            <div className="h-64 w-full relative overflow-hidden shrink-0 group/cover">
                 {artist.cover ? <img src={artist.cover} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-white/5" />}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
+                {isRealGroup && myGroupId != null && String(myGroupId) === String(groupId) && (
+                    <Link
+                        href="/mypage?open=artist-profile"
+                        className="absolute top-4 right-4 px-4 py-2 rounded-xl bg-black/50 hover:bg-violet-600/80 text-white text-sm font-medium border border-white/10 opacity-0 group-hover/cover:opacity-100 transition-opacity"
+                    >
+                        커버 이미지 변경
+                    </Link>
+                )}
             </div>
 
             {/* 헤더 프로필 */}
@@ -913,7 +937,7 @@ function ArtistDetailPageInner({ paramsId }) {
                             <div className="grid grid-cols-2 gap-6">
                                 {musicVideos.map(mv => (
                                     <Surface key={mv.id} className="p-4 group cursor-pointer">
-                                        <a href={mv.embedUrl} target="_blank" rel="noreferrer">
+                                        <a href={toYouTubeWatchUrl(mv.embedUrl) || mv.embedUrl} target="_blank" rel="noreferrer">
                                             <div className="aspect-video rounded-xl overflow-hidden mb-4">
                                                 <img src={mv.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
                                             </div>

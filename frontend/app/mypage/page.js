@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
 import Surface from "@/components/ui/Surface";
@@ -34,6 +35,7 @@ function getIsAdminFromToken() {
 }
 
 export default function MyPage() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,9 +51,11 @@ export default function MyPage() {
   const [pwMessage, setPwMessage] = useState("");
 
   const [showProfileImageEdit, setShowProfileImageEdit] = useState(false);
-  const [profileImageUrlInput, setProfileImageUrlInput] = useState("");
+  const [profileImageMediaAssetId, setProfileImageMediaAssetId] = useState(null);
+  const [profileImagePreviewUrl, setProfileImagePreviewUrl] = useState(null);
   const [profileImageLoading, setProfileImageLoading] = useState(false);
   const [profileImageMessage, setProfileImageMessage] = useState("");
+  const fanProfileImageInputRef = useRef(null);
 
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -143,6 +147,25 @@ export default function MyPage() {
       });
   }, []);
 
+  const openedArtistProfileFromQuery = useRef(false);
+  useEffect(() => {
+    if (loading || openedArtistProfileFromQuery.current) return;
+    if (searchParams.get("open") === "artist-profile" && artistProfile != null) {
+      openedArtistProfileFromQuery.current = true;
+      setArtistProfileEdit({
+        bio: artistProfile?.bio ?? "",
+        profileImageUrl: artistProfile?.profileImageUrl ?? "",
+        bannerImageUrl: artistProfile?.bannerImageUrl ?? "",
+        profileImageMediaAssetId: null,
+        bannerImageMediaAssetId: null,
+        profileImagePreviewUrl: null,
+        bannerImagePreviewUrl: null,
+      });
+      setArtistProfileEditMessage("");
+      setShowArtistProfileEdit(true);
+    }
+  }, [searchParams, loading, artistProfile]);
+
   const handleChangePassword = async () => {
     setPwMessage("");
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -173,23 +196,41 @@ export default function MyPage() {
     }
   };
 
+  const handleFanProfileImageUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !file.type.startsWith("image/") || !uploadProfileImage) return;
+    const result = await uploadProfileImage(file);
+    if (result?.mediaAssetId && result?.url) {
+      setProfileImageMediaAssetId(result.mediaAssetId);
+      setProfileImagePreviewUrl(result.url);
+    }
+    e.target.value = "";
+  };
+
   const handleProfileImageSubmit = async () => {
+    if (!profileImageMediaAssetId) return;
     setProfileImageMessage("");
     setProfileImageLoading(true);
     try {
       const headers = getAuthHeaders();
       await axios.put(
         `${BASE_URL}/api/user/profile`,
-        { nickname: data?.profile?.nickname ?? "", profileImageUrl: profileImageUrlInput },
+        {
+          nickname: data?.profile?.nickname ?? "",
+          profileImageMediaAssetId,
+        },
         { headers }
       );
+      const newUrl = profileImagePreviewUrl;
       setData((prev) =>
         prev && prev.profile
-          ? { ...prev, profile: { ...prev.profile, profileImageUrl: profileImageUrlInput } }
+          ? { ...prev, profile: { ...prev.profile, profileImageUrl: newUrl } }
           : prev
       );
       setProfileImageMessage("저장되었습니다.");
       setShowProfileImageEdit(false);
+      setProfileImageMediaAssetId(null);
+      setProfileImagePreviewUrl(null);
     } catch (e) {
       setProfileImageMessage(e.response?.data?.message ?? "저장에 실패했습니다.");
     } finally {
@@ -421,7 +462,8 @@ export default function MyPage() {
                   type="button"
                   onClick={() => {
                     setShowProfileImageEdit(true);
-                    setProfileImageUrlInput(profile?.profileImageUrl || "");
+                    setProfileImageMediaAssetId(null);
+                    setProfileImagePreviewUrl(null);
                     setProfileImageMessage("");
                   }}
                   className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
@@ -647,7 +689,8 @@ export default function MyPage() {
               type="button"
               onClick={() => {
                 setShowProfileImageEdit(true);
-                setProfileImageUrlInput(profile?.profileImageUrl || "");
+                setProfileImageMediaAssetId(null);
+                setProfileImagePreviewUrl(null);
                 setProfileImageMessage("");
               }}
               className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
@@ -691,16 +734,17 @@ export default function MyPage() {
         <Surface variant="primary" className="p-6 max-w-md">
           <h3 className="text-lg font-semibold text-white mb-4">프로필 이미지 변경</h3>
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1 block">
-              이미지 URL
-            </label>
-            <input
-              type="url"
-              value={profileImageUrlInput}
-              onChange={(e) => setProfileImageUrlInput(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-4 py-3 rounded-xl text-sm bg-[#201a33] text-white border border-white/[0.06] focus:ring-2 focus:ring-violet-500/20 outline-none"
-            />
+            <input ref={fanProfileImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleFanProfileImageUpload} />
+            {profileImagePreviewUrl ? (
+              <div className="relative inline-block">
+                <img src={profileImagePreviewUrl} alt="미리보기" className="size-24 rounded-xl object-cover border border-white/10" />
+                <button type="button" onClick={() => { setProfileImagePreviewUrl(null); setProfileImageMediaAssetId(null); }} className="absolute -top-1 -right-1 size-6 rounded-full bg-red-500 text-white text-xs">×</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => fanProfileImageInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 hover:text-violet-300 text-sm w-full">
+                사진 선택 (파일 탐색기)
+              </button>
+            )}
             {profileImageMessage && (
               <p className="text-xs text-white/70">{profileImageMessage}</p>
             )}
@@ -709,7 +753,7 @@ export default function MyPage() {
                 variant="primary"
                 className="flex-1 py-2.5 text-xs"
                 onClick={handleProfileImageSubmit}
-                disabled={profileImageLoading}
+                disabled={profileImageLoading || !profileImageMediaAssetId}
               >
                 {profileImageLoading ? "저장 중..." : "저장"}
               </Button>
@@ -718,7 +762,8 @@ export default function MyPage() {
                 className="py-2.5 text-xs border border-white/10"
                 onClick={() => {
                   setShowProfileImageEdit(false);
-                  setProfileImageUrlInput("");
+                  setProfileImageMediaAssetId(null);
+                  setProfileImagePreviewUrl(null);
                   setProfileImageMessage("");
                 }}
               >
