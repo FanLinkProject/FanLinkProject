@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { sendPhoneCode, verifyPhoneCode } from "@/lib/authApi";
 import { getProfile, completeOAuthProfile } from "@/lib/userApi";
 
 function InputGroup({ label, value, onChange, placeholder, type = "text", required }) {
@@ -34,6 +35,10 @@ export default function OAuthCompletePage() {
     phoneNumber: "",
   });
 
+  const [phoneCode, setPhoneCode] = useState("");
+  const [isPhoneCodeSent, setIsPhoneCodeSent] = useState(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+
   useEffect(() => {
     getProfile()
       .then((profile) => {
@@ -45,27 +50,77 @@ export default function OAuthCompletePage() {
         }));
       })
       .catch(() => {
-        setError("프로필을 불러오지 못했습니다. 로그인 후 다시 시도해 주세요.");
+        setError("프로필을 불러오지 못했습니다. 다시 로그인 후 시도해주세요.");
       })
       .finally(() => setLoading(false));
   }, []);
 
+  const handleSendPhoneCode = async () => {
+    const phone = form.phoneNumber?.trim();
+    if (!phone) {
+      setError("전화번호를 먼저 입력해주세요.");
+      return;
+    }
+
+    setError("");
+    try {
+      await sendPhoneCode(phone);
+      setIsPhoneCodeSent(true);
+      setIsPhoneVerified(false);
+    } catch (err) {
+      setError(err?.data?.message || err?.message || "인증번호 발송에 실패했습니다.");
+    }
+  };
+
+  const handleVerifyPhoneCode = async () => {
+    const phone = form.phoneNumber?.trim();
+    if (!phone) {
+      setError("전화번호를 먼저 입력해주세요.");
+      return;
+    }
+    if (!phoneCode || phoneCode.length !== 6) {
+      setError("인증번호 6자리를 입력해주세요.");
+      return;
+    }
+
+    setError("");
+    try {
+      await verifyPhoneCode(phone, phoneCode);
+      setIsPhoneVerified(true);
+    } catch (err) {
+      setIsPhoneVerified(false);
+      setError(err?.data?.message || err?.message || "인증번호 확인에 실패했습니다.");
+    }
+  };
+
+  const handlePhoneChange = (value) => {
+    setForm((prev) => ({ ...prev, phoneNumber: value }));
+    setIsPhoneVerified(false);
+    setError("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
     const { name, gender, birth, phoneNumber } = form;
     if (!name?.trim()) {
-      setError("이름을 입력해 주세요.");
+      setError("이름을 입력해주세요.");
       return;
     }
     if (!birth?.trim()) {
-      setError("생년월일을 입력해 주세요.");
+      setError("생년월일을 입력해주세요.");
       return;
     }
     if (!phoneNumber?.trim()) {
-      setError("전화번호를 입력해 주세요.");
+      setError("전화번호를 입력해주세요.");
       return;
     }
+    if (!isPhoneVerified) {
+      setError("휴대폰 본인인증을 완료해주세요.");
+      return;
+    }
+
     setSaving(true);
     try {
       await completeOAuthProfile({
@@ -98,13 +153,13 @@ export default function OAuthCompletePage() {
             <span className="material-symbols-outlined text-4xl font-black fill-icon">rocket_launch</span>
             <h1 className="text-3xl font-black tracking-tighter text-white">FanLink</h1>
           </Link>
-          <p className="text-white/55 font-medium italic">추가 정보를 입력해 주세요</p>
+          <p className="text-white/55 font-medium italic">추가 정보를 입력해주세요.</p>
         </div>
 
         <div className="bg-[#201a33] rounded-[2.5rem] p-10 border border-white/[0.08]">
           <h2 className="text-xl font-bold text-white mb-2 text-center">추가 정보 입력</h2>
           <p className="text-[11px] text-white/55 text-center mb-8">
-            서비스 이용을 위해 아래 정보를 입력해 주세요. DB에 안전하게 저장됩니다.
+            서비스 이용을 위해 아래 정보를 입력해주세요.
           </p>
 
           {error && (
@@ -122,6 +177,7 @@ export default function OAuthCompletePage() {
               placeholder="홍길동"
               required
             />
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">성별</label>
               <div className="flex gap-4">
@@ -141,6 +197,7 @@ export default function OAuthCompletePage() {
                 ))}
               </div>
             </div>
+
             <InputGroup
               label="생년월일"
               value={form.birth}
@@ -149,20 +206,64 @@ export default function OAuthCompletePage() {
               type="date"
               required
             />
-            <InputGroup
-              label="전화번호"
-              value={form.phoneNumber}
-              onChange={(v) => setForm((p) => ({ ...p, phoneNumber: v }))}
-              placeholder="010-1234-5678"
-              type="tel"
-              required
-            />
+
+            <div className="space-y-3">
+              <InputGroup
+                label="전화번호"
+                value={form.phoneNumber}
+                onChange={handlePhoneChange}
+                placeholder="010-1234-5678"
+                type="tel"
+                required
+              />
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSendPhoneCode}
+                  className="px-4 py-3 bg-[#16102a] border border-white/[0.08] text-white rounded-2xl text-[11px] font-black whitespace-nowrap hover:bg-white/[0.06] transition-all"
+                >
+                  인증코드 발송
+                </button>
+              </div>
+
+              {isPhoneCodeSent && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={phoneCode}
+                    onChange={(e) => {
+                      setPhoneCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                      setIsPhoneVerified(false);
+                    }}
+                    placeholder="인증번호 6자리"
+                    className="flex-1 px-4 py-3.5 bg-[#16102a] border border-white/[0.08] rounded-2xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-violet-500/20 placeholder:text-white/40 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyPhoneCode}
+                    className="px-5 py-3.5 bg-violet-500/90 text-white rounded-2xl text-[12px] font-black whitespace-nowrap hover:brightness-110 transition-all"
+                  >
+                    확인
+                  </button>
+                </div>
+              )}
+
+              {isPhoneVerified && (
+                <p className="text-[11px] font-bold text-emerald-300 px-1">
+                  휴대폰 본인인증이 완료되었습니다.
+                </p>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={saving}
               className="w-full py-4 bg-violet-500/90 text-white rounded-2xl font-black text-sm hover:brightness-110 transition-all disabled:opacity-60"
             >
-              {saving ? "저장 중…" : "저장하고 시작하기"}
+              {saving ? "저장 중..." : "저장하고 시작하기"}
             </button>
           </form>
 
