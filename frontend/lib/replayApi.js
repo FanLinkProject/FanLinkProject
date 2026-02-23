@@ -5,6 +5,10 @@ import { BASE_URL, normalizeToken, request } from "@/lib/api";
 
 export const ReplayAccessType = { FREE: "FREE", PAID: "PAID" };
 
+export function listByArtist(artistId) {
+  return request("/api/replays", { query: { artistId } });
+}
+
 export function getCandidates(artistId) {
   const id = artistId != null ? Number(artistId) : NaN;
   if (Number.isNaN(id) || id < 1) {

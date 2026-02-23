@@ -10,6 +10,8 @@ public record ArtistProfileUpdateRequest(
         @Size(max = 1000) String bio,
         String profileImageUrl,
         String bannerImageUrl,
+        Long profileImageMediaAssetId,
+        Long bannerImageMediaAssetId,
         String officialLinks  // JSON 예: {"instagram":"url","youtube":"url"}
 ) {
 }
