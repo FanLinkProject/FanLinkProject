@@ -3,6 +3,7 @@ package org.example.backend.order.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.delivery.entity.Delivery;
+import org.example.backend.order.dto.response.ArtistOrderDeliveryResponseDto;
 import org.example.backend.order.dto.request.OrderItemDto;
 import org.example.backend.order.dto.request.OrderRequestDto;
 import org.example.backend.order.entity.Order;
@@ -13,9 +14,12 @@ import org.example.backend.product.entity.Product;
 import org.example.backend.product.repository.ProductRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.enums.UserRole;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.user.repository.UserRepository;
 import org.example.backend.order.dto.request.CandyOrderRequestDto;
@@ -23,6 +27,7 @@ import org.example.backend.order.exception.OrderErrorCode;
 import org.example.backend.order.exception.OrderException;
 import org.example.backend.payment.service.PaymentService;
 import org.example.backend.product.enums.ProductPaymentMethod;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
@@ -38,6 +43,7 @@ public class OrderService {
         private final ProductRepository productRepository;
         private final UserRepository userRepository;
         private final PaymentService paymentService;
+        private final ArtistPermissionService artistPermissionService;
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
@@ -108,14 +114,17 @@ public class OrderService {
                 }
 
                 // 3. 배송 정보(Delivery) 생성(아직 송장번호 없음)
-                Delivery delivery = Delivery.createPendingDelivery(
-                        request.recipientName(),
-                        request.recipientPhone(),
-                        request.address(),
-                        request.detailAddress(),
-                        request.countryCode(),
-                        request.zipCode()
-                );
+                Delivery delivery = null;
+                if (hasShippableItem) {
+                        delivery = Delivery.createPendingDelivery(
+                                request.recipientName(),
+                                request.recipientPhone(),
+                                request.address(),
+                                request.detailAddress(),
+                                request.countryCode(),
+                                request.zipCode()
+                        );
+                }
                 if (calculatedTotalAmount.compareTo(BigDecimal.ZERO) > 0 && hasShippableItem) {
                         calculatedTotalAmount = calculatedTotalAmount.add(BigDecimal.valueOf(shippingFee));
                 }
@@ -209,6 +218,14 @@ public class OrderService {
                 order.updateStatus(OrderStatus.CANCELED);
         }
 
+        @Transactional(readOnly = true)
+        public List<ArtistOrderDeliveryResponseDto> getArtistConsoleOrders(Long operatorUserId, UserRole operatorRole) {
+                return orderRepository.findAllShippableOrdersWithDelivery().stream()
+                                .filter(order -> canManageOrder(order, operatorUserId, operatorRole))
+                                .map(ArtistOrderDeliveryResponseDto::from)
+                                .toList();
+        }
+
         private void validateShippingRequest(OrderRequestDto request) {
                 if (isBlank(request.recipientName())
                                 || isBlank(request.recipientPhone())
@@ -230,5 +247,54 @@ public class OrderService {
 
         private boolean isBlank(String value) {
                 return value == null || value.isBlank();
+        }
+
+        private boolean canManageOrder(Order order, Long operatorUserId, UserRole operatorRole) {
+                if (operatorRole == UserRole.ADMIN) {
+                        return true;
+                }
+                if (operatorUserId == null || operatorRole == null) {
+                        return false;
+                }
+                if (operatorRole != UserRole.ARTIST && operatorRole != UserRole.GROUP) {
+                        return false;
+                }
+
+                Set<Long> shippableArtistIds = resolveShippableArtistIds(order);
+                if (shippableArtistIds.isEmpty()) {
+                        return false;
+                }
+
+                return shippableArtistIds.stream()
+                                .allMatch(artistId -> artistPermissionService.canManagePage(
+                                                artistId,
+                                                operatorUserId,
+                                                operatorRole,
+                                                true));
+        }
+
+        private Set<Long> resolveShippableArtistIds(Order order) {
+                Set<Long> ids = new HashSet<>();
+                if (order == null || order.getOrderItems() == null) {
+                        return ids;
+                }
+
+                for (OrderItem item : order.getOrderItems()) {
+                        if (item == null) {
+                                continue;
+                        }
+                        Product product = item.getProduct();
+                        if (product == null || product.getArtistId() == null) {
+                                continue;
+                        }
+                        if (Boolean.TRUE.equals(product.getIsMembership())) {
+                                continue;
+                        }
+                        if (product.getConcertId() != null) {
+                                continue;
+                        }
+                        ids.add(product.getArtistId());
+                }
+                return ids;
         }
 }
