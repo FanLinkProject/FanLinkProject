@@ -57,6 +57,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
             Pageable pageable
     );
 
+    /**
+     * 공연 등록용 아티스트 검색: ARTIST 역할만 (그룹 계정 제외).
+     * 그룹에 소속되지 않은 개인 아티스트 + 그룹에 소속된 멤버 아티스트 조회.
+     * keyword가 있으면 닉네임/실명/소속 그룹명으로 검색.
+     */
+    @Query("SELECT DISTINCT u FROM User u LEFT JOIN GroupMember gm ON gm.member = u " +
+           "WHERE u.role = :artistRole AND u.status = :status AND u.deletedAt IS NULL " +
+           "AND (COALESCE(:keyword, '') = '' OR u.nickname LIKE CONCAT('%', :keyword, '%') " +
+           "OR u.name LIKE CONCAT('%', :keyword, '%') OR gm.groupName LIKE CONCAT('%', :keyword, '%'))")
+    Page<User> findArtistsOnlyForConcertSearch(
+            @Param("artistRole") UserRole artistRole,
+            @Param("status") UserStatus status,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
     /** 조회용 아티스트: GROUP 계정 + GroupMember에 속하지 않은 개인 ARTIST만 (페이징 정상 동작) */
     @Query("SELECT u FROM User u " +
            "WHERE u.role IN :roles AND u.status = :status AND u.deletedAt IS NULL " +

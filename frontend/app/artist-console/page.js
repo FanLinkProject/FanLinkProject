@@ -116,8 +116,6 @@ export default function ArtistConsolePage() {
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostIsMembershipOnly, setNewPostIsMembershipOnly] = useState(false);
     const [newPostIsNotice, setNewPostIsNotice] = useState(false);
-    const [newPostImagePreview, setNewPostImagePreview] = useState(null);
-    const [newPostImageFile, setNewPostImageFile] = useState(null);
     const [createPostLoading, setCreatePostLoading] = useState(false);
     const newPostFileInputRef = useRef(null);
 
@@ -393,23 +391,7 @@ export default function ArtistConsolePage() {
         return () => observer.disconnect();
     }, [fanPostsHasNext, fanPostsLastId, loadMoreFanPosts, fanPostsLoading]);
 
-    // 새 글 이미지 핸들러
-    const handleNewPostImageChange = (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !file.type.startsWith("image/")) return;
-        setNewPostImageFile(file);
-        setNewPostImagePreview(URL.createObjectURL(file));
-    };
-
-    const removeNewPostImage = () => {
-        if (newPostImagePreview && newPostImageFile) URL.revokeObjectURL(newPostImagePreview);
-        setNewPostImageFile(null);
-        setNewPostImagePreview(null);
-        if (newPostFileInputRef.current) newPostFileInputRef.current.value = "";
-    };
-
     const closeCreateModal = () => {
-        removeNewPostImage();
         setNewPostContent("");
         setNewPostIsMembershipOnly(false);
         setNewPostIsNotice(false);
@@ -855,45 +837,20 @@ export default function ArtistConsolePage() {
                             </label>
                         )}
 
-                        {/* 사진 첨부 */}
+                        {/* 사진 첨부 버튼 */}
                         <div className="mt-5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-                사진 첨부
-              </span>
-                            <input
-                                ref={newPostFileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleNewPostImageChange}
-                                className="hidden"
-                            />
-                            {!newPostImagePreview ? (
-                                <button
-                                    type="button"
-                                    onClick={() => newPostFileInputRef.current?.click()}
-                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
-                                >
-                  <span className="material-symbols-outlined text-3xl">
-                    add_photo_alternate
-                  </span>
-                                    <span className="text-xs font-bold">클릭하여 사진 추가</span>
-                                </button>
-                            ) : (
-                                <div className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                                    <img
-                                        src={newPostImagePreview}
-                                        alt="미리보기"
-                                        className="w-full max-h-56 object-contain bg-black/20"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={removeNewPostImage}
-                                        className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
-                                    >
-                                        <span className="material-symbols-outlined text-lg">close</span>
-                                    </button>
-                                </div>
-                            )}
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
+                                사진 첨부
+                            </span>
+                            <input ref={newPostFileInputRef} type="file" accept="image/*" className="hidden" />
+                            <button
+                                type="button"
+                                onClick={() => newPostFileInputRef.current?.click()}
+                                className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                                <span className="text-xs font-bold">클릭하여 사진 추가</span>
+                            </button>
                         </div>
 
                         {/* 버튼 */}

@@ -96,6 +96,16 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
+    // 공연 등록용 아티스트 검색: ARTIST만 (그룹 계정 제외). 개인 아티스트 + 그룹 소속 멤버만
+    @GetMapping("/artists/for-concert")
+    public ResponseEntity<Page<ArtistSearchResponse>> getArtistsForConcert(
+            @RequestParam(value = "nickname", required = false) String nickname,
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        Page<ArtistSearchResponse> response = userService.getArtistsForConcert(nickname, pageable);
+        return ResponseEntity.ok(response);
+    }
+
     // 유저 차단
     @PostMapping("/block")
     public ResponseEntity<Void> blockUser(
