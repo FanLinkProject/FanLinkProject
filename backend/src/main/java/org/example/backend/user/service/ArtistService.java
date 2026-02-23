@@ -12,8 +12,6 @@ import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.exception.UserErrorCode;
-import org.example.backend.order.enums.OrderStatus;
-import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.product.repository.ProductRepository;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.example.backend.settlement.service.SettlementDashboardService;
@@ -46,7 +44,6 @@ public class ArtistService {
     private final UserRepository userRepository;
     private final SettlementDashboardService settlementDashboardService;
     private final SettlementPendingRepository settlementPendingRepository;
-    private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -273,13 +270,12 @@ public class ArtistService {
                 artistId, startOfMonth, endOfMonth);
         Long estimated = settlementDashboardService.getEstimatedAmount(artistId).getEstimatedAmount();
         long estimatedSettlement = estimated != null ? estimated : 0L;
-        int pendingShipmentCount = (int) orderRepository.countCompletedOrdersByArtistId(artistId, OrderStatus.COMPLETED);
         int productCount = (int) productRepository.countByArtistId(artistId);
 
         return new ArtistDashboardKpiResponse(
                 monthlySales,
                 estimatedSettlement,
-                pendingShipmentCount,
+                0,  // pendingShipmentCount (주문/배송 미사용)
                 productCount
         );
     }
