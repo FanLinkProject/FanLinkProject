@@ -26,10 +26,6 @@ public class LiveChatWebSocketController {
 	/**
 	 * STOMP 매핑:
 	 * - 클라이언트에서 /pub/live/send 로 메시지 전송
-	 *
-	 * 주의:
-	 * - senderId/nickname 위변조 방지(=실제 로그인 유저 검증)는 interceptor/세션 기반으로 붙이는 걸 권장
-	 * - 현재는 DTO를 그대로 Kafka로 전달
 	 */
 	@MessageMapping("/live/send")
 	public void send(@Payload LiveChatMessageRequest request, Principal principal) {

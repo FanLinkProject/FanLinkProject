@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.milestone.dto.response.FanProfileResponse;
 import org.example.backend.milestone.service.FanProfileService;
-import org.example.backend.milestone.service.JoinDaysScheduler;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,7 +18,6 @@ import java.util.Map;
 public class FanProfileController {
 
     private final FanProfileService fanProfileService;
-    private final JoinDaysScheduler joinDaysScheduler;
 
     /**
      * 내 팬 프로필 목록 조회 (그룹별)
@@ -33,7 +31,7 @@ public class FanProfileController {
     }
 
     /**
-     * 팬 프로필 생성 (테스트용 - groupId로 해당 그룹에 대한 프로필 생성)
+     * 팬 프로필 생성 (groupId로 해당 그룹에 대한 프로필 생성)
      */
     @PostMapping
     public ResponseEntity<FanProfileResponse> createFanProfile(
@@ -79,25 +77,5 @@ public class FanProfileController {
     public ResponseEntity<Void> increaseVisit(@PathVariable Long id, @AuthenticationPrincipal PrincipalDetails principal) {
         fanProfileService.increaseVisitCount(id, principal.getUserId());
         return ResponseEntity.ok().build();
-    }
-
-
-    /**
-     * 테스트용: 특정 팬 프로필의 가입일수 증가
-     */
-    @PostMapping("/{id}/increase-join-days")
-    public ResponseEntity<Void> increaseJoinDays(@PathVariable Long id, @AuthenticationPrincipal PrincipalDetails principal) {
-        fanProfileService.increaseJoinDays(id);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * 테스트용: 모든 팬 프로필의 가입일수를 일괄 증가 (스케줄러 수동 실행)
-     * POST /api/fan-profiles/test/increment-all-join-days
-     */
-    @PostMapping("/test/increment-all-join-days")
-    public ResponseEntity<String> incrementAllJoinDays() {
-        joinDaysScheduler.manualIncrementJoinDays();
-        return ResponseEntity.ok("모든 팬 프로필의 가입일수 증가 완료");
     }
 }

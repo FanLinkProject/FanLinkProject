@@ -14,6 +14,7 @@ import org.example.backend.chat.repository.ChatRoomRepository;
 import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -70,6 +71,24 @@ public class NotificationService {
         }
 
         return emitter;
+    }
+
+    /**
+     * 프록시/로드밸런서가 idle로 연결을 끊지 않도록 주기적으로 SSE 코멘트 전송.
+     * (ERR_INCOMPLETE_CHUNKED_ENCODING 방지)
+     */
+    @Scheduled(fixedDelay = 20_000)
+    public void sendHeartbeat() {
+        for (Long userId : emitterRepository.getAllUserIds()) {
+            SseEmitter emitter = emitterRepository.get(userId);
+            if (emitter == null) continue;
+            try {
+                emitter.send(SseEmitter.event().comment(""));
+            } catch (IOException e) {
+                emitterRepository.delete(userId);
+                try { emitter.complete(); } catch (Exception ignored) { }
+            }
+        }
     }
 
     // 알림 생성 + SSE 푸시
