@@ -57,6 +57,7 @@ function transformArtistPost(p, groupId, groupAvatar = "") {
     createdAt: p.createdAt,
     isMembershipOnly: p.isMembershipOnly ?? false,
     isLockedByServer: !!(p.isMembershipOnly && p.content === null),
+    isNotice: !!p.isNotice,
     type: "ARTIST",
   };
 }
@@ -686,6 +687,7 @@ export default function UserHomePage() {
                   href={`/posts/${post.id}?type=ARTIST&groupId=${post.groupId}`}
                   showVerified={true}
                   isLocked={post.isLockedByServer ?? false}
+                  showCommentButton={!post.isNotice}
                 />
               ))}
             </div>

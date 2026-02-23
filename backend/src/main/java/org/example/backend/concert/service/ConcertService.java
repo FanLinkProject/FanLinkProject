@@ -53,10 +53,10 @@ public class ConcertService {
      * 공연 생성
      */
     public ConcertResponse createConcert(Long creatorId, ConcertCreateRequest request) {
-        // 아티스트 권한 확인
+        // 아티스트/그룹 권한 확인
         User creator = userRepository.findById(creatorId)
                 .orElseThrow(() -> new ConcertException(ConcertErrorCode.NOT_ARTIST_USER));
-        if (creator.getRole() != UserRole.ARTIST) {
+        if (creator.getRole() != UserRole.ARTIST && creator.getRole() != UserRole.GROUP) {
             throw new ConcertException(ConcertErrorCode.NOT_ARTIST_USER);
         }
 
@@ -97,9 +97,12 @@ public class ConcertService {
             concertMediaAssetRepository.save(cma);
         }
 
-        // 아티스트 추가 (artistIds가 없으면 생성자 본인을 추가)
+        // 아티스트 추가: 개인 아티스트는 미선택 시 본인 자동 추가, 그룹 계정은 참여 아티스트 필수
         List<Long> artistIds = request.getArtistIds();
         if (artistIds == null || artistIds.isEmpty()) {
+            if (creator.getRole() == UserRole.GROUP) {
+                throw new ConcertException(ConcertErrorCode.EMPTY_ARTIST_LIST);
+            }
             artistIds = List.of(creatorId);
         }
         addArtistsToConcert(savedConcert, artistIds);

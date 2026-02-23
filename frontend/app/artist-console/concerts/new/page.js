@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 import Surface from "@/components/ui/Surface";
@@ -110,6 +110,24 @@ export default function NewConcertPage() {
     } catch (_) {}
   }, []);
 
+  // 그룹 소속 멤버·개인 아티스트 진입 시에만 본인 미리 선택 (그룹 계정은 비워 둠)
+  // 그룹 계정: profile.groupId === profile.id → 참여 아티스트 빈 상태 유지, 미선택 시 백엔드에서 EMPTY_ARTIST_LIST
+  useEffect(() => {
+    if (userId == null) return;
+    apiGet("/api/user/profile")
+      .then((profile) => {
+        if (!profile?.id) return;
+        const isGroupAccount = profile.groupId != null && Number(profile.groupId) === Number(profile.id);
+        if (isGroupAccount) return;
+        setSelectedArtists((prev) => {
+          const hasSelf = prev.some((a) => Number(a.id) === Number(profile.id));
+          if (hasSelf) return prev;
+          return [{ id: profile.id, nickname: profile.nickname ?? "", profileImageUrl: profile.profileImageUrl ?? null }, ...prev];
+        });
+      })
+      .catch(() => {});
+  }, [userId]);
+
   const [presaleTicketCount, setPresaleTicketCount] = useState("");
   const [saleTicketCount, setSaleTicketCount] = useState("");
   const [presaleStartDateTime, setPresaleStartDateTime] = useState("");
@@ -147,6 +165,10 @@ export default function NewConcertPage() {
       setError("장소를 검색하여 선택해주세요.");
       return;
     }
+    if (!selectedArtists?.length) {
+      setError("참여 아티스트를 1명 이상 선택해 주세요.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -172,11 +194,9 @@ export default function NewConcertPage() {
         posterMediaAssetId != null && Number.isInteger(posterMediaAssetId) && posterMediaAssetId > 0
           ? posterMediaAssetId
           : null;
-      const rawIds = [
-        ...(userId != null && Number.isInteger(Number(userId)) ? [Number(userId)] : []),
-        ...selectedArtists.map((a) => Number(a.id)),
-      ].filter((id) => id > 0 && Number.isInteger(id));
-      const artistIds = rawIds.length > 0 ? [...new Set(rawIds)] : undefined;
+      const artistIds = [
+        ...new Set(selectedArtists.map((a) => Number(a.id)).filter((id) => id > 0 && Number.isInteger(id))),
+      ];
 
       await apiPost("/api/concerts", {
         title: title.trim(),

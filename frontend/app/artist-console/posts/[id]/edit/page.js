@@ -14,10 +14,10 @@ function EditPostContent() {
   const id = typeof params?.id === "string" ? params.id : null;
   const numericId = Number(id);
 
+  const [isIndividualArtist, setIsIndividualArtist] = useState(false);
   const [content, setContent] = useState("");
   const [isMembershipOnly, setIsMembershipOnly] = useState(false);
   const [isNotice, setIsNotice] = useState(false);
-  const [isIndividualArtist, setIsIndividualArtist] = useState(false);
   const [mediaAssetIds, setMediaAssetIds] = useState([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState([]);
   const [writerNickname, setWriterNickname] = useState("");

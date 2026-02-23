@@ -16,6 +16,9 @@ import org.example.backend.post.exception.PostErrorCode;
 import org.example.backend.post.exception.PostException;
 import org.example.backend.comment.enums.TargetType;
 import org.example.backend.comment.service.CommentService;
+import org.example.backend.notification.dto.request.NotificationSendRequest;
+import org.example.backend.notification.entity.NotificationType;
+import org.example.backend.notification.service.NotificationService;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.PostMediaAssetRepository;
 import org.example.backend.subscription.repository.SubscriptionRepository;
@@ -26,6 +29,8 @@ import org.example.backend.user.repository.UserRepository;
 import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -41,6 +46,8 @@ import java.time.Instant;
 @Transactional(readOnly = true)
 public class ArtistPostService {
 
+    private static final Logger log = LoggerFactory.getLogger(ArtistPostService.class);
+
     private final ArtistPostRepository artistPostRepository;
     private final UserRepository userRepository;
     private final PostMediaAssetRepository postMediaAssetRepository;
@@ -50,6 +57,7 @@ public class ArtistPostService {
     private final ArtistPermissionService artistPermissionService;
     private final GroupMemberRepository groupMemberRepository;
     private final CommentService commentService;
+    private final NotificationService notificationService;
 
     private String getCdnBaseUrl() {
         String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
@@ -99,12 +107,15 @@ public class ArtistPostService {
         if (user.getRole() == UserRole.USER) {
             throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
         }
-        if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
-            // 그룹 소속 ARTIST: 자신의 소속 그룹에 대해서만 포스트 작성 허용
-            if (user.getRole() != UserRole.ARTIST
-                    || request.getGroupId() == null
-                    || !groupMemberRepository.existsByGroupIdAndMemberId(request.getGroupId(), userId)) {
-                throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+        // ADMIN: groupId 없이 서비스 공지 작성 허용
+        if (user.getRole() != UserRole.ADMIN || request.getGroupId() != null) {
+            if (!artistPermissionService.isManageAccount(userId, user.getRole())) {
+                // 그룹 소속 ARTIST: 자신의 소속 그룹에 대해서만 포스트 작성 허용
+                if (user.getRole() != UserRole.ARTIST
+                        || request.getGroupId() == null
+                        || !groupMemberRepository.existsByGroupIdAndMemberId(request.getGroupId(), userId)) {
+                    throw new PostException(PostErrorCode.UNAUTHORIZED_ACCESS);
+                }
             }
         }
 
@@ -116,13 +127,22 @@ public class ArtistPostService {
                     .orElseThrow(() -> new PostException(PostErrorCode.GROUP_NOT_FOUND));
         }
 
+        // 그룹 계정(ROLE_GROUP): 항상 공지. 그룹 소속 멤버(ARTIST): 항상 일반글. 그 외: 요청값 사용
+        boolean isNotice;
+        if (user.getRole() == UserRole.GROUP) {
+            isNotice = true;
+        } else if (user.getRole() == UserRole.ARTIST && request.getGroupId() != null) {
+            isNotice = false;
+        } else {
+            isNotice = Boolean.TRUE.equals(request.getIsNotice());
+        }
         ArtistPost artistPost = ArtistPost.builder()
                 .user(user)
                 .group(group)
                 .title(request.getTitle())
                 .content(request.getContent())
                 .isMembershipOnly(request.getIsMembershipOnly())
-                .isNotice(Boolean.TRUE.equals(request.getIsNotice()))
+                .isNotice(isNotice)
                 .status(false)
                 .representativeMediaAssetId(request.getRepresentativeMediaAssetId())
                 .build();
@@ -132,6 +152,15 @@ public class ArtistPostService {
         List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(userId, request.getMediaAssetIds());
         for (MediaAsset asset : mediaAssets) {
             postMediaAssetRepository.save(new PostMediaAsset(PostMediaAssetType.ARTIST, savedPost.getId(), asset));
+        }
+
+        // 서비스 공지(ADMIN + group null) 등록 시 전체 유저에게 알림 발송 (실패해도 공지 등록은 성공)
+        if (user.getRole() == UserRole.ADMIN && group == null && isNotice) {
+            try {
+                notifyServiceNotice(userId, savedPost);
+            } catch (Exception e) {
+                log.warn("공지 알림 발송 실패 (공지 등록은 완료됨): {}", e.getMessage(), e);
+            }
         }
 
         List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, savedPost.getId());
@@ -162,7 +191,7 @@ public class ArtistPostService {
 
     public List<ArtistPostResponse> getNotices(Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
-        return artistPostRepository.findNotices(lastPostId, UserRole.ADMIN, pageable).stream()
+        return artistPostRepository.findNotices(lastPostId, pageable).stream()
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
                         userId, role, true))
@@ -172,7 +201,7 @@ public class ArtistPostService {
     /** 그룹 계정이 올린 공지사항만 조회 (해당 그룹 페이지용) */
     public List<ArtistPostResponse> getNoticesByGroupId(Long groupId, Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
-        return artistPostRepository.findNoticesByGroupId(groupId, lastPostId, UserRole.GROUP, pageable).stream()
+        return artistPostRepository.findNoticesByGroupId(groupId, lastPostId, pageable).stream()
                 .map(post -> buildPostResponseWithAccess(post,
                         postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
                         userId, role, true))
@@ -251,8 +280,17 @@ public class ArtistPostService {
             newRepresentativeId = artistPost.getRepresentativeMediaAssetId();
         }
 
+        // 그룹 계정: 항상 공지. 그룹 소속 멤버: 항상 일반글. 그 외: 요청값 사용
+        Boolean isNotice;
+        if (artistPost.getUser().getRole() == UserRole.GROUP) {
+            isNotice = true;
+        } else if (artistPost.getUser().getRole() == UserRole.ARTIST && artistPost.getGroup() != null) {
+            isNotice = false;
+        } else {
+            isNotice = request.getIsNotice();
+        }
         artistPost.update(request.getTitle(), request.getContent(), request.getIsMembershipOnly(),
-                request.getIsNotice(), newRepresentativeId);
+                isNotice, newRepresentativeId);
 
         if (request.getMediaAssetIds() != null) {
             postMediaAssetRepository.deleteAllByPostTypeAndPostId(PostMediaAssetType.ARTIST, postId);
@@ -355,5 +393,30 @@ public class ArtistPostService {
         }
         Long artistId = post.getGroup() != null ? post.getGroup().getId() : post.getUser().getId();
         return subscriptionRepository.existsActiveSubscriptionForArtist(userId, artistId, Instant.now());
+    }
+
+    /** 서비스 공지 등록 시 전체 유저에게 알림 발송 (작성자 제외) */
+    private void notifyServiceNotice(Long adminUserId, ArtistPost post) {
+        List<Long> userIds = userRepository.findAllUserIdsByDeletedAtIsNull();
+        if (userIds == null || userIds.isEmpty()) return;
+        String contentPreview = post.getContent();
+        if (contentPreview != null && contentPreview.length() > 50) {
+            contentPreview = contentPreview.substring(0, 50) + "…";
+        }
+        String content = "새로운 공지가 등록되었습니다." + (contentPreview != null && !contentPreview.isBlank() ? " " + contentPreview : "");
+
+        for (Long receiverId : userIds) {
+            if (receiverId.equals(adminUserId)) continue; // 작성자 본인 제외
+            try {
+                notificationService.sendNotification(NotificationSendRequest.builder()
+                        .senderId(adminUserId)
+                        .receiverId(receiverId)
+                        .type(NotificationType.SERVICE_NOTICE)
+                        .content(content)
+                        .build());
+            } catch (Exception e) {
+                // 개별 알림 실패 시 로그만 하고 계속 진행
+            }
+        }
     }
 }
