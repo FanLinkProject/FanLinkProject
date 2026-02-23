@@ -8,7 +8,8 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 import { BASE_URL } from "@/lib/api";
-const ARTISTS_API = `${BASE_URL}/api/user/artists`;
+// 공연 등록용: ARTIST만 (그룹 계정 제외), 개인 아티스트 + 그룹 소속 멤버만 조회
+const ARTISTS_FOR_CONCERT_API = `${BASE_URL}/api/user/artists/for-concert`;
 
 function getAuthHeaders() {
   const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -37,7 +38,7 @@ export default function SelectArtistsPage() {
         if (searchKeyword.trim()) params.set("nickname", searchKeyword.trim());
         params.set("page", page);
         params.set("size", 20);
-        const res = await axios.get(`${ARTISTS_API}?${params.toString()}`, {
+        const res = await axios.get(`${ARTISTS_FOR_CONCERT_API}?${params.toString()}`, {
           headers: getAuthHeaders(),
         });
         setArtists(res.data?.content ?? []);
