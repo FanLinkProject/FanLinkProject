@@ -96,26 +96,6 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    // 팬 홈용: 추천 아티스트 (그룹 계정만, 기존 /artists API는 수정하지 않음)
-    @GetMapping("/artists/recommended")
-    public ResponseEntity<Page<ArtistSearchResponse>> getRecommendedArtists(
-            @RequestParam(value = "nickname", required = false) String nickname,
-            @PageableDefault(size = 10) Pageable pageable
-    ) {
-        Page<ArtistSearchResponse> response = userService.getArtistsGroupsOnly(nickname, pageable);
-        return ResponseEntity.ok(response);
-    }
-
-    // /artists 페이지용: 그룹만 조회, 팬 수·포스트 수(그룹+멤버 합계) 포함
-    @GetMapping("/artists/list")
-    public ResponseEntity<Page<ArtistGroupCardResponse>> getArtistGroupsList(
-            @RequestParam(value = "nickname", required = false) String nickname,
-            @PageableDefault(size = 24) Pageable pageable
-    ) {
-        Page<ArtistGroupCardResponse> response = userService.getArtistGroupsWithStats(nickname, pageable);
-        return ResponseEntity.ok(response);
-    }
-
     // 유저 차단
     @PostMapping("/block")
     public ResponseEntity<Void> blockUser(
