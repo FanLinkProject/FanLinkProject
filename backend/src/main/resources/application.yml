@@ -327,3 +327,9 @@ app:
   kafka:
     trusted-packages: org.example.backend.chat.dto
     live-group-id: live-chat-group
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
