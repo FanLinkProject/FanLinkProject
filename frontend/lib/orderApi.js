@@ -13,3 +13,7 @@ export function createCandyOrder(productId, quantity = 1) {
     body: { productId, quantity },
   });
 }
+
+export function getArtistConsoleOrders() {
+  return request("/api/orders/artist-console");
+}
