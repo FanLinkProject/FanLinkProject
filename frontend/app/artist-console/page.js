@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MOCK_LIVES } from "@/lib/mockData";
 import { request } from "@/lib/api";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
@@ -87,6 +87,8 @@ export default function ArtistConsolePage() {
     const [groupId, setGroupId] = useState(null); // GROUP 계정: 본인 ID / ARTIST: 소속 그룹 ID
     const [myProfile, setMyProfile] = useState(null);
     const [groupProfile, setGroupProfile] = useState(null); // 그룹 계정 프로필 (ARTIST 멤버인 경우 그룹 계정 정보)
+    const [totalFollowers, setTotalFollowers] = useState(null);
+    const [profileBio, setProfileBio] = useState(null); // 소개글 (마이페이지 프로필)
 
     // 아티스트 포스트 state
     const [artistPosts, setArtistPosts] = useState([]);
@@ -121,7 +123,7 @@ export default function ArtistConsolePage() {
     const artistPostsBottomRef = useRef(null);
     const fanPostsBottomRef = useRef(null);
 
-    const endedLives = MOCK_LIVES.filter((l) => l.status === "ENDED");
+    const [endedLives, setEndedLives] = useState([]);
 
     // 프로필 조회 → myId, groupId
     useEffect(() => {
@@ -152,6 +154,7 @@ export default function ArtistConsolePage() {
                 setGroupProfile({
                     nickname: data.artistInfo?.nickname || data.nickname || "",
                     profileImageUrl: data.artistInfo?.profileImageUrl || data.profileImageUrl || "",
+                    bio: data.artistInfo?.bio ?? "",
                 });
             })
             .catch(() => {
@@ -159,6 +162,30 @@ export default function ArtistConsolePage() {
                 setGroupProfile(null);
             });
     }, [groupId, myId, myProfile]);
+
+    // 종료된 라이브 목록 (Live History 탭용)
+    useEffect(() => {
+        if (!groupId) return;
+        request(`/api/live-sessions?artistId=${groupId}&status=ENDED`)
+            .then((list) => setEndedLives(Array.isArray(list) ? list : []))
+            .catch(() => setEndedLives([]));
+    }, [groupId]);
+
+    // 팔로워 수 (아티스트 마이페이지 API에서 조회)
+    useEffect(() => {
+        if (!myId) return;
+        request("/api/artist/mypage")
+            .then((data) => {
+                const n = data?.fanDailyGraph?.totalFollowers;
+                setTotalFollowers(n != null ? Number(n) : null);
+                const bio = data?.profile?.bio;
+                setProfileBio(bio != null && String(bio).trim() !== "" ? String(bio).trim() : null);
+            })
+            .catch(() => {
+                setTotalFollowers(null);
+                setProfileBio(null);
+            });
+    }, [myId]);
 
     // 아티스트 포스트 배치 메타 (like/comment count) 로드
     const fetchArtistPostsMeta = useCallback(async (transformed) => {
@@ -430,9 +457,10 @@ export default function ArtistConsolePage() {
         });
     };
 
-    // 그룹 계정의 이름/아바타 우선 표시 (ARTIST 멤버는 소속 그룹 계정 정보 표시)
+    // 그룹 계정의 이름/아바타/소개글 우선 표시 (ARTIST 멤버는 소속 그룹 계정 정보 표시)
     const displayName = groupProfile?.nickname || myProfile?.nickname || "Studio";
     const displayAvatar = groupProfile?.profileImageUrl || myProfile?.profileImageUrl || "";
+    const displayBio = (groupId === myId ? profileBio : groupProfile?.bio) ?? "";
 
     return (
         <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-10">
@@ -441,20 +469,20 @@ export default function ArtistConsolePage() {
                 variant="primary"
                 className="p-10 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden"
             >
-                {displayAvatar && (
-                    <img
-                        src={displayAvatar}
-                        className="size-32 rounded-2xl border-2 border-white/[0.08] shrink-0"
-                        alt=""
-                    />
-                )}
-                <div className="flex-1 text-center md:text-left">
+                <img
+                    src={displayAvatar || getDefaultAvatarUrl(displayName)}
+                    className="size-32 rounded-2xl border-2 border-white/[0.08] shrink-0 object-cover"
+                    alt=""
+                />
+                <div className="flex-1 text-center md:text-left min-w-0">
                     <SectionTitle className="text-3xl font-black">
                         {displayName} Studio
                     </SectionTitle>
-                    <p className="text-white/70 font-medium mt-2">
-                        팬들과 가장 가깝게 만나는 나만의 공간입니다.
-                    </p>
+                    {displayBio ? (
+                        <p className="text-white/70 font-medium mt-2 whitespace-pre-wrap">
+                            {displayBio}
+                        </p>
+                    ) : null}
                     {/* 소속 아티스트 계정으로 접속 중인 경우 표시 */}
                     {groupId !== myId && myProfile && (
                         <div className="mt-3 flex items-center gap-2 justify-center md:justify-start">
@@ -466,47 +494,64 @@ export default function ArtistConsolePage() {
                                 />
                             )}
                             <span className="text-white/50 text-sm font-medium">
-                {myProfile.nickname}
-              </span>
+                                {myProfile.nickname}
+                            </span>
                         </div>
                     )}
                 </div>
+                {totalFollowers != null && (
+                    <p className="text-violet-300 font-bold text-sm tabular-nums shrink-0 md:ml-auto">
+                        팔로워 {Number(totalFollowers).toLocaleString("ko-KR")}명
+                    </p>
+                )}
             </Surface>
 
-            {/* 탭 */}
-            <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-2xl w-fit border border-white/[0.06]">
-                {[
-                    { id: "POSTS", label: "My Posts" },
-                    { id: "FAN_POSTS", label: "Fan Posts" },
-                    { id: "LIVE", label: "Live History" },
-                    {
-                        id: "CONCERTS",
-                        label: "Concerts",
-                        href: "/artist-console/concerts",
-                    },
-                ].map((tab) =>
-                    tab.href ? (
-                        <Link
-                            key={tab.id}
-                            href={tab.href}
-                            className="px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-white/55 hover:text-white/80"
-                        >
-                            {tab.label}
-                        </Link>
-                    ) : (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                                activeTab === tab.id
-                                    ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
-                                    : "text-white/55 hover:text-white/80"
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    )
+            {/* 탭 + 새 글 작성 (가로 정렬) */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-2xl border border-white/[0.06]">
+                    {[
+                        { id: "POSTS", label: "My Posts" },
+                        { id: "FAN_POSTS", label: "Fan Posts" },
+                        { id: "LIVE", label: "Live History" },
+                        {
+                            id: "CONCERTS",
+                            label: "Concerts",
+                            href: "/artist-console/concerts",
+                        },
+                    ].map((tab) =>
+                        tab.href ? (
+                            <Link
+                                key={tab.id}
+                                href={tab.href}
+                                className="px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-white/55 hover:text-white/80"
+                            >
+                                {tab.label}
+                            </Link>
+                        ) : (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                    activeTab === tab.id
+                                        ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
+                                        : "text-white/55 hover:text-white/80"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        )
+                    )}
+                </div>
+                {activeTab === "POSTS" && (
+                    <Button
+                        variant="primary"
+                        className="text-xs uppercase tracking-widest px-6 py-3 shrink-0"
+                        onClick={() => setShowCreateModal(true)}
+                    >
+                        <span className="material-symbols-outlined text-lg mr-1.5 align-middle">edit_note</span>
+                        새 글 작성
+                    </Button>
                 )}
             </div>
 
@@ -514,20 +559,6 @@ export default function ArtistConsolePage() {
                 {/* MY POSTS 탭 — artists/[id] ARTIST 탭과 동일 */}
                 {activeTab === "POSTS" && (
                     <>
-                        {/* 새 글 작성 버튼 — 항상 표시 */}
-                        <div className="flex justify-end">
-                            <Button
-                                variant="primary"
-                                className="text-xs uppercase tracking-widest px-6 py-3"
-                                onClick={() => setShowCreateModal(true)}
-                            >
-                <span className="material-symbols-outlined text-lg mr-1.5 align-middle">
-                  edit_note
-                </span>
-                                새 글 작성
-                            </Button>
-                        </div>
-
                         {artistPostsLoading ? (
                             <Surface variant="primary" className="py-12 text-center">
                                 <p className="text-white/55">로딩 중...</p>
@@ -610,28 +641,41 @@ export default function ArtistConsolePage() {
                 {/* LIVE 탭 */}
                 {activeTab === "LIVE" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {endedLives.map((live) => (
-                            <Surface key={live.id} variant="card" className="overflow-hidden">
-                                <div className="aspect-video relative overflow-hidden bg-white/5">
-                                    <img
-                                        src={live.thumbnail}
-                                        className="w-full h-full object-cover"
-                                        alt=""
-                                    />
-                                </div>
-                                <div className="p-6">
-                                    <h4 className="font-bold text-white truncate mb-4">
-                                        {live.title}
-                                    </h4>
-                                    <Button
-                                        variant="primary"
-                                        className="w-full py-3 text-[10px] uppercase tracking-widest"
-                                    >
-                                        다시보기 발행
-                                    </Button>
-                                </div>
+                        {endedLives.length === 0 ? (
+                            <Surface variant="primary" className="p-12 text-center col-span-full">
+                                <p className="text-white/55">종료된 라이브가 없습니다.</p>
                             </Surface>
-                        ))}
+                        ) : (
+                            endedLives.map((live) => (
+                                <Surface key={live.id} variant="card" className="overflow-hidden">
+                                    <div className="aspect-video relative overflow-hidden bg-white/5">
+                                        {(live.thumbnailUrl || live.thumbnail) ? (
+                                            <img
+                                                src={live.thumbnailUrl || live.thumbnail}
+                                                className="w-full h-full object-cover"
+                                                alt=""
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-white/30">
+                                                <span className="material-symbols-outlined text-4xl">videocam_off</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-6">
+                                        <h4 className="font-bold text-white truncate mb-4">
+                                            {live.title || "제목 없음"}
+                                        </h4>
+                                        <Button
+                                            variant="primary"
+                                            href={live.id ? `/artist-console/live/${live.id}` : "#"}
+                                            className="w-full py-3 text-[10px] uppercase tracking-widest"
+                                        >
+                                            다시보기
+                                        </Button>
+                                    </div>
+                                </Surface>
+                            ))
+                        )}
                     </div>
                 )}
             </div>
