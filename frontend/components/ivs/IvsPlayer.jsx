@@ -59,7 +59,8 @@ export default function IvsPlayer({ playbackUrl, token, className = "", videoPro
                 : playbackUrl;
 
             player.load(urlToLoad);
-            player.play().catch(() => {});
+            // IVS Player play() returns void (not Promise). Errors are handled via PlayerEventType.ERROR listener.
+            player.play();
 
             playerRef.current = player;
 
