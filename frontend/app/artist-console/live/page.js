@@ -35,6 +35,17 @@ export default function ArtistLivePage() {
     const [authError, setAuthError] = useState("");
 
     const fetchLiveData = useCallback(async () => {
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
+            setLiveSessions([]);
+            setReplayCandidates([]);
+            setLiveLoading(false);
+            setReplayLoading(false);
+            setLiveError("");
+            setReplayError("");
+            return;
+        }
+
         setAuthError("");
         setLiveError("");
         setReplayError("");
@@ -42,8 +53,8 @@ export default function ArtistLivePage() {
         setReplayLoading(true);
 
         const [liveResult, replayResult] = await Promise.allSettled([
-            apiGet(`/api/live-sessions?artistId=${artistId}&status=LIVE`),
-            apiGet(`/api/live-sessions?artistId=${artistId}`),
+            apiGet("/api/live-sessions", { query: { artistId: numericArtistId, status: "LIVE" } }),
+            apiGet("/api/live-sessions", { query: { artistId: numericArtistId } }),
         ]);
 
         if (liveResult.status === "fulfilled") {
@@ -75,8 +86,13 @@ export default function ArtistLivePage() {
     }, [artistId]);
 
     useEffect(() => {
-        fetchLiveData();
-    }, [fetchLiveData]);
+        if (artistId != null && !Number.isNaN(Number(artistId)) && Number(artistId) >= 1) {
+            fetchLiveData();
+        } else {
+            setLiveLoading(false);
+            setReplayLoading(false);
+        }
+    }, [artistId, fetchLiveData]);
 
     // --- LIVE_LIST_CHANGED -> refresh list (no polling) ---
     const fetchLiveDataRef = useRef(fetchLiveData);
@@ -132,10 +148,17 @@ export default function ArtistLivePage() {
     const [publishError, setPublishError] = useState(null);
 
     useEffect(() => {
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
+            setPublishCandidates([]);
+            setLoadingCandidates(false);
+            return;
+        }
+
         setLoadingCandidates(true);
         setPublishError(null);
 
-        getCandidates(artistId)
+        getCandidates(numericArtistId)
             .then((res) => {
                 const arr = Array.isArray(res) ? res : [];
                 setPublishCandidates(arr);
@@ -150,15 +173,16 @@ export default function ArtistLivePage() {
     const handlePublish = async (e) => {
         e.preventDefault();
 
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
         const liveSessionId = Number(publishForm.liveSessionId);
-        if (!liveSessionId) return;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1 || !liveSessionId) return;
 
         setPublishing(true);
         setPublishError(null);
 
         try {
             const res = await publish({
-                artistId,
+                artistId: numericArtistId,
                 liveSessionId,
                 accessType: publishForm.accessType,
                 title: publishForm.title || null,
@@ -371,8 +395,8 @@ export default function ArtistLivePage() {
                     <input
                         type="number"
                         min="1"
-                        value={artistId}
-                        onChange={(e) => setArtistId(Number(e.target.value) || 1)}
+                        value={artistId != null ? artistId : ""}
+                        onChange={(e) => setArtistId(Number(e.target.value) || null)}
                         className="mt-1 w-24 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
                     />
                 </label>

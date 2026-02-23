@@ -99,7 +99,22 @@ export default function ConcertDetailPage() {
       : "/concerts?mode=map";
 
   const handleBack = () => {
-    router.back();
+    if (typeof document !== "undefined" && document.referrer) {
+      const ref = document.referrer;
+      const sameOrigin =
+        ref.startsWith(window.location.origin) ||
+        (typeof window !== "undefined" && window.location.hostname.includes("fan-link-project.vercel.app") && ref.includes("fan-link-project.vercel.app"));
+      if (sameOrigin) {
+        router.back();
+        return;
+      }
+    }
+    const artistId = concert?.artists?.[0]?.id ?? concert?.artistId;
+    if (artistId != null) {
+      router.push(`/artists/${artistId}`);
+    } else {
+      router.push("/concerts");
+    }
   };
 
   // 목록과 동일한 필드 형태로 통일 + 날짜 필드 camelCase 보장 (API가 snake_case로 올 수 있음)

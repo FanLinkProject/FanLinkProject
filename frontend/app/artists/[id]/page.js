@@ -46,6 +46,11 @@ function getCurrentUser() {
     } catch { return null; }
 }
 
+function getConcertId(concert) {
+    if (!concert) return null;
+    return concert.id ?? concert.concertId ?? concert.concert_id ?? concert?.concert?.id ?? null;
+}
+
 function formatTimestamp(instant) {
     if (!instant) return "방금 전";
     try {
@@ -600,17 +605,34 @@ function ArtistDetailPageInner({ paramsId }) {
                 <div className="max-w-6xl w-full mx-auto px-8 mt-12">
                     <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {artistConcerts.map((c, i) => (
-                            <Link key={c.id ?? `concert-${i}`} href={`/concerts/${c.id}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
-                                <div className="aspect-[16/10] overflow-hidden">
-                                    <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        {artistConcerts.map((c, i) => {
+                            const concertId = getConcertId(c);
+                            if (!concertId) {
+                                if (typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
+                            }
+                            const cardContent = (
+                                <>
+                                    <div className="aspect-[16/10] overflow-hidden">
+                                        <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                    <div className="p-5">
+                                        <h4 className="font-bold text-white truncate">{c.title}</h4>
+                                        <p className="text-white/50 text-xs mt-2">{formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}</p>
+                                    </div>
+                                </>
+                            );
+                            const key = concertId ?? `concert-${i}`;
+                            const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                            return concertId ? (
+                                <Link key={key} href={`/concerts/${concertId}`} className={className}>
+                                    {cardContent}
+                                </Link>
+                            ) : (
+                                <div key={key} className={className} aria-disabled="true">
+                                    {cardContent}
                                 </div>
-                                <div className="p-5">
-                                    <h4 className="font-bold text-white truncate">{c.title}</h4>
-                                    <p className="text-white/50 text-xs mt-2">{formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}</p>
-                                </div>
-                            </Link>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
