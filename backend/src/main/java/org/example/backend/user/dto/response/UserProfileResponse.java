@@ -23,7 +23,11 @@ public record UserProfileResponse(
         }
         String phone = user.getPhoneNumber();
         String birth = user.getBirth();
-        return (phone == null || phone.isBlank() || phone.startsWith("kakao_") || phone.startsWith("google_"))
+        return (phone == null || phone.isBlank()
+                || phone.startsWith("kakao_")
+                || phone.startsWith("google_")
+                || phone.startsWith("naver_")
+                || phone.startsWith("instagram_"))
                 || (birth == null || birth.isBlank() || "1900-01-01".equals(birth));
     }
 
