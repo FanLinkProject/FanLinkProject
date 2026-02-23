@@ -28,6 +28,9 @@ public class ArtistPostResponse {
 
     /** 서비스/그룹 공지 여부 판별 (다른 패키지에서 빌더로 응답할 때 사용) */
     public static boolean isNotice(ArtistPost post) {
+        if (Boolean.TRUE.equals(post.getIsNotice())) {
+            return true;
+        }
         UserRole r = post.getUser().getRole();
         return (r == UserRole.ADMIN && post.getGroup() == null) || r == UserRole.GROUP;
     }

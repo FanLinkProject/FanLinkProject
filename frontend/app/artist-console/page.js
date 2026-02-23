@@ -103,6 +103,7 @@ export default function ArtistConsolePage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostIsMembershipOnly, setNewPostIsMembershipOnly] = useState(false);
+    const [newPostIsNotice, setNewPostIsNotice] = useState(false);
     const [newPostImagePreview, setNewPostImagePreview] = useState(null);
     const [newPostImageFile, setNewPostImageFile] = useState(null);
     const [createPostLoading, setCreatePostLoading] = useState(false);
@@ -360,6 +361,7 @@ export default function ArtistConsolePage() {
         removeNewPostImage();
         setNewPostContent("");
         setNewPostIsMembershipOnly(false);
+        setNewPostIsNotice(false);
         setShowCreateModal(false);
     };
 
@@ -375,6 +377,7 @@ export default function ArtistConsolePage() {
                     title: "",
                     content: newPostContent.trim(),
                     isMembershipOnly: newPostIsMembershipOnly,
+                    isNotice: newPostIsNotice,
                     mediaAssetIds: [],
                 },
             });
@@ -701,6 +704,30 @@ export default function ArtistConsolePage() {
                 </span>
                             )}
                         </label>
+
+                        {/* 공지사항 토글 (개인 아티스트만) */}
+                        {groupId === myId && currentUser?.role === "ARTIST" && (
+                            <label className="flex items-center gap-3 mt-4 cursor-pointer w-fit">
+                                <div
+                                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                                        newPostIsNotice ? "bg-violet-500" : "bg-white/[0.12]"
+                                    }`}
+                                    onClick={() => setNewPostIsNotice((v) => !v)}
+                                >
+                                    <span
+                                        className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+                                            newPostIsNotice ? "translate-x-5" : "translate-x-0.5"
+                                        }`}
+                                    />
+                                </div>
+                                <span className="text-sm font-bold text-white/70">공지사항</span>
+                                {newPostIsNotice && (
+                                    <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest">
+                                        공지로 노출
+                                    </span>
+                                )}
+                            </label>
+                        )}
 
                         {/* 사진 첨부 */}
                         <div className="mt-5">

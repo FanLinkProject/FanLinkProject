@@ -47,6 +47,18 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long> {
     List<ArtistPost> findNoticesByGroupId(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId,
             @Param("groupRole") UserRole groupRole, Pageable pageable);
 
+    // 공지사항(개인 아티스트 페이지): 해당 아티스트가 공지로 지정한 글만 조회
+    @Query("SELECT a FROM ArtistPost a " +
+            "JOIN FETCH a.user u " +
+            "LEFT JOIN FETCH a.group g " +
+            "WHERE a.status = false " +
+            "AND a.user.id = :artistId " +
+            "AND a.isNotice = true " +
+            "AND (:lastPostId IS NULL OR a.id < :lastPostId) " +
+            "ORDER BY a.id DESC")
+    List<ArtistPost> findNoticesByArtistId(@Param("artistId") Long artistId, @Param("lastPostId") Long lastPostId,
+            Pageable pageable);
+
     // 아티스트 게시글(Group이 있는 글) 조회 - 공지사항 제외
     @Query("SELECT a FROM ArtistPost a " +
             "JOIN FETCH a.user u " +

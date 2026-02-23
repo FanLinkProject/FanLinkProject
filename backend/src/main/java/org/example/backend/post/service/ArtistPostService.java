@@ -122,6 +122,7 @@ public class ArtistPostService {
                 .title(request.getTitle())
                 .content(request.getContent())
                 .isMembershipOnly(request.getIsMembershipOnly())
+                .isNotice(Boolean.TRUE.equals(request.getIsNotice()))
                 .status(false)
                 .representativeMediaAssetId(request.getRepresentativeMediaAssetId())
                 .build();
@@ -178,6 +179,28 @@ public class ArtistPostService {
                 .collect(Collectors.toList());
     }
 
+    /** 개인 아티스트가 공지로 지정한 글만 조회 */
+    public List<ArtistPostResponse> getNoticesByArtistId(Long artistId, Long lastPostId, int limit, Long userId, UserRole role) {
+        Pageable pageable = PageRequest.of(0, limit);
+        return artistPostRepository.findNoticesByArtistId(artistId, lastPostId, pageable).stream()
+                .map(post -> buildPostResponseWithAccess(post,
+                        postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.ARTIST, post.getId()),
+                        userId, role, true))
+                .collect(Collectors.toList());
+    }
+
+    /** 페이지(그룹 또는 개인 아티스트)별 공지 목록: 그룹이면 그룹 공지, 개인 아티스트면 isNotice=true 글 */
+    public List<ArtistPostResponse> getNoticesForPage(Long pageId, Long lastPostId, int limit, Long userId, UserRole role) {
+        User pageUser = userRepository.findById(pageId).orElse(null);
+        if (pageUser == null) {
+            return List.of();
+        }
+        if (pageUser.getRole() == UserRole.GROUP) {
+            return getNoticesByGroupId(pageId, lastPostId, limit, userId, role);
+        }
+        return getNoticesByArtistId(pageId, lastPostId, limit, userId, role);
+    }
+
     public List<ArtistPostResponse> getArtistPosts(Long groupId, Long lastPostId, int limit, Long userId, UserRole role) {
         Pageable pageable = PageRequest.of(0, limit);
         return artistPostRepository.findArtistPosts(groupId, lastPostId, pageable).stream()
@@ -228,7 +251,8 @@ public class ArtistPostService {
             newRepresentativeId = artistPost.getRepresentativeMediaAssetId();
         }
 
-        artistPost.update(request.getTitle(), request.getContent(), request.getIsMembershipOnly(), newRepresentativeId);
+        artistPost.update(request.getTitle(), request.getContent(), request.getIsMembershipOnly(),
+                request.getIsNotice(), newRepresentativeId);
 
         if (request.getMediaAssetIds() != null) {
             postMediaAssetRepository.deleteAllByPostTypeAndPostId(PostMediaAssetType.ARTIST, postId);

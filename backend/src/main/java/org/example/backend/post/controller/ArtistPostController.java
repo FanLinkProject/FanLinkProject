@@ -51,7 +51,7 @@ public class ArtistPostController {
         Long userId = principalDetails != null ? principalDetails.getUserId() : null;
         var role = principalDetails != null ? principalDetails.getUser().getRole() : null;
         List<ArtistPostResponse> responses = groupId != null
-                ? artistPostService.getNoticesByGroupId(groupId, lastPostId, limit, userId, role)
+                ? artistPostService.getNoticesForPage(groupId, lastPostId, limit, userId, role)
                 : artistPostService.getNotices(lastPostId, limit, userId, role);
         return ResponseEntity.ok(responses);
     }
