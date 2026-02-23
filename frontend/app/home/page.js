@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { request } from "@/lib/api";
@@ -13,6 +13,17 @@ import { BASE_URL } from "@/lib/api";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 
 const FEED_POSTS_LIMIT_PER_GROUP = 15;
+
+/** 배열을 셔플 후 최대 n개 반환 (길이 < n이면 전부 반환) */
+function pickRandomUpTo(arr, n) {
+  if (!Array.isArray(arr) || arr.length <= n) return arr ?? [];
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
 
 function formatTimestamp(instant) {
   if (!instant) return "";
@@ -165,6 +176,11 @@ export default function UserHomePage() {
   const [guestAllArtistsLoading, setGuestAllArtistsLoading] = useState(false);
   const [guestAllArtistsSearch, setGuestAllArtistsSearch] = useState("");
 
+  const guestRecommended = useMemo(
+    () => pickRandomUpTo(guestData?.recommendedArtists ?? [], 5),
+    [guestData?.recommendedArtists]
+  );
+
   const [feedPosts, setFeedPosts] = useState([]);
   const [feedPostsLoading, setFeedPostsLoading] = useState(false);
 
@@ -230,11 +246,11 @@ export default function UserHomePage() {
     const followed = data?.followedArtists ?? [];
     const followedIds = new Set(followed.map((a) => String(a.artistId)));
     axios
-      .get(`${BASE_URL}/api/user/artists?page=0&size=24`, { headers })
+      .get(`${BASE_URL}/api/user/artists?page=0&size=60`, { headers })
       .then((res) => {
         const list = res.data?.content ?? res.data ?? [];
         const recommended = Array.isArray(list) ? list.filter((a) => !followedIds.has(String(a.id))) : [];
-        setRecommendedArtists(recommended);
+        setRecommendedArtists(pickRandomUpTo(recommended, 5));
       })
       .catch(() => setRecommendedArtists([]));
   }, [data?.followedArtists, data != null]);
@@ -368,7 +384,7 @@ export default function UserHomePage() {
 
   // 비로그인 유저 메인 홈: 로그인 버튼, 추천 아티스트, 새로운 아티스트만 표시
   if (isGuestHome && guestData) {
-    const recommended = guestData.recommendedArtists ?? [];
+    const recommended = guestRecommended;
     const newArtists = guestData.newArtists ?? [];
 
     return (

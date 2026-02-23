@@ -128,6 +128,19 @@ public class ConcertService {
     }
 
     /**
+     * 아티스트 콘솔용: 로그인한 아티스트(또는 그룹+소속 멤버)가 참여한 다가오는 공연만 조회
+     */
+    @Transactional(readOnly = true)
+    public List<ConcertListItemResponse> getUpcomingConcertsForArtistIds(List<Long> artistIds) {
+        if (artistIds == null || artistIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Instant now = Instant.now();
+        List<Concert> concerts = concertRepository.findUpcomingConcertsByArtistIdsIn(artistIds, now);
+        return buildConcertListItems(concerts);
+    }
+
+    /**
      * 지도 bounds 내 공연 목록 조회 - 다가오는 공연만, 목록 DTO 동일
      */
     @Transactional(readOnly = true)

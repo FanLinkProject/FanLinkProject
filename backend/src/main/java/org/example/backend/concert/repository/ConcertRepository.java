@@ -50,4 +50,8 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
             @Param("now") Instant now
     );
 
+    /** 다가오는 공연 중 특정 아티스트(들)가 참여한 공연만 조회 (그룹 소속이면 그룹+멤버 공연, 아니면 본인 공연만) */
+    @Query("select distinct c from Concert c left join fetch c.location join c.artists ca where ca.artist.id in :artistIds and c.endDateTime > :now order by c.startDateTime asc")
+    List<Concert> findUpcomingConcertsByArtistIdsIn(@Param("artistIds") List<Long> artistIds, @Param("now") Instant now);
+
 }

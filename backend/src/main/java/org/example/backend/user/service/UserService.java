@@ -494,8 +494,8 @@ public class UserService {
                 "/api/auth/signup"
         );
 
-        // 2) 추천 아티스트 (랜덤, 최대 10개) — 그룹에 속한 개인 아티스트 제외
-        Pageable recommendedPageable = PageRequest.of(0, 10);
+        // 2) 추천 아티스트 (랜덤, 넉넉히 조회 후 5명 표시용) — 그룹에 속한 개인 아티스트 제외
+        Pageable recommendedPageable = PageRequest.of(0, 30);
         List<User> recommendedArtists = userRepository.findRecommendedArtists(
                 UserRole.ARTIST.name(),
                 UserRole.GROUP.name(),

@@ -50,13 +50,19 @@ public class ArtistDashboardService {
             throw new BusinessException(UserErrorCode.FOLLOW_TARGET_NOT_ARTIST);
         }
 
-        // 1) 아티스트 기본 정보
+        // 1) 아티스트 기본 정보 (팔로워 수·포스트 수는 해당 아티스트/그룹 기준)
+        long followerCount = followRepository.countByArtist(artist);
+        int postCount = artist.getRole() == UserRole.GROUP
+                ? (int) artistPostRepository.countByGroupId(artist.getId())
+                : (int) artistPostRepository.countByUserAndStatus(artist, false);
         ArtistDashboardResponse.ArtistInfo artistInfo = new ArtistDashboardResponse.ArtistInfo(
                 artist.getId(),
                 artist.getNickname(),
                 artist.getProfileImageUrl(),
                 artist.getBannerImageUrl(),
-                artist.getBio()
+                artist.getBio(),
+                followerCount,
+                postCount
         );
 
         // 2) 팔로우 상태
