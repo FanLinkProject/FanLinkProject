@@ -30,7 +30,7 @@ public class User {
     private String email;
 
     // 유저는 닉네임, 아티스트는 예명 사용
-    @Column(name = "nickname", unique = false, nullable = false)
+    @Column(name = "nickname", unique = true, nullable = false)
     private String nickname;
 
     // 결제 정보 등록 위한 실명
