@@ -74,6 +74,8 @@ public class SecurityConfig {
                     .hasAnyRole("ADMIN", "ARTIST", "GROUP")
                     .requestMatchers(HttpMethod.GET, "/api/deliveries/*")
                     .authenticated()
+                    .requestMatchers(HttpMethod.GET, "/api/deliveries/*/history")
+                    .authenticated()
                     // 상품 목록/상세/아티스트별 조회 - 마켓 페이지용 (비로그인 접근 허용)
                     .requestMatchers(GET, "/api/products").permitAll()
                     .requestMatchers(GET, "/api/products/by-artist/*").permitAll()
