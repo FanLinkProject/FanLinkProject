@@ -2,93 +2,111 @@ package org.example.backend.user.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.exception.BusinessException;
 import org.example.backend.user.dto.request.EmailVerificationCodeRequest;
 import org.example.backend.user.dto.request.EmailVerificationRequest;
 import org.example.backend.user.dto.request.PhoneVerificationCodeRequest;
 import org.example.backend.user.dto.request.PhoneVerificationRequest;
 import org.example.backend.user.dto.response.VerificationResponse;
+import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.user.service.EmailService;
+import org.example.backend.user.service.RateLimitService;
 import org.example.backend.user.service.SmsService;
 import org.example.backend.user.service.VerificationCodeService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/verification")
 @RequiredArgsConstructor
 public class VerificationController {
 
+    private static final int SEND_LIMIT_PER_HOUR = 5;
+    private static final int VERIFY_LIMIT_PER_10_MIN = 10;
+    private static final Duration SEND_WINDOW = Duration.ofHours(1);
+    private static final Duration VERIFY_WINDOW = Duration.ofMinutes(10);
+
     private final VerificationCodeService verificationCodeService;
     private final EmailService emailService;
     private final SmsService smsService;
+    private final RateLimitService rateLimitService;
 
-    // 이메일 인증 코드 발송
     @PostMapping("/email/send")
     public ResponseEntity<VerificationResponse> sendEmailCode(
             @Valid @RequestBody EmailVerificationRequest request
     ) {
-        // 인증 코드 생성
+        String email = normalizeEmail(request.email());
+        enforceRateLimit("verification:email:send:" + email, SEND_LIMIT_PER_HOUR, SEND_WINDOW);
+
         String code = verificationCodeService.generateCode();
-        
-        // Redis에 저장 (5분 유효)
-        verificationCodeService.saveEmailCode(request.email(), code);
-        
-        // 이메일 발송
-        emailService.sendVerificationCode(request.email(), code);
-        
-        return ResponseEntity.ok(VerificationResponse.success("이메일"));
+        verificationCodeService.saveEmailCode(email, code);
+        emailService.sendVerificationCode(email, code);
+
+        return ResponseEntity.ok(VerificationResponse.success("Email verification code sent."));
     }
 
-    // 이메일 인증 코드 검증
     @PostMapping("/email/verify")
     public ResponseEntity<VerificationResponse> verifyEmailCode(
             @Valid @RequestBody EmailVerificationCodeRequest request
     ) {
-        boolean isValid = verificationCodeService.verifyEmailCode(
-                request.email(),
-                request.code()
-        );
-        
+        String email = normalizeEmail(request.email());
+        enforceRateLimit("verification:email:verify:" + email, VERIFY_LIMIT_PER_10_MIN, VERIFY_WINDOW);
+
+        boolean isValid = verificationCodeService.verifyEmailCode(email, request.code());
         if (isValid) {
-            return ResponseEntity.ok(new VerificationResponse("이메일 인증이 완료되었습니다."));
-        } else {
-            return ResponseEntity.badRequest()
-                    .body(new VerificationResponse("인증 코드가 일치하지 않거나 만료되었습니다."));
+            return ResponseEntity.ok(new VerificationResponse("Email verification completed."));
         }
+
+        return ResponseEntity.badRequest()
+                .body(new VerificationResponse("Invalid or expired verification code."));
     }
 
-    // 전화번호 인증번호 발송
     @PostMapping("/phone/send")
     public ResponseEntity<VerificationResponse> sendPhoneCode(
             @Valid @RequestBody PhoneVerificationRequest request
     ) {
-        // 인증번호 생성
+        String phone = normalizePhone(request.phoneNumber());
+        enforceRateLimit("verification:phone:send:" + phone, SEND_LIMIT_PER_HOUR, SEND_WINDOW);
+
         String code = verificationCodeService.generateCode();
-        
-        // Redis에 저장 (5분 유효)
-        verificationCodeService.savePhoneCode(request.phoneNumber(), code);
-        
-        // SMS 발송
-        smsService.sendVerificationCode(request.phoneNumber(), code);
-        
-        return ResponseEntity.ok(VerificationResponse.success("전화번호"));
+        verificationCodeService.savePhoneCode(phone, code);
+        smsService.sendVerificationCode(phone, code);
+
+        return ResponseEntity.ok(VerificationResponse.success("Phone verification code sent."));
     }
 
-    // 전화번호 인증번호 검증
     @PostMapping("/phone/verify")
     public ResponseEntity<VerificationResponse> verifyPhoneCode(
             @Valid @RequestBody PhoneVerificationCodeRequest request
     ) {
-        boolean isValid = verificationCodeService.verifyPhoneCode(
-                request.phoneNumber(),
-                request.code()
-        );
-        
+        String phone = normalizePhone(request.phoneNumber());
+        enforceRateLimit("verification:phone:verify:" + phone, VERIFY_LIMIT_PER_10_MIN, VERIFY_WINDOW);
+
+        boolean isValid = verificationCodeService.verifyPhoneCode(phone, request.code());
         if (isValid) {
-            return ResponseEntity.ok(new VerificationResponse("전화번호 인증이 완료되었습니다."));
-        } else {
-            return ResponseEntity.badRequest()
-                    .body(new VerificationResponse("인증번호가 일치하지 않거나 만료되었습니다."));
+            return ResponseEntity.ok(new VerificationResponse("Phone verification completed."));
         }
+
+        return ResponseEntity.badRequest()
+                .body(new VerificationResponse("Invalid or expired verification code."));
+    }
+
+    private void enforceRateLimit(String key, int limit, Duration window) {
+        if (!rateLimitService.tryAcquire(key, limit, window)) {
+            throw new BusinessException(UserErrorCode.TOO_MANY_REQUESTS);
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private String normalizePhone(String phoneNumber) {
+        return phoneNumber == null ? "" : phoneNumber.replaceAll("\\s+", "");
     }
 }

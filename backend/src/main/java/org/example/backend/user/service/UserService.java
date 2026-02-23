@@ -3,6 +3,7 @@ package org.example.backend.user.service;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
 import org.example.backend.user.dto.request.BlockRequest;
+import org.example.backend.user.dto.request.OAuthProfileCompleteRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
@@ -135,6 +136,38 @@ public class UserService {
 
         User savedUser = userRepository.save(currentUser);
         return UserProfileResponse.from(savedUser);
+    }
+
+    /** OAuth 간편가입 후 부족한 추가 정보(name, gender, birth, phoneNumber) 저장 */
+    public UserProfileResponse updateOAuthProfileComplete(User user, OAuthProfileCompleteRequest request) {
+        User currentUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
+
+        if (request.name() != null && !request.name().isBlank()) {
+            currentUser.setName(request.name());
+        }
+        if (request.gender() != null && !request.gender().isBlank()) {
+            currentUser.setGender(request.gender());
+        }
+        if (request.birth() != null && !request.birth().isBlank()) {
+            currentUser.setBirth(request.birth());
+        }
+        if (request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
+            String newPhone = request.phoneNumber().trim();
+            String currentPhone = currentUser.getPhoneNumber();
+            boolean isPlaceholder = currentPhone == null || currentPhone.isBlank()
+                    || currentPhone.startsWith("kakao_") || currentPhone.startsWith("google_")
+                    || currentPhone.startsWith("naver_") || currentPhone.startsWith("instagram_");
+            if (isPlaceholder || !currentPhone.equals(newPhone)) {
+                if (userRepository.existsByPhoneNumber(newPhone)) {
+                    throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
+                }
+                currentUser.setPhoneNumber(newPhone);
+            }
+        }
+
+        User saved = userRepository.save(currentUser);
+        return getProfile(saved);
     }
 
     // 비밀번호 변경
@@ -406,6 +439,7 @@ public class UserService {
         Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
         var purchaseHistory = ordersPage.map(order -> new UserMyPageResponse.PurchaseHistory(
                 order.getId(),
+                order.getDelivery() != null ? order.getDelivery().getId() : null,
                 order.getOrderNo(),
                 order.getName(),
                 order.getTotalAmount(),

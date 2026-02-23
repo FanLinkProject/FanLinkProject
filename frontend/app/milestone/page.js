@@ -105,7 +105,7 @@ export default function MilestonePage() {
       const status = err.response?.status;
       const msg = err.response?.data?.message;
       if (status === 401 || status === 403) {
-        setError("인증이 필요합니다. 아티스트 계정으로 로그인 후 다시 시도해주세요.");
+        setError("인증이 필요합니다. 그룹 계정으로 로그인 후 다시 시도해주세요.");
       } else {
         setError(msg || "목록 조회 실패. 로그인 후 시도하세요.");
       }
@@ -115,6 +115,8 @@ export default function MilestonePage() {
     }
   };
 
+  const [isGroupAccount, setIsGroupAccount] = useState(false);
+
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
     if (!token) {
@@ -123,12 +125,13 @@ export default function MilestonePage() {
     }
     const userData = parseJwt(token);
     const role = userData?.role;
-    const isArtist = role === "ARTIST" || role === "ROLE_ARTIST" || role === "GROUP" || role === "ROLE_GROUP";
-    if (!isArtist) {
-      router.push("/mypage");
-      return;
+    const isGroup = role === "GROUP" || role === "ROLE_GROUP";
+    setIsGroupAccount(!!isGroup);
+    if (isGroup) {
+      fetchMilestones();
+    } else {
+      setLoading(false);
     }
-    fetchMilestones();
   }, [router]);
 
   const updateGrade = (idx, field, value) => {
@@ -205,6 +208,15 @@ export default function MilestonePage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <p className="text-white/55 font-medium">로딩 중...</p>
+      </div>
+    );
+  }
+
+  if (!isGroupAccount) {
+    return (
+      <div className="p-8 lg:p-12 max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
+        <p className="text-white/80 font-semibold text-lg">권한 없음</p>
+        <p className="text-white/55 text-sm mt-2">멤버 등급 관리는 그룹 계정에서만 이용할 수 있습니다.</p>
       </div>
     );
   }

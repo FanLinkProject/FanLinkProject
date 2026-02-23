@@ -15,7 +15,7 @@ import java.util.List;
 @Builder
 public class MilestoneResponse {
     private Long id;
-    private Long artistId;
+    private Long groupId;
 
     private String name;
     private String description;
@@ -29,7 +29,7 @@ public class MilestoneResponse {
     public static MilestoneResponse from(Milestone milestone) {
         return MilestoneResponse.builder()
                 .id(milestone.getId())
-                .artistId(milestone.getArtist().getId())
+                .groupId(milestone.getGroup().getId())
                 .name(milestone.getName())
                 .description(milestone.getDescription())
                 .sortOrder(milestone.getSortOrder())

@@ -30,32 +30,32 @@ public class MilestoneService {
     private final MemberGradeRepository memberGradeRepository;
 
     /**
-     * 아티스트가 마일스톤(등급)을 생성한다.
+     * 그룹 계정이 마일스톤(등급)을 생성한다.
      */
     public MilestoneResponse createMilestone(MilestoneRequest request) {
 
-        // ========== 1) 아티스트 조회 ==========
-        User artist = userRepository.findById(request.getArtistId())
-                .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.ARTIST_NOT_FOUND));
+        // ========== 1) 그룹 계정 조회 ==========
+        User group = userRepository.findById(request.getGroupId())
+                .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.GROUP_NOT_FOUND));
 
-        if (!artist.getRole().equals(UserRole.ARTIST)) {
-            throw new MilestoneException(MilestoneErrorCode.NOT_ARTIST_USER);
+        if (!group.getRole().equals(UserRole.GROUP)) {
+            throw new MilestoneException(MilestoneErrorCode.NOT_GROUP_USER);
         }
 
         // ========== 2) 중복 검증 ==========
-        boolean nameExists = milestoneRepository.existsByArtist_IdAndName(request.getArtistId(), request.getName());
+        boolean nameExists = milestoneRepository.existsByGroup_IdAndName(request.getGroupId(), request.getName());
         if (nameExists) {
             throw new MilestoneException(MilestoneErrorCode.DUPLICATE_MILESTONE_NAME);
         }
 
-        boolean sortExists = milestoneRepository.existsByArtist_IdAndSortOrder(request.getArtistId(), request.getSortOrder());
+        boolean sortExists = milestoneRepository.existsByGroup_IdAndSortOrder(request.getGroupId(), request.getSortOrder());
         if (sortExists) {
             throw new MilestoneException(MilestoneErrorCode.DUPLICATE_SORT_ORDER);
         }
 
         // ========== 3) Milestone 생성 ==========
         Milestone milestone = Milestone.builder()
-                .artist(artist)
+                .group(group)
                 .name(request.getName())
                 .description(request.getDescription())
                 .sortOrder(request.getSortOrder())
@@ -86,19 +86,19 @@ public class MilestoneService {
     }
 
     /**
-     * 아티스트별 마일스톤 목록을 조회한다. (sortOrder 내림차순)
+     * 그룹별 마일스톤 목록을 조회한다. (sortOrder 내림차순)
      */
-    public List<MilestoneResponse> getMilestonesByArtist(Long artistId) {
-        User artist = userRepository.findById(artistId)
-                .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.ARTIST_NOT_FOUND));
-        List<Milestone> milestones = milestoneRepository.findAllByArtistOrderBySortOrderDesc(artist);
+    public List<MilestoneResponse> getMilestonesByGroup(Long groupId) {
+        User group = userRepository.findById(groupId)
+                .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.GROUP_NOT_FOUND));
+        List<Milestone> milestones = milestoneRepository.findAllByGroupOrderBySortOrderDesc(group);
         return milestones.stream()
                 .map(MilestoneResponse::from)
                 .toList();
     }
 
     /**
-     * 아티스트가 마일스톤(등급)을 업데이트한다.
+     * 그룹 계정이 마일스톤(등급)을 업데이트한다.
      */
     public MilestoneResponse updateMilestone(Long milestoneId, MilestoneRequest request) {
 
@@ -106,15 +106,15 @@ public class MilestoneService {
         Milestone milestone = milestoneRepository.findById(milestoneId)
                 .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.MILESTONE_NOT_FOUND));
 
-        // 2) 아티스트 검증
-        if (!milestone.getArtist().getId().equals(request.getArtistId())) {
+        // 2) 그룹 검증
+        if (!milestone.getGroup().getId().equals(request.getGroupId())) {
             throw new MilestoneException(MilestoneErrorCode.NOT_MILESTONE_OWNER);
         }
 
         // 3) 중복 검증 (이름/순서 변경 시만)
         if (!milestone.getName().equals(request.getName())) {
-            boolean nameExists = milestoneRepository.existsByArtist_IdAndName(
-                    request.getArtistId(), request.getName()
+            boolean nameExists = milestoneRepository.existsByGroup_IdAndName(
+                    request.getGroupId(), request.getName()
             );
             if (nameExists) {
                 throw new MilestoneException(MilestoneErrorCode.DUPLICATE_MILESTONE_NAME);
@@ -122,8 +122,8 @@ public class MilestoneService {
         }
 
         if (!milestone.getSortOrder().equals(request.getSortOrder())) {
-            boolean sortExists = milestoneRepository.existsByArtist_IdAndSortOrder(
-                    request.getArtistId(), request.getSortOrder()
+            boolean sortExists = milestoneRepository.existsByGroup_IdAndSortOrder(
+                    request.getGroupId(), request.getSortOrder()
             );
             if (sortExists) {
                 throw new MilestoneException(MilestoneErrorCode.DUPLICATE_SORT_ORDER);
@@ -159,16 +159,16 @@ public class MilestoneService {
     }
 
     /**
-     * 아티스트가 마일스톤(등급)을 삭제한다.
+     * 그룹 계정이 마일스톤(등급)을 삭제한다.
      */
-    public MilestoneResponse deleteMilestone(Long milestoneId, Long artistId) {
+    public MilestoneResponse deleteMilestone(Long milestoneId, Long groupId) {
 
         // 1) 마일스톤 조회
         Milestone milestone = milestoneRepository.findById(milestoneId)
                 .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.MILESTONE_NOT_FOUND));
 
         // 2) 소유자 검증
-        if (!milestone.getArtist().getId().equals(artistId)) {
+        if (!milestone.getGroup().getId().equals(groupId)) {
             throw new MilestoneException(MilestoneErrorCode.NOT_MILESTONE_OWNER);
         }
 
@@ -188,7 +188,7 @@ public class MilestoneService {
      */
     public void checkAndUpgradeFanGrade(FanProfile fan) {
         List<Milestone> milestones =
-                milestoneRepository.findAllByArtistOrderBySortOrderDesc(fan.getArtist());
+                milestoneRepository.findAllByGroupOrderBySortOrderDesc(fan.getGroup());
 
         for (Milestone milestone : milestones) {
             if (!milestone.isAutoUpgrade()) continue;

@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.user.dto.request.BlockRequest;
+import org.example.backend.user.dto.request.OAuthProfileCompleteRequest;
 import org.example.backend.user.dto.request.PasswordUpdateRequest;
 import org.example.backend.user.dto.request.PhoneNumberUpdateRequest;
 import org.example.backend.user.dto.request.UserProfileUpdateRequest;
@@ -51,6 +52,16 @@ public class UserController {
             @Valid @RequestBody UserProfileUpdateRequest request
     ) {
         UserProfileResponse response = userService.updateProfile(principalDetails.getUser(), request);
+        return ResponseEntity.ok(response);
+    }
+
+    /** OAuth 간편가입 후 부족한 추가 정보 입력 저장 */
+    @PutMapping("/profile/complete")
+    public ResponseEntity<UserProfileResponse> completeOAuthProfile(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @Valid @RequestBody OAuthProfileCompleteRequest request
+    ) {
+        UserProfileResponse response = userService.updateOAuthProfileComplete(principalDetails.getUser(), request);
         return ResponseEntity.ok(response);
     }
 

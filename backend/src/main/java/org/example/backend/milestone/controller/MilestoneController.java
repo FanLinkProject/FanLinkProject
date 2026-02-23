@@ -28,8 +28,8 @@ public class MilestoneController {
             @AuthenticationPrincipal PrincipalDetails principal,
             @RequestBody @Valid MilestoneRequest request
     ) {
-        MilestoneRequest requestWithArtist = MilestoneRequest.builder()
-                .artistId(principal.getUserId())
+        MilestoneRequest requestWithGroup = MilestoneRequest.builder()
+                .groupId(principal.getUserId())
                 .name(request.getName())
                 .description(request.getDescription())
                 .sortOrder(request.getSortOrder())
@@ -37,18 +37,18 @@ public class MilestoneController {
                 .active(request.isActive())
                 .conditions(request.getConditions())
                 .build();
-        MilestoneResponse response = milestoneService.createMilestone(requestWithArtist);
+        MilestoneResponse response = milestoneService.createMilestone(requestWithGroup);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
-     * 아티스트별 마일스톤 목록 조회 (sortOrder 내림차순)
+     * 그룹별 마일스톤 목록 조회 (sortOrder 내림차순, 그룹 계정 로그인 시)
      */
     @GetMapping
-    public ResponseEntity<List<MilestoneResponse>> getMilestonesByArtist(
+    public ResponseEntity<List<MilestoneResponse>> getMilestonesByGroup(
             @AuthenticationPrincipal PrincipalDetails principal
     ) {
-        List<MilestoneResponse> response = milestoneService.getMilestonesByArtist(principal.getUserId());
+        List<MilestoneResponse> response = milestoneService.getMilestonesByGroup(principal.getUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -61,8 +61,8 @@ public class MilestoneController {
             @PathVariable Long id,
             @RequestBody @Valid MilestoneRequest request
     ) {
-        MilestoneRequest requestWithArtist = MilestoneRequest.builder()
-                .artistId(principal.getUserId())
+        MilestoneRequest requestWithGroup = MilestoneRequest.builder()
+                .groupId(principal.getUserId())
                 .name(request.getName())
                 .description(request.getDescription())
                 .sortOrder(request.getSortOrder())
@@ -70,7 +70,7 @@ public class MilestoneController {
                 .active(request.isActive())
                 .conditions(request.getConditions())
                 .build();
-        MilestoneResponse response = milestoneService.updateMilestone(id, requestWithArtist);
+        MilestoneResponse response = milestoneService.updateMilestone(id, requestWithGroup);
         return ResponseEntity.ok(response);
     }
 
@@ -82,7 +82,7 @@ public class MilestoneController {
             @AuthenticationPrincipal PrincipalDetails principal,
             @PathVariable Long id
     ) {
-        MilestoneResponse response = milestoneService.deleteMilestone(id, principal.getUserId());
+        MilestoneResponse response = milestoneService.deleteMilestone(id, principal.getUserId()); // principal = 그룹 계정
         return ResponseEntity.ok(response);
     }
 }
