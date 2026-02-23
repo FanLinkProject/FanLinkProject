@@ -18,6 +18,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByArtistId(Long artistId);
 
+    long countByArtistId(Long artistId);
+
     List<Product> findByArtistIdIn(List<Long> artistIds);
 
     List<Product> findByArtistIdIsNull();
