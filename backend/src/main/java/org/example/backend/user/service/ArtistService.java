@@ -17,6 +17,7 @@ import org.example.backend.product.repository.ProductRepository;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.example.backend.settlement.service.SettlementDashboardService;
 import org.example.backend.user.exception.UserException;
+import org.example.backend.media_asset.service.MediaAssetService;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
@@ -44,6 +45,7 @@ public class ArtistService {
     private final GroupMemberRepository groupMemberRepository;
     private final ArtistPostRepository artistPostRepository;
     private final UserRepository userRepository;
+    private final MediaAssetService mediaAssetService;
     private final SettlementDashboardService settlementDashboardService;
     private final SettlementPendingRepository settlementPendingRepository;
     private final ProductRepository productRepository;
@@ -184,10 +186,18 @@ public class ArtistService {
         if (request.bio() != null) {
             user.setBio(request.bio());
         }
-        if (request.profileImageUrl() != null) {
+        if (request.profileImageMediaAssetId() != null) {
+            String profileUrl = mediaAssetService.getPublicUrlForArtistProfileImage(
+                    request.profileImageMediaAssetId(), user.getId());
+            user.setProfileImageUrl(profileUrl);
+        } else if (request.profileImageUrl() != null) {
             user.setProfileImageUrl(request.profileImageUrl());
         }
-        if (request.bannerImageUrl() != null) {
+        if (request.bannerImageMediaAssetId() != null) {
+            String bannerUrl = mediaAssetService.getPublicUrlForArtistCover(
+                    request.bannerImageMediaAssetId(), user.getId());
+            user.setBannerImageUrl(bannerUrl);
+        } else if (request.bannerImageUrl() != null) {
             user.setBannerImageUrl(request.bannerImageUrl());
         }
         if (request.officialLinks() != null) {

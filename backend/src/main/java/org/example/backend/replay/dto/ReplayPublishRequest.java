@@ -13,6 +13,7 @@ public record ReplayPublishRequest(
         @NotNull
         ReplayAccessType accessType,
         @Size(max = 200)
-        String title
+        String title,
+        Long thumbnailMediaAssetId
 ) {
 }

@@ -2,6 +2,12 @@ package org.example.backend.replay.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.backend.media_asset.config.AwsProperties;
+import org.example.backend.media_asset.entity.MediaAsset;
+import org.example.backend.media_asset.entity.MediaAssetCategory;
+import org.example.backend.media_asset.entity.MediaAssetStatus;
+import org.example.backend.media_asset.exception.MediaAssetErrorCode;
+import org.example.backend.media_asset.exception.MediaAssetException;
+import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.replay.dto.ReplayAccessResponse;
 import org.example.backend.replay.dto.ReplayAccessResult;
 import org.example.backend.replay.dto.ReplayPublishRequest;
@@ -36,6 +42,7 @@ import java.util.List;
 public class ReplayCommandService {
 
     private final ReplayRepository replayRepository;
+    private final MediaAssetRepository mediaAssetRepository;
     @Qualifier("replayLiveSessionServiceGateway")
     private final LiveSessionGateway liveSessionGateway;
     private final ArtistPermissionService artistPermissionService;
@@ -83,6 +90,18 @@ public class ReplayCommandService {
                 now
         );
         replayRepository.save(replay);
+
+        if (request.thumbnailMediaAssetId() != null) {
+            MediaAsset mediaAsset = mediaAssetRepository.findById(request.thumbnailMediaAssetId())
+                    .orElseThrow(() -> new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_NOT_FOUND));
+            if (mediaAsset.getCategory() != MediaAssetCategory.REPLAY_THUMBNAIL) {
+                throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED, "다시보기 썸네일이 아닌 미디어입니다.");
+            }
+            if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
+                throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 썸네일만 사용할 수 있습니다.");
+            }
+            replay.updateThumbnailKey(mediaAsset.getObjectKey());
+        }
 
         String playbackUrl = playbackUrlCalculator.buildPlaybackUrl(awsProperties.getCloudfront().getDomain(), replay);
         return new ReplayPublishResponse(

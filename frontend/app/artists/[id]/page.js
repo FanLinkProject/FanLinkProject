@@ -6,8 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 
 // 데이터 및 유틸리티
-import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
+import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
+import { listByArtist as listReplays } from "@/lib/replayApi";
 import { request, apiGet, apiPost, BASE_URL } from "@/lib/api";
 import {
     isUpcoming,
@@ -44,6 +45,11 @@ function getCurrentUser() {
         const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
         return { email: payload.sub, role: (payload.role || "").replace("ROLE_", "") };
     } catch { return null; }
+}
+
+function getConcertId(concert) {
+    if (!concert) return null;
+    return concert.id ?? concert.concertId ?? concert.concert_id ?? concert?.concert?.id ?? null;
 }
 
 function formatTimestamp(instant) {
@@ -135,6 +141,8 @@ function ArtistDetailPageInner({ paramsId }) {
     const [liveSessions, setLiveSessions] = useState([]);
     const [liveLoading, setLiveLoading] = useState(false);
     const [liveError, setLiveError] = useState("");
+    const [vodList, setVodList] = useState([]);
+    const [vodLoading, setVodLoading] = useState(false);
 
     // 모달 및 UI 상태
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -368,7 +376,17 @@ function ArtistDetailPageInner({ paramsId }) {
             .catch(() => setArtistNotices([]));
     }, [groupId, isRealGroup]);
 
-    // 5. MV 탭 활성화 시 로드
+    // 5. LIVE 탭 활성화 시 다시보기(VOD) 목록 로드
+    useEffect(() => {
+        if (activeTab !== "LIVE" || !artist?.backendId) return;
+        setVodLoading(true);
+        listReplays(artist.backendId)
+            .then((list) => setVodList(Array.isArray(list) ? list : []))
+            .catch(() => setVodList([]))
+            .finally(() => setVodLoading(false));
+    }, [activeTab, artist?.backendId]);
+
+    // 6. MV 탭 활성화 시 로드
     useEffect(() => {
         if (activeTab !== "MV" || !artist) return;
         setMusicVideosLoading(true);
@@ -534,11 +552,8 @@ function ArtistDetailPageInner({ paramsId }) {
         { id: "LIVE", label: "Live" },
         { id: "CONCERT", label: "공연" },
         { id: "MARKET", label: "Market" },
-        { id: "MV", label: "MV." },
+        { id: "MV", label: "MV" },
     ];
-
-    // VOD (Mock 기반 유지)
-    const vodList = MOCK_LIVES.filter(l => l.artistId === artist.id && (l.status === "ENDED" || l.status === "RECORDED"));
 
     return (
         <div className="flex flex-col min-h-full relative pb-20">
@@ -595,6 +610,43 @@ function ArtistDetailPageInner({ paramsId }) {
                     </div>
                 </Surface>
             </div>
+
+            {/* 참여 공연 섹션 */}
+            {artistConcerts.length > 0 && (
+                <div className="max-w-6xl w-full mx-auto px-8 mt-12">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {artistConcerts.map((c, i) => {
+                            const concertId = getConcertId(c);
+                            if (!concertId) {
+                                if (typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
+                            }
+                            const cardContent = (
+                                <>
+                                    <div className="aspect-[16/10] overflow-hidden">
+                                        <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                    <div className="p-5">
+                                        <h4 className="font-bold text-white truncate">{c.title}</h4>
+                                        <p className="text-white/50 text-xs mt-2">{formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}</p>
+                                    </div>
+                                </>
+                            );
+                            const key = concertId ?? `concert-${i}`;
+                            const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                            return concertId ? (
+                                <Link key={key} href={`/concerts/${concertId}`} className={className}>
+                                    {cardContent}
+                                </Link>
+                            ) : (
+                                <div key={key} className={className} aria-disabled="true">
+                                    {cardContent}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* 탭 메뉴 */}
             <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 border-b border-white/[0.06] mt-12">
@@ -793,18 +845,20 @@ function ArtistDetailPageInner({ paramsId }) {
 
                             <section>
                                 <h3 className="text-xs font-black text-white/40 mb-6 uppercase tracking-widest">Replay (VOD)</h3>
-                                {vodList.length > 0 ? (
+                                {vodLoading ? (
+                                    <p className="text-white/40 py-12 text-center">로딩 중...</p>
+                                ) : vodList.length > 0 ? (
                                     <div className="grid grid-cols-2 gap-6">
-                                        {vodList.map(vod => (
-                                            <Link key={vod.id} href={`/live/${vod.id}`} className="group">
+                                        {vodList.map((vod) => (
+                                            <Link key={vod.replayId} href={`/live/${vod.replayId}`} className="group">
                                                 <div className="aspect-video rounded-2xl overflow-hidden relative mb-3">
-                                                    <img src={vod.thumbnail} className="w-full h-full object-cover" alt="" />
+                                                    <img src={vod.thumbnailUrl || "https://picsum.photos/seed/vod/800/450"} className="w-full h-full object-cover" alt="" />
                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
                                                         <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
                                                     </div>
                                                 </div>
-                                                <h5 className="font-bold text-white truncate">{vod.title}</h5>
-                                                <p className="text-white/40 text-xs mt-1">{vod.startTime}</p>
+                                                <h5 className="font-bold text-white truncate">다시보기</h5>
+                                                <p className="text-white/40 text-xs mt-1">{vod.publishedAt ? new Date(vod.publishedAt).toLocaleDateString("ko-KR") : ""}</p>
                                             </Link>
                                         ))}
                                     </div>

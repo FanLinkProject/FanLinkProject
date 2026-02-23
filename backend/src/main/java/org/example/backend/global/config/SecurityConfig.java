@@ -109,6 +109,10 @@ public class SecurityConfig {
                     .permitAll()
 
 				.requestMatchers(GET, "/api/concerts/**").permitAll()
+                    // Replay 목록·단건 (아티스트별 공개 조회)
+                    .requestMatchers(GET, "/api/replays").permitAll()
+                    .requestMatchers(GET, "/api/replays/candidates").authenticated()
+                    .requestMatchers(GET, "/api/replays/*").permitAll()
 
                 // 관리자
                 .requestMatchers("/api/admin/**")

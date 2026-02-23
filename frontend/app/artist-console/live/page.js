@@ -11,6 +11,8 @@ import Button from "@/components/ui/Button";
 
 import { apiGet, getToken, normalizeToken, WS_CHAT_URL } from "@/lib/api";
 import { getCandidates, publish, ReplayAccessType } from "@/lib/replayApi";
+import { useMediaUpload } from "@/lib/useMediaUpload";
+import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
 export default function ArtistLivePage() {
     // --- artist context (현재 로그인 계정 = groupId 또는 본인 id) ---
@@ -35,6 +37,17 @@ export default function ArtistLivePage() {
     const [authError, setAuthError] = useState("");
 
     const fetchLiveData = useCallback(async () => {
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
+            setLiveSessions([]);
+            setReplayCandidates([]);
+            setLiveLoading(false);
+            setReplayLoading(false);
+            setLiveError("");
+            setReplayError("");
+            return;
+        }
+
         setAuthError("");
         setLiveError("");
         setReplayError("");
@@ -42,8 +55,8 @@ export default function ArtistLivePage() {
         setReplayLoading(true);
 
         const [liveResult, replayResult] = await Promise.allSettled([
-            apiGet(`/api/live-sessions?artistId=${artistId}&status=LIVE`),
-            apiGet(`/api/live-sessions?artistId=${artistId}`),
+            apiGet("/api/live-sessions", { query: { artistId: numericArtistId, status: "LIVE" } }),
+            apiGet("/api/live-sessions", { query: { artistId: numericArtistId } }),
         ]);
 
         if (liveResult.status === "fulfilled") {
@@ -75,8 +88,13 @@ export default function ArtistLivePage() {
     }, [artistId]);
 
     useEffect(() => {
-        fetchLiveData();
-    }, [fetchLiveData]);
+        if (artistId != null && !Number.isNaN(Number(artistId)) && Number(artistId) >= 1) {
+            fetchLiveData();
+        } else {
+            setLiveLoading(false);
+            setReplayLoading(false);
+        }
+    }, [artistId, fetchLiveData]);
 
     // --- LIVE_LIST_CHANGED -> refresh list (no polling) ---
     const fetchLiveDataRef = useRef(fetchLiveData);
@@ -125,17 +143,34 @@ export default function ArtistLivePage() {
         liveSessionId: "",
         accessType: ReplayAccessType.FREE,
         title: "",
+        thumbnailMediaAssetId: null,
+        thumbnailPreviewUrl: null,
     });
+
+    const thumbnailPresignItem = {
+        category: MediaAssetCategory.REPLAY_THUMBNAIL,
+        scope: MediaAssetScope.PUBLIC,
+        artistId: artistId ?? undefined,
+        replayIdOrTemp: "tmp_publish",
+    };
+    const { upload: uploadThumbnail } = useMediaUpload(thumbnailPresignItem);
 
     const [publishing, setPublishing] = useState(false);
     const [publishedReplay, setPublishedReplay] = useState(null);
     const [publishError, setPublishError] = useState(null);
 
     useEffect(() => {
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
+            setPublishCandidates([]);
+            setLoadingCandidates(false);
+            return;
+        }
+
         setLoadingCandidates(true);
         setPublishError(null);
 
-        getCandidates(artistId)
+        getCandidates(numericArtistId)
             .then((res) => {
                 const arr = Array.isArray(res) ? res : [];
                 setPublishCandidates(arr);
@@ -150,18 +185,20 @@ export default function ArtistLivePage() {
     const handlePublish = async (e) => {
         e.preventDefault();
 
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
         const liveSessionId = Number(publishForm.liveSessionId);
-        if (!liveSessionId) return;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1 || !liveSessionId) return;
 
         setPublishing(true);
         setPublishError(null);
 
         try {
             const res = await publish({
-                artistId,
+                artistId: numericArtistId,
                 liveSessionId,
                 accessType: publishForm.accessType,
                 title: publishForm.title || null,
+                thumbnailMediaAssetId: publishForm.thumbnailMediaAssetId || null,
             });
 
             setPublishedReplay(res);
@@ -169,6 +206,8 @@ export default function ArtistLivePage() {
                 liveSessionId: "",
                 accessType: ReplayAccessType.FREE,
                 title: "",
+                thumbnailMediaAssetId: null,
+                thumbnailPreviewUrl: null,
             });
 
             // 발행 후 리스트도 같이 갱신 (선택)
@@ -371,8 +410,8 @@ export default function ArtistLivePage() {
                     <input
                         type="number"
                         min="1"
-                        value={artistId}
-                        onChange={(e) => setArtistId(Number(e.target.value) || 1)}
+                        value={artistId != null ? artistId : ""}
+                        onChange={(e) => setArtistId(Number(e.target.value) || null)}
                         className="mt-1 w-24 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
                     />
                 </label>
@@ -450,6 +489,37 @@ export default function ArtistLivePage() {
                             }
                             className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
                         />
+                    </label>
+
+                    <label className="block">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55">
+              썸네일 (선택)
+            </span>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            id="replay-thumbnail-input"
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !file.type.startsWith("image/") || !uploadThumbnail) return;
+                                const result = await uploadThumbnail(file);
+                                if (result?.mediaAssetId && result?.url) {
+                                    setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: result.mediaAssetId, thumbnailPreviewUrl: result.url }));
+                                }
+                                e.target.value = "";
+                            }}
+                        />
+                        {publishForm.thumbnailPreviewUrl ? (
+                            <div className="mt-1 relative inline-block">
+                                <img src={publishForm.thumbnailPreviewUrl} alt="썸네일" className="w-full max-w-xs rounded-lg border border-white/10 object-cover aspect-video" />
+                                <button type="button" onClick={() => setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: null, thumbnailPreviewUrl: null }))} className="absolute top-1 right-1 size-6 rounded-full bg-red-500 text-white text-xs">×</button>
+                            </div>
+                        ) : (
+                            <button type="button" onClick={() => document.getElementById("replay-thumbnail-input")?.click()} className="mt-1 py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">
+                                파일 업로드
+                            </button>
+                        )}
                     </label>
 
                     <Button type="submit" variant="primary" disabled={publishing}>
