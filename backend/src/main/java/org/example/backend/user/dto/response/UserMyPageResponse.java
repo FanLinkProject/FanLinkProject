@@ -44,9 +44,11 @@ public record UserMyPageResponse(
 
     /**
      * 구매 내역
+     * deliveryId: 배송 추적 시 GET /api/deliveries/{deliveryId} 호출에 사용 (없으면 null)
      */
     public record PurchaseHistory(
             Long orderId,
+            Long deliveryId,
             String orderNo,
             String orderName,
             BigDecimal totalAmount,

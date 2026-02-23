@@ -13,8 +13,20 @@ public record UserProfileResponse(
         String birth,
         Long candy,
         // GROUP 계정: 자신의 ID / ARTIST 계정(그룹 소속): 소속 그룹의 ID / 기타: null
-        Long groupId
+        Long groupId,
+        // OAuth 간편가입 후 추가 정보 미입력 시 true (추가정보 입력 페이지로 유도용)
+        Boolean needsProfileComplete
 ) {
+    private static boolean computeNeedsProfileComplete(User user) {
+        if (user.getProvider() == null || "LOCAL".equals(user.getProvider())) {
+            return false;
+        }
+        String phone = user.getPhoneNumber();
+        String birth = user.getBirth();
+        return (phone == null || phone.isBlank() || phone.startsWith("kakao_") || phone.startsWith("google_"))
+                || (birth == null || birth.isBlank() || "1900-01-01".equals(birth));
+    }
+
     public static UserProfileResponse from(User user) {
         return new UserProfileResponse(
                 user.getId(),
@@ -25,7 +37,8 @@ public record UserProfileResponse(
                 user.getGender(),
                 user.getBirth(),
                 user.getCandy(),
-                null
+                null,
+                computeNeedsProfileComplete(user)
         );
     }
 
@@ -39,7 +52,8 @@ public record UserProfileResponse(
                 user.getGender(),
                 user.getBirth(),
                 user.getCandy(),
-                groupId
+                groupId,
+                computeNeedsProfileComplete(user)
         );
     }
 }

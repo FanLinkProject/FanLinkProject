@@ -1,53 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
-
-const historyData = {
-  CANDY_RECHARGE: [
-    {
-      id: "CHG-102",
-      date: "2025.02.21",
-      name: "3,000 캔디 충전",
-      amount: "33,000원",
-      status: "충전 완료",
-    },
-    {
-      id: "CHG-101",
-      date: "2025.01.10",
-      name: "1,000 캔디 충전",
-      amount: "11,000원",
-      status: "충전 완료",
-    },
-  ],
-  MEMBERSHIP_USE: [
-    {
-      id: "SUB-201",
-      date: "2025.02.21",
-      name: "Luna Ray Membership (1단계)",
-      amount: "-500 캔디",
-      status: "구독 완료",
-    },
-  ],
-  GOODS_BUY: [
-    {
-      id: "ORD-12345",
-      date: "2025.02.20",
-      name: "Signature Hoodie - Violet",
-      amount: "68,000원",
-      status: "배송 준비중",
-    },
-    {
-      id: "ORD-12344",
-      date: "2025.01.15",
-      name: "Signed Vinyl - Moonlit Night",
-      amount: "45,000원",
-      status: "배송 완료",
-    },
-  ],
-};
+import { getMypage } from "@/lib/userApi";
 
 const TABS = [
   { id: "CANDY_RECHARGE", label: "캔디 충전" },
@@ -55,9 +12,62 @@ const TABS = [
   { id: "GOODS_BUY", label: "상품 구매" },
 ];
 
+function formatDate(str) {
+  if (!str) return "—";
+  try {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? str : d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, ".").replace(".", ".");
+  } catch (_) {
+    return str;
+  }
+}
+
 export default function PaymentHistoryPage() {
-  const [activeTab, setActiveTab] = useState("CANDY_RECHARGE");
+  const [activeTab, setActiveTab] = useState("GOODS_BUY");
+  const [loading, setLoading] = useState(true);
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
+  const [memberships, setMemberships] = useState([]);
+
+  useEffect(() => {
+    getMypage()
+      .then((data) => {
+        setPurchaseHistory(data.purchaseHistory ?? []);
+        setMemberships(data.memberships ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const candyRechargeList = []; // 캔디 충전 전용 API 없음
+  const membershipList = memberships.map((m) => ({
+    id: `SUB-${m.subscriptionId}`,
+    date: formatDate(m.endDate),
+    name: m.productName,
+    amount: "- 캔디",
+    status: m.isActive ? "구독 중" : "만료",
+  }));
+  const goodsList = purchaseHistory.map((o) => ({
+    id: o.orderNo,
+    date: formatDate(o.createdAt),
+    name: o.orderName,
+    amount: o.totalAmount != null ? `${Number(o.totalAmount).toLocaleString()}원` : "—",
+    status: o.status ?? "—",
+  }));
+
+  const historyData = {
+    CANDY_RECHARGE: candyRechargeList,
+    MEMBERSHIP_USE: membershipList,
+    GOODS_BUY: goodsList,
+  };
   const currentHistory = historyData[activeTab];
+
+  if (loading) {
+    return (
+      <div className="p-8 lg:p-12 max-w-4xl mx-auto flex items-center justify-center min-h-[30vh]">
+        <p className="text-white/55 font-medium">로딩 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 lg:p-12 max-w-4xl mx-auto space-y-12">
@@ -130,7 +140,9 @@ export default function PaymentHistoryPage() {
         ))}
         {currentHistory.length === 0 && (
           <Surface variant="primary" className="py-20 text-center">
-            <p className="text-white/55 italic">내역이 존재하지 않습니다.</p>
+            <p className="text-white/55 italic">
+              {activeTab === "CANDY_RECHARGE" ? "캔디 충전 내역은 준비 중입니다." : "내역이 존재하지 않습니다."}
+            </p>
           </Surface>
         )}
       </div>

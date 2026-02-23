@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.global.security.details.PrincipalDetails;
-import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.user.entity.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -20,38 +19,37 @@ import java.io.IOException;
 @Slf4j
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final JwtTokenProvider jwtTokenProvider;
+    private final OAuthAuthorizationCodeStore oauthAuthorizationCodeStore;
 
-    @Value("${oauth2.redirect-uri:http://localhost:3000}")
+    @Value("${oauth2.redirect-uri:http://localhost:3000/oauth2/login/success}")
     private String redirectUri;
+
+    private static final String DEFAULT_FRONT_REDIRECT = "http://localhost:3000/oauth2/login/success";
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                                         Authentication authentication) throws IOException {
         try {
-            // 1. 인증된 사용자 정보 추출
             PrincipalDetails principalDetails = (PrincipalDetails) authentication.getPrincipal();
             User user = principalDetails.getUser();
-            
-            // 2. JWT 토큰 생성 (이메일과 역할을 포함)
-            String refreshToken = jwtTokenProvider.createRefreshToken(user.getEmail(), user.getRole().getValue());
-            String accessToken = jwtTokenProvider.createAccessToken(user.getEmail(), user.getRole().getValue());
 
+            String code = oauthAuthorizationCodeStore.createCode(user.getEmail(), user.getRole().getValue());
 
-            // 3. 프론트엔드로 리다이렉트 (토큰을 쿼리 파라미터로 전달)
-            String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
-                    .queryParam("refreshToken", refreshToken)
-                    .queryParam("accessToken", accessToken)
-                    .queryParam("tokenType", "Bearer")
+            String resolvedRedirectUri = redirectUri;
+            if (resolvedRedirectUri == null || resolvedRedirectUri.isBlank() || resolvedRedirectUri.contains("callback.html")) {
+                resolvedRedirectUri = DEFAULT_FRONT_REDIRECT;
+            }
+
+            String targetUrl = UriComponentsBuilder.fromUriString(resolvedRedirectUri)
+                    .queryParam("code", code)
                     .build()
-                    .encode() // URL 인코딩 처리
+                    .encode()
                     .toUriString();
 
-            log.info("OAuth2 리다이렉트 URL: {}", targetUrl);
+            log.info("OAuth2 redirect prepared: email={}, redirectUri={}", user.getEmail(), resolvedRedirectUri);
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } catch (Exception e) {
-            log.error("OAuth2 로그인 성공 처리 중 오류 발생", e);
-            // 에러 발생 시 기본 페이지로 리다이렉트
+            log.error("OAuth2 login success handling failed", e);
             response.sendRedirect("http://localhost:3000?error=oauth2_failed");
         }
     }
