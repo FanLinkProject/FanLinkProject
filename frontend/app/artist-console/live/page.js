@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
-import { MOCK_ARTISTS } from "@/lib/mockData";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
@@ -14,11 +13,15 @@ import { apiGet, getToken, normalizeToken, WS_CHAT_URL } from "@/lib/api";
 import { getCandidates, publish, ReplayAccessType } from "@/lib/replayApi";
 
 export default function ArtistLivePage() {
-    // --- artist context ---
-    const me = MOCK_ARTISTS?.[0];
-    const initialArtistId = me?.backendId ?? 1;
+    // --- artist context (현재 로그인 계정 = groupId 또는 본인 id) ---
+    const [artistId, setArtistId] = useState(null);
 
-    const [artistId, setArtistId] = useState(initialArtistId);
+    useEffect(() => {
+        apiGet("/api/user/profile").then((p) => {
+            const id = p?.groupId ?? p?.id;
+            if (id != null) setArtistId(Number(id));
+        }).catch(() => {});
+    }, []);
 
     // --- live list (API) ---
     const [liveSessions, setLiveSessions] = useState([]);

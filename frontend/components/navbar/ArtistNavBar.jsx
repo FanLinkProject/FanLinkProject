@@ -90,12 +90,14 @@ export default function ArtistNavBar({ showSidebarToggle, sidebarOpen, onSidebar
       </nav>
 
       <div className="flex items-center gap-6 shrink-0">
-        <Link
-          href="/dm/artist"
-          className="p-2 text-white/80 hover:bg-white/10 rounded-full transition-colors"
-          aria-label="DM">
-          <span className="material-symbols-outlined">send</span>
-        </Link>
+        {!isGroupRole && (
+          <Link
+            href="/dm/artist"
+            className="p-2 text-white/80 hover:bg-white/10 rounded-full transition-colors"
+            aria-label="DM">
+            <span className="material-symbols-outlined">send</span>
+          </Link>
+        )}
 
         <Link
           href="/notifications"

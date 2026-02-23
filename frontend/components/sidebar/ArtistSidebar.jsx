@@ -38,14 +38,9 @@ const businessMenuItems = [
     icon: "account_balance_wallet",
     href: "/artist-console/settlement",
   },
-  {
-    id: "ARTIST_ACCOUNT",
-    label: "정산 계좌",
-    icon: "payments",
-    href: "/artist-console/account",
-  },
 ];
-export default function ArtistSidebar() {
+
+export default function ArtistSidebar({ hideDm = false }) {
   const pathname = usePathname();
   const router = useRouter();
   const [canSeeMemberMenu, setCanSeeMemberMenu] = useState(false);
@@ -61,6 +56,9 @@ export default function ArtistSidebar() {
       })
       .catch(() => {});
   }, []);
+
+  // 그룹 계정 또는 그룹 없는 개인 아티스트일 때만 공연 관리 표시
+  const canSeeConcertMenu = !isGroupMember;
 
   const isActive = (href) =>
     pathname === href ||
@@ -85,7 +83,7 @@ export default function ArtistSidebar() {
           </div>
           <div className="flex flex-col gap-1">
             {personalMenuItems
-              .filter((item) => item.id !== "ARTIST_MILESTONES" || !isGroupMember)
+              .filter((item) => (item.id !== "ARTIST_MILESTONES" || !isGroupMember) && (item.id !== "ARTIST_DM" || !hideDm))
               .map((item) => (
               <Link
                 key={item.id}
@@ -111,7 +109,7 @@ export default function ArtistSidebar() {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {businessMenuItems.map((item) => (
+            {(isGroupMember ? businessMenuItems.filter((item) => item.id === "ARTIST_SETTLEMENT") : businessMenuItems).map((item) => (
               <Link
                 key={item.id}
                 href={item.href}
@@ -126,6 +124,20 @@ export default function ArtistSidebar() {
                 <span className="text-sm font-bold leading-none">{item.label}</span>
               </Link>
             ))}
+            {canSeeConcertMenu && (
+              <Link
+                href="/artist-console/concerts"
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all text-left group ${
+                  isActive("/artist-console/concerts")
+                    ? "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+                    : "hover:bg-white/[0.06] text-white/80"
+                }`}>
+                <span className={`material-symbols-outlined text-xl ${isActive("/artist-console/concerts") ? "fill-icon" : ""}`}>
+                  event
+                </span>
+                <span className="text-sm font-bold leading-none">공연 관리</span>
+              </Link>
+            )}
             {canSeeMemberMenu && (
               <Link
                 href="/artist-console/members"

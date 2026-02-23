@@ -129,7 +129,7 @@ function PostDetailContent({ id }) {
       });
       setLikeCount(p.likes || 0);
       if (!groupId) {
-        const a = MOCK_ARTISTS.find((x) => x.id === p.artistId);
+      const a = MOCK_ARTISTS.find((x) => x.id === p.artistId);
         if (a) setBackArtistId(a.id);
       }
       return;
@@ -733,7 +733,7 @@ function PostDetailContent({ id }) {
                 <p className="text-white/40 text-sm">멤버십에 가입하면 모든 콘텐츠를 즐길 수 있습니다</p>
               </div>
             ) : (
-              <div className="prose max-w-none">
+            <div className="prose max-w-none">
                 <p className="text-white/85 text-xl leading-relaxed font-light">
                   &quot;{post.content}&quot;
                 </p>
@@ -805,7 +805,7 @@ function PostDetailContent({ id }) {
                           alt=""
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1">
                             <span className={`text-sm font-bold ${isDeleted ? "text-white/35" : "text-white"}`}>
                               {isDeleted ? "알 수 없음" : (c.nickname || "익명")}
                             </span>
@@ -1083,7 +1083,7 @@ function PostDetailContent({ id }) {
                           )}
                         </div>
                       )}
-                    </div>
+                  </div>
                   );
                 })}
 

@@ -20,6 +20,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByArtistId(Long artistId);
 
+    long countByArtistId(Long artistId);
+
     List<Product> findByArtistIdAndPaymentMethod(Long artistId, ProductPaymentMethod paymentMethod);
 
     List<Product> findByArtistIdIn(List<Long> artistIds);
