@@ -80,6 +80,52 @@
 
 ---
 
+## 📖 주요 동작 설명 (Behavior Notes)
+
+### 1. 다시보기(VOD) 링크와 재생 페이지
+
+- **상황**: 아티스트 페이지의 "Replay (VOD)" 섹션에 발행된 다시보기 카드가 보인다.
+- **차이**:
+  - **liveSessionId**: 라이브를 **진행할 때** 쓰는 세션 ID (라이브 중인 방).
+  - **replayId**: 라이브가 끝난 뒤 **다시보기로 발행**된 후 부여되는 ID (VOD 한 건).
+- **연결 방식**: 카드 클릭 시 **replayId**로 이동해야 하므로, 링크는 `/replay/{replayId}` 를 사용한다.
+- **이유**: `/live/{id}` 는 **liveSessionId** 기준(진행 중/종료된 라이브 세션 접근)이라, 이미 발행된 VOD는 **replayId**를 쓰는 `/replay/[replayId]` 전용 재생 페이지에서 재생한다.
+- **구현**: `app/replay/[replayId]/page.js` 에서 replay 조회 → access(쿠키 발급) → HLS 재생.
+
+### 2. 아티스트 프로필 이미지 (본인만 설정)
+
+- **상황**: 아티스트(또는 그룹) **프로필 이미지**로 사용할 미디어를 선택할 때.
+- **동작**: 백엔드 `getPublicUrlForArtistProfileImage(mediaAssetId, artistId)` 에서, 해당 미디어의 **업로드 소유자(owner)** 가 **해당 아티스트 페이지의 본인(artistId와 동일한 user)** 인 경우에만 URL을 허용한다.
+- **의미**: **그룹 멤버가 그룹 프로필 이미지를 올리는 것은 허용하지 않는다.** 프로필 이미지는 해당 아티스트(그룹) 계정 본인만 설정할 수 있다.
+- **구현**: `ownerUserId.equals(artistId)` 로 검사.
+
+### 3. 새 게시글 작성 시 groupId / artistId (posts/new)
+
+- **상황**: 아티스트가 **새 글 작성** 시, 그 게시글이 **어느 팬페이지(그룹) 소유로** 붙을지 정해야 한다.
+- **의미**:
+  - **groupId**: “이 게시글이 소속되는 팬페이지” 의 ID.  
+    - 그룹 계정 → 그룹 자신의 id.  
+    - 그룹 소속 개인 아티스트 → **소속 그룹의 id**.  
+    - 솔로 아티스트 → 본인 id.
+  - **artistId**: 로그인한 아티스트(또는 그룹)의 **user id**.
+- **프론트**: 아티스트 마이페이지 API(`/api/artist/mypage`)에서 `profile.groupId` 와 `profile.id` 를 받아,  
+  **게시글 생성 시에는 `groupId ?? id`** (그룹이 있으면 그룹 id, 없으면 본인 id)를 `groupId` 로 보낸다.
+- **백엔드**: `ArtistMyPageResponse.Profile` 에 **groupId** 필드를 넣고,  
+  그룹 계정 = 본인 id, 소속 아티스트 = 소속 그룹 id, 솔로 = 본인 id 로 설정해 내려준다.
+
+### 4. 다시보기 수동 업로드
+
+- **상황**: 라이브를 했지만 **녹화가 되지 않았을 때** 본인이 따로 녹화한 영상을 올리거나, **행사·TV 출연** 등 라이브가 아닌 영상을 다시보기로 남기고 싶을 때.
+- **의미**: **라이브 세션 없이** “수동 업로드” 전용 파이프라인이 있다. 슬롯 생성 → 영상 파일 업로드 → MediaConvert HLS 변환 → 발행.
+- **플로우**:
+  1. 아티스트 콘솔 **라이브 관리** 페이지에서 **다시보기 수동 업로드** 섹션 사용.
+  2. 접근 타입(FREE/PAID) 선택 후 **슬롯 생성** → `POST /api/replays/manual` 로 Replay 행 생성 (`live_session_id` = null, `status` = UPLOADING).
+  3. 반환된 **replayId** 로 `REPLAY_VIDEO` presign 업로드 → complete 시 `applyReplayMapping` 이 Replay에 mp4Key를 넣고 MediaConvert 제출.
+  4. 변환 완료(READY) 후 **발행** → `POST /api/replays/{replayId}/publish-manual` 로 `status` = PUBLISHED, `published_at` 설정.
+- **엔티티**: `Replay` 의 `live_session_id`, `recording_s3_bucket`, `recording_s3_prefix` 는 수동 업로드 시 null. `ReplayStatus.UPLOADING` 은 “슬롯만 생성됨, 영상 업로드 대기” 상태.
+
+---
+
 ## 🛠 기술 스택 (Tech Stack)
 
 ### **Backend**

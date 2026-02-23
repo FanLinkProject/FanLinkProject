@@ -11,8 +11,10 @@ public record ArtistMyPageResponse(
         SettlementSummary settlementSummary
 ){
 
+    /** 아티스트 마이페이지 프로필. groupId = 게시글/팬페이지 소유 주체(그룹 계정 ID). 그룹이면 본인 id, 소속 아티스트면 소속 그룹 id, 솔로면 본인 id */
     public record Profile(
             Long id,
+            Long groupId,
             String nickname,
             String profileImageUrl,
             String bannerImageUrl,

@@ -21,6 +21,16 @@ export function publish(body) {
   return request("/api/replays/publish", { method: "POST", body });
 }
 
+/** 다시보기 수동 업로드 슬롯 생성. 반환된 replayId로 REPLAY_VIDEO presign 업로드 후 complete. */
+export function createManualReplay(body) {
+  return request("/api/replays/manual", { method: "POST", body });
+}
+
+/** 수동 업로드 Replay 발행. 상태가 READY일 때만 가능. */
+export function publishManualReplay(replayId) {
+  return request(`/api/replays/${replayId}/publish-manual`, { method: "POST" });
+}
+
 export function getReplay(replayId) {
   return request(`/api/replays/${replayId}`);
 }
