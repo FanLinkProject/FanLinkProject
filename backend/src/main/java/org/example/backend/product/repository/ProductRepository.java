@@ -26,7 +26,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByArtistIdIn(List<Long> artistIds);
 
+    boolean existsByArtistIdAndIsMembershipTrue(Long artistId);
+
     List<Product> findByArtistIdIsNull();
 
     List<Product> findByArtistIdIsNotNull();
+
+    List<Product> findByConcertId(Long concertId);
 }

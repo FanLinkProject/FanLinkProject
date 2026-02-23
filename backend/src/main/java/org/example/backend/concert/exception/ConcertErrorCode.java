@@ -20,6 +20,7 @@ public enum ConcertErrorCode implements ErrorCode {
     // ====== 생성/수정 검증 ======
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE", "공연 시작 시간은 종료 시간보다 이전이어야 합니다."),
     INVALID_SALE_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_SALE_PERIOD", "예매 기간이 공연 시간과 겹치거나 잘못되었습니다."),
+    NO_MEMBERSHIP_PRODUCT(HttpStatus.BAD_REQUEST, "NO_MEMBERSHIP_PRODUCT", "선예매를 운영하려면 해당 아티스트(또는 그룹)의 멤버십 상품이 필요합니다. 먼저 멤버십 상품을 등록해 주세요."),
     INVALID_TICKET_COUNT(HttpStatus.BAD_REQUEST, "INVALID_TICKET_COUNT", "티켓 수량은 0 이상이어야 합니다."),
     EMPTY_ARTIST_LIST(HttpStatus.BAD_REQUEST, "EMPTY_ARTIST_LIST", "공연에는 최소 1명의 아티스트가 필요합니다."),
     DUPLICATE_ARTIST(HttpStatus.BAD_REQUEST, "DUPLICATE_ARTIST", "이미 추가된 아티스트입니다."),

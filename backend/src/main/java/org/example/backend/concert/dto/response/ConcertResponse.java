@@ -28,6 +28,8 @@ public class ConcertResponse {
     private List<ConcertMediaAssetResponse> mediaAssets;
     private Integer presaleTicketCount;
     private Integer saleTicketCount;
+    private Long presaleTicketPrice;
+    private Long saleTicketPrice;
     private Instant presaleStartDateTime;
     private Instant presaleEndDateTime;
     private Instant saleStartDateTime;
@@ -36,7 +38,8 @@ public class ConcertResponse {
     private Instant updatedAt;
     private List<ArtistResponse> artists;
 
-    public static ConcertResponse from(Concert concert, String posterImageUrl, List<ConcertMediaAssetResponse> mediaAssets) {
+    public static ConcertResponse from(Concert concert, String posterImageUrl, List<ConcertMediaAssetResponse> mediaAssets,
+                                       Long presaleTicketPrice, Long saleTicketPrice) {
         return ConcertResponse.builder()
                 .id(concert.getId())
                 .title(concert.getTitle())
@@ -52,6 +55,8 @@ public class ConcertResponse {
                 .mediaAssets(mediaAssets != null ? mediaAssets : Collections.emptyList())
                 .presaleTicketCount(concert.getPresaleTicketCount())
                 .saleTicketCount(concert.getSaleTicketCount())
+                .presaleTicketPrice(presaleTicketPrice)
+                .saleTicketPrice(saleTicketPrice)
                 .presaleStartDateTime(concert.getPresaleStartDateTime())
                 .presaleEndDateTime(concert.getPresaleEndDateTime())
                 .saleStartDateTime(concert.getSaleStartDateTime())

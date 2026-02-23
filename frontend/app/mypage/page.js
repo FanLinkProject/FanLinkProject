@@ -86,6 +86,8 @@ export default function MyPage() {
   const [nicknameEdit, setNicknameEdit] = useState("");
   const [nicknameLoading, setNicknameLoading] = useState(false);
   const [nicknameMessage, setNicknameMessage] = useState("");
+  const [myTickets, setMyTickets] = useState([]);
+  const [ticketQrModal, setTicketQrModal] = useState({ open: false, title: "", qrBase64: null, loading: false });
 
   const artistIdForCover = artistProfile?.groupId ?? artistProfile?.id;
   const profilePresignItem = {
@@ -165,6 +167,16 @@ export default function MyPage() {
       setShowArtistProfileEdit(true);
     }
   }, [searchParams, loading, artistProfile]);
+
+  useEffect(() => {
+    if (loading || isAdmin || artistTeamInfo?.type || fanTab !== "ticket") return;
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) return;
+    axios
+      .get(`${BASE_URL}/api/tickets/my`, { headers })
+      .then((res) => setMyTickets(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setMyTickets([]));
+  }, [loading, isAdmin, artistTeamInfo?.type, fanTab]);
 
   const handleChangePassword = async () => {
     setPwMessage("");
@@ -435,6 +447,7 @@ export default function MyPage() {
     { id: "posts", label: "MY POSTS" },
     { id: "comments", label: "MY COMMENTS" },
     { id: "like", label: "LIKE" },
+    { id: "ticket", label: "TICKET" },
   ];
 
   return (
@@ -663,6 +676,59 @@ export default function MyPage() {
                       <p className="text-[10px] text-white/45 mt-2">좋아요: {item.likedAt}</p>
                     </Link>
                   ))}
+                </div>
+              )}
+            </Surface>
+          )}
+
+          {fanTab === "ticket" && (
+            <Surface variant="primary" className="p-8">
+              <h3 className="text-lg font-black tracking-tight text-white mb-2">내 티켓</h3>
+              <p className="text-[11px] text-white/55 font-medium mb-6">구매한 콘서트 티켓 목록입니다.</p>
+              {myTickets.length === 0 ? (
+                <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                  <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">구매한 티켓이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myTickets.map((ticket) => {
+                    const startStr = ticket.concert?.startDateTime
+                      ? new Date(ticket.concert.startDateTime).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })
+                      : "-";
+                    const endStr = ticket.concert?.endDateTime
+                      ? new Date(ticket.concert.endDateTime).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })
+                      : "-";
+                    return (
+                      <div
+                        key={ticket.id}
+                        className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06]"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-white truncate">{ticket.concert?.title ?? "콘서트"}</p>
+                          <p className="text-[11px] text-white/60 mt-1">
+                            {startStr} ~ {endStr}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTicketQrModal({ open: true, title: ticket.concert?.title ?? "티켓", qrBase64: null, loading: true });
+                            const headers = getAuthHeaders();
+                            axios
+                              .get(`${BASE_URL}/api/tickets/${ticket.ticketCode}/qr`, { headers })
+                              .then((res) => {
+                                const base64 = res.data?.qrImageBase64 ?? null;
+                                setTicketQrModal((prev) => ({ ...prev, qrBase64: base64, loading: false }));
+                              })
+                              .catch(() => setTicketQrModal((prev) => ({ ...prev, qrBase64: null, loading: false })));
+                          }}
+                          className="shrink-0 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold transition-colors"
+                        >
+                          입장 QR
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </Surface>
@@ -1197,6 +1263,27 @@ export default function MyPage() {
             </div>
           </div>
         </Surface>
+      )}
+
+      {ticketQrModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" aria-hidden onClick={() => setTicketQrModal((prev) => ({ ...prev, open: false }))} />
+          <Surface variant="primary" className="relative p-8 max-w-sm w-full text-center">
+            <h3 className="text-lg font-bold text-white mb-4 truncate">{ticketQrModal.title}</h3>
+            {ticketQrModal.loading ? (
+              <p className="text-white/60 py-8">QR 코드 생성 중...</p>
+            ) : ticketQrModal.qrBase64 ? (
+              <div className="flex justify-center mb-6">
+                <img src={`data:image/png;base64,${ticketQrModal.qrBase64}`} alt="입장 QR" className="w-48 h-48 object-contain bg-white rounded-xl" />
+              </div>
+            ) : (
+              <p className="text-white/60 py-8">QR 코드를 불러오지 못했습니다.</p>
+            )}
+            <Button variant="primary" className="w-full py-2.5 text-sm" onClick={() => setTicketQrModal((prev) => ({ ...prev, open: false }))}>
+              닫기
+            </Button>
+          </Surface>
+        </div>
       )}
     </div>
   );

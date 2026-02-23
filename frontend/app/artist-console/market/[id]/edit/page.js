@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getProduct, updateProduct } from "@/lib/productApi";
-import { getConcerts } from "@/lib/concertApi";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 import Surface from "@/components/ui/Surface";
@@ -28,7 +27,6 @@ export default function EditProductPage({ params }) {
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(false);
   const [artistId, setArtistId] = useState(null);
-  const [concerts, setConcerts] = useState([]);
   const fileInputRef = useRef(null);
 
   const presignItem = form
@@ -70,12 +68,6 @@ export default function EditProductPage({ params }) {
       })
       .catch(() => router.push("/artist-console/market"));
   }, [id, router]);
-
-  useEffect(() => {
-    getConcerts()
-      .then((list) => setConcerts(Array.isArray(list) ? list : []))
-      .catch(() => setConcerts([]));
-  }, []);
 
   const handleMembershipChange = (checked) => {
     setForm((f) => ({
@@ -300,42 +292,8 @@ export default function EditProductPage({ params }) {
                 onChange={handleMembershipChange}
                 label="멤버십 상품"
               />
-              <Toggle
-                checked={form.isTicket}
-                onChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    isTicket: v,
-                    concertId: v ? f.concertId : null,
-                  }))
-                }
-                label="티켓 상품"
-              />
             </div>
           </div>
-
-          {form.isTicket && (
-            <div>
-              <label className="block text-sm font-bold text-white/80 mb-2">공연 선택 *</label>
-              <select
-                value={form.concertId ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    concertId: e.target.value ? Number(e.target.value) : null,
-                  }))
-                }
-                className="w-full px-5 py-3 bg-[#201a33] border border-white/[0.06] rounded-2xl text-white"
-              >
-                <option value="">공연을 선택하세요</option>
-                {concerts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title || `공연 #${c.id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
 
           {showQuantity && (
             <div>

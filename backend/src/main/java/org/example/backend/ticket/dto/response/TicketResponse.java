@@ -56,6 +56,7 @@ public class TicketResponse {
         private String title;
         private String venueName;
         private Instant startDateTime;
+        private Instant endDateTime;
 
         public static ConcertSummary from(Concert concert) {
             return ConcertSummary.builder()
@@ -63,6 +64,7 @@ public class TicketResponse {
                     .title(concert.getTitle())
                     .venueName(concert.getVenueName())
                     .startDateTime(concert.getStartDateTime())
+                    .endDateTime(concert.getEndDateTime())
                     .build();
         }
     }

@@ -8,6 +8,7 @@ import { getProfile } from "@/lib/userApi";
 import { createCandyOrder } from "@/lib/orderApi";
 import { createCandySubscription } from "@/lib/subscriptionApi";
 import { request } from "@/lib/api";
+import { apiGet } from "@/lib/api";
 
 function getProductImageUrl(product) {
   const rep = product.attachments?.find(
@@ -24,6 +25,18 @@ function formatPrice(product) {
   return `${product.price?.toLocaleString()}원`;
 }
 
+function formatSaleStartForMessage(isoString) {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day} ${h}:${min}`;
+}
+
 export default function ProductDetailPage({ params }) {
   const resolvedParams = React.use(params);
   const id = resolvedParams?.id;
@@ -36,6 +49,7 @@ export default function ProductDetailPage({ params }) {
   const [candyModalLoading, setCandyModalLoading] = useState(false);
   const [candyPaying, setCandyPaying] = useState(false);
   const [isFollowing, setIsFollowing] = useState(null); // null: 로딩/플랫폼상품, true/false: 아티스트 상품
+  const [concert, setConcert] = useState(null); // 티켓 상품일 때 공연 기간 정보
 
   useEffect(() => {
     const saved = sessionStorage.getItem("productDetailReturnPath");
@@ -47,6 +61,13 @@ export default function ProductDetailPage({ params }) {
     getProduct(id)
       .then((p) => {
         setProduct(p);
+        if (p.concertId != null) {
+          apiGet(`/api/concerts/${p.concertId}`)
+            .then((c) => setConcert(c))
+            .catch(() => setConcert(null));
+        } else {
+          setConcert(null);
+        }
         if (p.artistId) {
           return getProductsByArtist(p.artistId);
         }
@@ -78,8 +99,24 @@ export default function ProductDetailPage({ params }) {
     router.push(returnPath);
   };
 
-  const canPurchase = product?.artistId == null || isFollowing === true;
+  const isTicketProduct = product?.concertId != null;
+  const isPresaleTicket = isTicketProduct && product?.isMembershipOnly === true;
+  const ticketSaleStartIso = concert
+    ? (isPresaleTicket ? concert.presaleStartDateTime : concert.saleStartDateTime)
+    : null;
+  const ticketSaleStartTime = ticketSaleStartIso ? new Date(ticketSaleStartIso).getTime() : null;
+  const now = Date.now();
+  const ticketPeriodAllowed = !isTicketProduct || (ticketSaleStartTime != null && now >= ticketSaleStartTime);
+  const ticketDisabledMessage =
+    isTicketProduct && !ticketPeriodAllowed
+      ? ticketSaleStartIso
+        ? `${formatSaleStartForMessage(ticketSaleStartIso)}부터 구매 가능`
+        : "예매 기간 확인 중..."
+      : null;
+
+  const canPurchase = (product?.artistId == null || isFollowing === true) && ticketPeriodAllowed;
   const followTooltip = "해당 아티스트(그룹)를 팔로우한 후 구매 및 장바구니 담기가 가능합니다.";
+  const purchaseDisabledTooltip = ticketDisabledMessage || (!canPurchase ? followTooltip : undefined);
 
   const handleAddToCart = () => {
     if (!canPurchase) return;
@@ -213,27 +250,27 @@ export default function ProductDetailPage({ params }) {
           <p className="text-3xl font-black text-violet-300 mb-10">{formatPrice(product)}</p>
           <div
             className={`mt-12 flex gap-4 ${!canPurchase ? "cursor-not-allowed" : ""}`}
-            title={!canPurchase ? followTooltip : undefined}
+            title={purchaseDisabledTooltip}
           >
             <button
               type="button"
               onClick={handleBuyNowClick}
               disabled={!canPurchase}
-              title={!canPurchase ? followTooltip : undefined}
+              title={purchaseDisabledTooltip}
               className={`flex-1 py-5 rounded-3xl font-black text-base uppercase tracking-widest text-center transition-all ${
                 canPurchase
                   ? "bg-violet-500/90 text-white hover:brightness-110"
                   : "bg-white/10 text-white/40 cursor-not-allowed"
               }`}
             >
-              지금 바로 구매하기
+              {ticketDisabledMessage || "지금 바로 구매하기"}
             </button>
-            {!isCandyOnly && (
+            {!isCandyOnly && !isTicketProduct && (
               <button
                 type="button"
                 onClick={handleAddToCart}
                 disabled={!canPurchase}
-                title={!canPurchase ? followTooltip : undefined}
+                title={purchaseDisabledTooltip}
                 className={`size-16 rounded-3xl border flex items-center justify-center transition-all ${
                   canPurchase
                     ? "border-white/[0.08] text-white/55 hover:bg-white/[0.06] hover:text-violet-300"
@@ -244,7 +281,7 @@ export default function ProductDetailPage({ params }) {
               </button>
             )}
           </div>
-          {!canPurchase && product.artistId != null && (
+          {!canPurchase && product.artistId != null && !ticketDisabledMessage && (
             <div className="mt-4 space-y-2">
               <p className="text-sm text-amber-400/90 flex items-start gap-2">
                 <span className="material-symbols-outlined text-lg shrink-0">info</span>
