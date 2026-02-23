@@ -4,10 +4,12 @@
 
 const NOW = () => new Date();
 
-/** endDateTime > now 이면 다가오는 공연 */
+/** endDateTime > now 이면 다가오는 공연 (endDate 등 대체 필드 허용) */
 export function isUpcoming(concert) {
-  if (!concert?.endDateTime) return false;
-  return new Date(concert.endDateTime) > NOW();
+  const endStr = concert?.endDateTime ?? concert?.endDate;
+  if (!endStr) return false;
+  const end = new Date(endStr);
+  return !Number.isNaN(end.getTime()) && end > NOW();
 }
 
 /** 예매 상태: OPEN(예매중) | UPCOMING(예매 예정) | CLOSED(마감) */
@@ -24,7 +26,7 @@ export function getTicketStatus(concert) {
   return "CLOSED";
 }
 
-/** D-day (날짜만 기준, 예매 시작일까지) */
+/** D-day (날짜만 기준, 일반 예매 시작일까지) */
 export function getDaysUntilSaleStart(concert) {
   const saleStart = concert?.saleStartDateTime ? new Date(concert.saleStartDateTime) : null;
   if (!saleStart) return null;
@@ -32,7 +34,85 @@ export function getDaysUntilSaleStart(concert) {
   const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const b = new Date(saleStart.getFullYear(), saleStart.getMonth(), saleStart.getDate());
   const diff = Math.ceil((b - a) / (1000 * 60 * 60 * 24));
-  return diff;
+  return diff < 0 ? null : diff;
+}
+
+/** D-day (날짜만 기준, 선예매 시작일까지). 이미 지났으면 null */
+export function getDaysUntilPresaleStart(concert) {
+  const presaleStart = concert?.presaleStartDateTime ? new Date(concert.presaleStartDateTime) : null;
+  if (!presaleStart) return null;
+  const now = NOW();
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(presaleStart.getFullYear(), presaleStart.getMonth(), presaleStart.getDate());
+  const diff = Math.ceil((b - a) / (1000 * 60 * 60 * 24));
+  return diff < 0 ? null : diff;
+}
+
+/** 선예매 기간이 아직 안 끝났는지 (현재 시각이 선예매 종료 전인지) */
+export function isPresalePeriodNotEnded(concert) {
+  const presaleEnd = concert?.presaleEndDateTime ? new Date(concert.presaleEndDateTime) : null;
+  if (!presaleEnd) return false;
+  return NOW() < presaleEnd;
+}
+
+/** 예매 예정(UPCOMING)일 때 표시용 문자열: "선예매 D-3", "일반 예매 D-3", "선예매 D-Day", "일반 예매 D-Day", null */
+export function formatUpcomingSaleDday(concert) {
+  const presaleD = getDaysUntilPresaleStart(concert);
+  const saleD = getDaysUntilSaleStart(concert);
+  const presaleNotEnded = isPresalePeriodNotEnded(concert);
+  if (presaleNotEnded && presaleD != null) {
+    return presaleD === 0 ? "선예매 D-Day" : `선예매 D-${presaleD}`;
+  }
+  if (saleD != null) {
+    return saleD === 0 ? "일반 예매 D-Day" : `일반 예매 D-${saleD}`;
+  }
+  return null;
+}
+
+/** D-day (날짜만 기준, 공연 시작일까지). 이미 지난 공연이면 null, 당일이면 0(D-Day) */
+export function getDaysUntilConcertStart(concert) {
+  const start = concert?.startDateTime ? new Date(concert.startDateTime) : null;
+  if (!start) return null;
+  const now = NOW();
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const diff = Math.ceil((b - a) / (1000 * 60 * 60 * 24));
+  return diff < 0 ? null : diff;
+}
+
+/** 공연 D-day 표시 문자열: "D-3", "D-Day"(당일), null */
+export function formatConcertDday(concert) {
+  const d = getDaysUntilConcertStart(concert);
+  if (d == null) return null;
+  return d === 0 ? "D-Day" : `D-${d}`;
+}
+
+/** 공연이 끝났는지 (endDateTime < now) */
+export function isConcertEnded(concert) {
+  const endStr = concert?.endDateTime ?? concert?.endDate;
+  if (!endStr) return true;
+  const end = new Date(endStr);
+  return !Number.isNaN(end.getTime()) && end <= NOW();
+}
+
+/** D-day (날짜만 기준, 공연 종료일까지). 이미 지났으면 null, 당일이면 0 */
+export function getDaysUntilConcertEnd(concert) {
+  const endStr = concert?.endDateTime ?? concert?.endDate;
+  if (!endStr) return null;
+  const end = new Date(endStr);
+  const now = NOW();
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const diff = Math.ceil((b - a) / (1000 * 60 * 60 * 24));
+  return diff < 0 ? null : diff;
+}
+
+/** 예매 마감(CLOSED)일 때 표시: "공연 마감" | "예매 마감 · 공연 D-n" */
+export function formatClosedLabel(concert) {
+  if (isConcertEnded(concert)) return "공연 마감";
+  const d = getDaysUntilConcertEnd(concert);
+  if (d != null) return d === 0 ? "예매 마감 · 공연 D-Day" : `예매 마감 · 공연 D-${d}`;
+  return "예매 마감";
 }
 
 /** 선예매 종료까지 남은 시간이 적은 순 정렬용 (예매중 종료 임박) */

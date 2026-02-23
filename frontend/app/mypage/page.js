@@ -52,25 +52,6 @@ export default function MyPage() {
   const [profileImageMessage, setProfileImageMessage] = useState("");
 
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showArtistCreateModal, setShowArtistCreateModal] = useState(false);
-  const [artistCreateForm, setArtistCreateForm] = useState({
-    email: "",
-    nickname: "",
-    name: "",
-    password: "",
-    gender: "",
-    birth: "",
-    phoneNumber: "",
-    phonePart1: "010",
-    phonePart2: "",
-    phonePart3: "",
-    privacyPolicyAgreed: true,
-    isGroup: false,
-    groupId: null,
-    channelArn: "",
-  });
-  const [artistCreateLoading, setArtistCreateLoading] = useState(false);
-  const [artistCreateMessage, setArtistCreateMessage] = useState("");
 
   const [showArtistProfileEdit, setShowArtistProfileEdit] = useState(false);
   const [artistProfileEdit, setArtistProfileEdit] = useState({
@@ -88,6 +69,11 @@ export default function MyPage() {
   const [newLinkCustomLabel, setNewLinkCustomLabel] = useState("");
   const [officialLinksSaveLoading, setOfficialLinksSaveLoading] = useState(false);
   const [officialLinksMessage, setOfficialLinksMessage] = useState("");
+
+  const [fanTab, setFanTab] = useState("profile");
+  const [nicknameEdit, setNicknameEdit] = useState("");
+  const [nicknameLoading, setNicknameLoading] = useState(false);
+  const [nicknameMessage, setNicknameMessage] = useState("");
 
   useEffect(() => {
     const headers = getAuthHeaders();
@@ -149,7 +135,7 @@ export default function MyPage() {
     setPwLoading(true);
     try {
       const headers = getAuthHeaders();
-      await axios.patch(
+      await axios.put(
         `${BASE_URL}/api/user/password`,
         { currentPassword, newPassword },
         { headers }
@@ -171,9 +157,9 @@ export default function MyPage() {
     setProfileImageLoading(true);
     try {
       const headers = getAuthHeaders();
-      await axios.patch(
+      await axios.put(
         `${BASE_URL}/api/user/profile`,
-        { profileImageUrl: profileImageUrlInput },
+        { nickname: data?.profile?.nickname ?? "", profileImageUrl: profileImageUrlInput },
         { headers }
       );
       setData((prev) =>
@@ -190,38 +176,30 @@ export default function MyPage() {
     }
   };
 
-  const handleArtistCreate = async () => {
-    setArtistCreateMessage("");
-    setArtistCreateLoading(true);
+  const handleNicknameSave = async () => {
+    const val = (nicknameEdit || (data?.profile?.nickname ?? "")).trim();
+    if (!val || val.length < 2) {
+      setNicknameMessage("닉네임은 2자 이상 입력해 주세요.");
+      return;
+    }
+    setNicknameMessage("");
+    setNicknameLoading(true);
     try {
       const headers = getAuthHeaders();
-      const payload = {
-        ...artistCreateForm,
-        phoneNumber: [artistCreateForm.phonePart1, artistCreateForm.phonePart2, artistCreateForm.phonePart3].filter(Boolean).join("-") || null,
-      };
-      await axios.post(`${BASE_URL}/api/admin/artists`, payload, { headers });
-      setArtistCreateMessage("아티스트 계정이 생성되었습니다.");
-      setShowArtistCreateModal(false);
-      setArtistCreateForm({
-        email: "",
-        nickname: "",
-        name: "",
-        password: "",
-        gender: "",
-        birth: "",
-        phoneNumber: "",
-        phonePart1: "010",
-        phonePart2: "",
-        phonePart3: "",
-        privacyPolicyAgreed: true,
-        isGroup: false,
-        groupId: null,
-        channelArn: "",
-      });
+      await axios.put(
+        `${BASE_URL}/api/user/profile`,
+        { nickname: val, profileImageUrl: data?.profile?.profileImageUrl ?? null },
+        { headers }
+      );
+      setData((prev) =>
+        prev && prev.profile ? { ...prev, profile: { ...prev.profile, nickname: val } } : prev
+      );
+      setNicknameEdit("");
+      setNicknameMessage("저장되었습니다.");
     } catch (e) {
-      setArtistCreateMessage(e.response?.data?.message ?? "생성에 실패했습니다.");
+      setNicknameMessage(e.response?.data?.message ?? "저장에 실패했습니다.");
     } finally {
-      setArtistCreateLoading(false);
+      setNicknameLoading(false);
     }
   };
 
@@ -354,6 +332,16 @@ export default function MyPage() {
   const myLikedPosts = data?.myLikedPosts ?? [];
   const teamType = artistTeamInfo?.type;
   const isArtistAccount = !!teamType;
+  /** ARTIST이면서 소속 그룹이 있는 경우(그룹 멤버) — 프로필 관리·공식 링크 비노출 */
+  const isGroupMember = teamType === "ARTIST" && !!artistTeamInfo?.groupName;
+
+  const isFan = !isArtistAccount && !isAdmin;
+  const fanTabs = [
+    { id: "profile", label: "프로필 설정" },
+    { id: "posts", label: "MY POSTS" },
+    { id: "comments", label: "MY COMMENTS" },
+    { id: "like", label: "LIKE" },
+  ];
 
   return (
     <div className="p-8 lg:p-12 max-w-6xl mx-auto space-y-10">
@@ -361,6 +349,234 @@ export default function MyPage() {
         {isAdmin ? "관리자 마이페이지" : "마이페이지"}
       </SectionTitle>
 
+      {isFan && (
+        <>
+          <Surface variant="primary" className="p-8 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+                <div className="size-20 rounded-2xl overflow-hidden border-2 border-white/[0.08] bg-white/[0.04]">
+                  <img
+                    src={
+                      profile?.profileImageUrl ||
+                      getDefaultAvatarUrl(profile?.nickname)
+                    }
+                    alt="프로필"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileImageEdit(true);
+                    setProfileImageUrlInput(profile?.profileImageUrl || "");
+                    setProfileImageMessage("");
+                  }}
+                  className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                >
+                  사진 변경
+                </button>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/55 mb-1">Account</p>
+                <h2 className="text-2xl font-black text-white mb-1">{profile?.nickname || "사용자"}</h2>
+                <p className="text-sm text-white/70">{profile?.email}</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 text-right text-xs text-white/60">
+              <p>팔로우 아티스트: <span className="font-bold text-white/90">{data?.totalFollowingsCount ?? 0}</span></p>
+              <p>멤버십(결제) 구독: <span className="font-bold text-white/90">{data?.totalMembershipsCount ?? 0}</span></p>
+            </div>
+          </Surface>
+
+          <div className="flex gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/[0.06] w-fit">
+            {fanTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFanTab(tab.id)}
+                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+                  fanTab === tab.id
+                    ? "bg-violet-500/30 text-violet-300 border border-violet-500/40"
+                    : "text-white/70 hover:text-white hover:bg-white/[0.06] border border-transparent"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {fanTab === "profile" && (
+            <div className="space-y-8">
+              <Surface variant="primary" className="p-8">
+                <h3 className="text-lg font-semibold tracking-tight text-white mb-4">닉네임 변경</h3>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex-1 min-w-[200px] space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">닉네임</label>
+                    <input
+                      type="text"
+                      value={nicknameEdit || profile?.nickname || ""}
+                      onChange={(e) => setNicknameEdit(e.target.value)}
+                      placeholder="2자 이상"
+                      className="w-full px-5 py-3.5 rounded-2xl text-sm font-bold bg-[#201a33] text-white border border-white/[0.06] focus:ring-2 focus:ring-violet-500/20 outline-none"
+                    />
+                  </div>
+                  <Button variant="primary" className="py-3 text-xs uppercase tracking-widest" onClick={handleNicknameSave} disabled={nicknameLoading}>
+                    {nicknameLoading ? "저장 중..." : "저장"}
+                  </Button>
+                </div>
+                {nicknameMessage && <p className="text-xs text-white/70 mt-2">{nicknameMessage}</p>}
+              </Surface>
+
+              <Surface variant="primary" className="p-8">
+                <h3 className="text-lg font-semibold tracking-tight text-white mb-6">비밀번호 변경</h3>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">현재 비밀번호</label>
+                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-5 py-3.5 rounded-2xl text-sm font-bold bg-[#201a33] text-white border border-white/[0.06] focus:ring-2 focus:ring-violet-500/20 outline-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">새 비밀번호</label>
+                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-3.5 rounded-2xl text-sm font-bold bg-[#201a33] text-white border border-white/[0.06] focus:ring-2 focus:ring-violet-500/20 outline-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/55 px-1">새 비밀번호 확인</label>
+                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-5 py-3.5 rounded-2xl text-sm font-bold bg-[#201a33] text-white border border-white/[0.06] focus:ring-2 focus:ring-violet-500/20 outline-none" />
+                  </div>
+                  {pwMessage && <p className="text-xs text-white/70 mt-1 whitespace-pre-line">{pwMessage}</p>}
+                  <div className="pt-2">
+                    <Button variant="primary" className="w-full py-3 text-xs uppercase tracking-widest" onClick={handleChangePassword} disabled={pwLoading}>
+                      {pwLoading ? "변경 중..." : "비밀번호 변경"}
+                    </Button>
+                  </div>
+                </div>
+              </Surface>
+
+              <Surface variant="primary" className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight text-white">멤버십(결제) 구독</h3>
+                    <p className="text-[11px] text-white/55 font-medium">유료 결제가 활성화된 멤버십 목록입니다.</p>
+                  </div>
+                  <Link href="/candy/recharge" className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline">결제 관리</Link>
+                </div>
+                {memberships.length === 0 ? (
+                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">활성화된 멤버십(결제) 구독이 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {memberships.map((m) => (
+                      <div key={m.subscriptionId} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06]">
+                        <div className="flex flex-col">
+                          <p className="text-sm font-bold text-white truncate">{m.productName}</p>
+                          <p className="text-[10px] text-white/55 font-medium">상태: {m.isActive ? "활성" : "만료"}</p>
+                        </div>
+                        {m.endDate && <p className="text-[10px] text-white/45 font-medium">종료일: {m.endDate}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Surface>
+
+              <Surface variant="primary" className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight text-white">팔로우 중인 아티스트</h3>
+                    <p className="text-[11px] text-white/55 font-medium">멤버십 여부와 관계 없이, 내가 팔로우한 아티스트 목록입니다.</p>
+                  </div>
+                  <Link href="/artists" className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline">아티스트 둘러보기</Link>
+                </div>
+                {followedArtists.length === 0 ? (
+                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">팔로우 중인 아티스트가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {followedArtists.map((a) => (
+                      <Link key={a.artistId} href={`/artists/${a.artistId}`} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/[0.04] transition-all group border border-transparent hover:border-white/[0.06]">
+                        <img src={a.profileImageUrl || `https://picsum.photos/seed/artist-${a.artistId}/100/100`} className="size-10 rounded-full border border-white/[0.08] object-cover" alt="" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">{a.nickname}</p>
+                        </div>
+                        <span className="material-symbols-outlined text-white/45 group-hover:text-violet-300 transition-colors text-base">chevron_right</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Surface>
+            </div>
+          )}
+
+          {fanTab === "posts" && (
+            <Surface variant="primary" className="p-8">
+              <h3 className="text-lg font-black tracking-tight text-white mb-2">내가 작성한 글</h3>
+              <p className="text-[11px] text-white/55 font-medium mb-6">내가 작성한 팬글 목록입니다.</p>
+              {myPosts.length === 0 ? (
+                <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                  <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">작성한 글이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myPosts.map((post) => (
+                    <Link key={post.postId} href={`/posts/${post.postId}`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
+                      <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">{post.title}</p>
+                      {post.content && <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{post.content}</p>}
+                      <p className="text-[10px] text-white/45 mt-2">{post.createdAt}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Surface>
+          )}
+
+          {fanTab === "comments" && (
+            <Surface variant="primary" className="p-8">
+              <h3 className="text-lg font-black tracking-tight text-white mb-2">내가 작성한 댓글</h3>
+              <p className="text-[11px] text-white/55 font-medium mb-6">내가 작성한 댓글 목록입니다.</p>
+              {myComments.length === 0 ? (
+                <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                  <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">작성한 댓글이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myComments.map((c) => (
+                    <Link key={c.commentId} href={`/posts/${c.targetId}`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
+                      <p className="text-[11px] text-white/70 line-clamp-2">{c.content}</p>
+                      <p className="text-[10px] text-white/45 mt-2">{c.targetType} · {c.createdAt}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Surface>
+          )}
+
+          {fanTab === "like" && (
+            <Surface variant="primary" className="p-8">
+              <h3 className="text-lg font-black tracking-tight text-white mb-2">좋아요 누른 글</h3>
+              <p className="text-[11px] text-white/55 font-medium mb-6">내가 좋아요한 게시글 목록입니다.</p>
+              {myLikedPosts.length === 0 ? (
+                <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                  <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">좋아요한 글이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {myLikedPosts.map((item) => (
+                    <Link key={`${item.postType}-${item.postId}`} href={`/posts/${item.postId}`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
+                      <p className="text-[10px] text-violet-300/80 font-bold uppercase tracking-wider mb-1">{item.postType === "ARTIST_POST" ? "아티스트 글" : "팬글"}</p>
+                      <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">{item.title}</p>
+                      {item.content && <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{item.content}</p>}
+                      <p className="text-[10px] text-white/45 mt-2">좋아요: {item.likedAt}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Surface>
+          )}
+        </>
+      )}
+
+      {!isFan && (
+        <>
       <Surface variant="primary" className="p-8 flex flex-col md:flex-row items-center justify-between gap-8">
         <div className="flex items-center gap-6">
           <div className="relative group">
@@ -415,6 +631,8 @@ export default function MyPage() {
           </div>
         )}
       </Surface>
+        </>
+      )}
 
       {showProfileImageEdit && (
         <Surface variant="primary" className="p-6 max-w-md">
@@ -458,6 +676,7 @@ export default function MyPage() {
         </Surface>
       )}
 
+      {!isFan && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <section className="lg:col-span-6 space-y-6">
           <Surface variant="primary" className="p-8">
@@ -516,234 +735,6 @@ export default function MyPage() {
         </section>
 
         <section className="lg:col-span-6 space-y-8">
-          {isAdmin && (
-            <Surface variant="primary" className="p-8">
-              <h3 className="text-lg font-black tracking-tight text-white mb-2">아티스트 계정 관리</h3>
-              <p className="text-[11px] text-white/55 font-medium mb-6">
-                새 아티스트 또는 그룹 계정을 생성할 수 있습니다.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowArtistCreateModal(true);
-                  setArtistCreateMessage("");
-                }}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-violet-500/40 bg-violet-500/10 text-violet-300 font-bold text-sm hover:bg-violet-500/20 transition-colors"
-              >
-                <span className="material-symbols-outlined">person_add</span>
-                아티스트 계정 생성하기
-              </button>
-            </Surface>
-          )}
-
-          {!isArtistAccount && !isAdmin && (
-            <>
-              <Surface variant="primary" className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-black tracking-tight text-white">
-                      멤버십(결제) 구독
-                    </h3>
-                    <p className="text-[11px] text-white/55 font-medium">
-                      유료 결제가 활성화된 멤버십 목록입니다.
-                    </p>
-                  </div>
-                  <Link
-                    href="/candy/recharge"
-                    className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
-                  >
-                    결제 관리
-                  </Link>
-                </div>
-                {memberships.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
-                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">
-                      활성화된 멤버십(결제) 구독이 없습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {memberships.map((m) => (
-                      <div
-                        key={m.subscriptionId}
-                        className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06]"
-                      >
-                        <div className="flex flex-col">
-                          <p className="text-sm font-bold text-white truncate">
-                            {m.productName}
-                          </p>
-                          <p className="text-[10px] text-white/55 font-medium">
-                            상태: {m.isActive ? "활성" : "만료"}
-                          </p>
-                        </div>
-                        {m.endDate && (
-                          <p className="text-[10px] text-white/45 font-medium">
-                            종료일: {m.endDate}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Surface>
-
-              <Surface variant="primary" className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-black tracking-tight text-white">
-                      팔로우 중인 아티스트
-                    </h3>
-                    <p className="text-[11px] text-white/55 font-medium">
-                      멤버십 여부와 관계 없이, 내가 팔로우한 아티스트 목록입니다.
-                    </p>
-                  </div>
-                  <Link
-                    href="/artists"
-                    className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline"
-                  >
-                    아티스트 둘러보기
-                  </Link>
-                </div>
-                {followedArtists.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
-                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">
-                      팔로우 중인 아티스트가 없습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {followedArtists.map((a) => (
-                      <Link
-                        key={a.artistId}
-                        href={`/artists/${a.artistId}`}
-                        className="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/[0.04] transition-all group border border-transparent hover:border-white/[0.06]"
-                      >
-                        <img
-                          src={
-                            a.profileImageUrl ||
-                            `https://picsum.photos/seed/artist-${a.artistId}/100/100`
-                          }
-                          className="size-10 rounded-full border border-white/[0.08] object-cover"
-                          alt=""
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">
-                            {a.nickname}
-                          </p>
-                        </div>
-                        <span className="material-symbols-outlined text-white/45 group-hover:text-violet-300 transition-colors text-base">
-                          chevron_right
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </Surface>
-
-              <Surface variant="primary" className="p-8">
-                <h3 className="text-lg font-black tracking-tight text-white mb-2">좋아요 누른 글</h3>
-                <p className="text-[11px] text-white/55 font-medium mb-6">
-                  내가 좋아요한 게시글 목록입니다.
-                </p>
-                {myLikedPosts.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
-                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">
-                      좋아요한 글이 없습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {myLikedPosts.map((item) => (
-                      <Link
-                        key={`${item.postType}-${item.postId}`}
-                        href={`/posts/${item.postId}`}
-                        className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group"
-                      >
-                        <p className="text-[10px] text-violet-300/80 font-bold uppercase tracking-wider mb-1">
-                          {item.postType === "ARTIST_POST" ? "아티스트 글" : "팬글"}
-                        </p>
-                        <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">
-                          {item.title}
-                        </p>
-                        {item.content && (
-                          <p className="text-[11px] text-white/60 mt-1 line-clamp-2">
-                            {item.content}
-                          </p>
-                        )}
-                        <p className="text-[10px] text-white/45 mt-2">좋아요: {item.likedAt}</p>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </Surface>
-
-              <Surface variant="primary" className="p-8">
-                <h3 className="text-lg font-black tracking-tight text-white mb-2">본인이 작성한 글</h3>
-                <p className="text-[11px] text-white/55 font-medium mb-6">
-                  내가 작성한 팬글 목록입니다.
-                </p>
-                {myPosts.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
-                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">
-                      작성한 글이 없습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {myPosts.map((post) => (
-                      <Link
-                        key={post.postId}
-                        href={`/posts/${post.postId}`}
-                        className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group"
-                      >
-                        <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">
-                          {post.title}
-                        </p>
-                        {post.content && (
-                          <p className="text-[11px] text-white/60 mt-1 line-clamp-2">
-                            {post.content}
-                          </p>
-                        )}
-                        <p className="text-[10px] text-white/45 mt-2">{post.createdAt}</p>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </Surface>
-
-              <Surface variant="primary" className="p-8">
-                <h3 className="text-lg font-black tracking-tight text-white mb-2">본인이 작성한 댓글</h3>
-                <p className="text-[11px] text-white/55 font-medium mb-6">
-                  내가 작성한 댓글 목록입니다.
-                </p>
-                {myComments.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
-                    <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">
-                      작성한 댓글이 없습니다.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {myComments.map((c) => (
-                      <Link
-                        key={c.commentId}
-                        href={`/posts/${c.targetId}`}
-                        className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group"
-                      >
-                        <p className="text-[11px] text-white/70 line-clamp-2">
-                          {c.content}
-                        </p>
-                        <p className="text-[10px] text-white/45 mt-2">
-                          {c.targetType} · {c.createdAt}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </Surface>
-            </>
-          )}
-
           {isArtistAccount && !isAdmin && (
             <>
               {/* 팬 수 변화 그래프 */}
@@ -771,7 +762,8 @@ export default function MyPage() {
                 </Surface>
               )}
 
-              {/* 프로필 관리 (소개, 프로필 이미지, 배너) */}
+              {/* 프로필 관리 (그룹 멤버 계정은 비노출) */}
+              {!isGroupMember && (
               <Surface variant="primary" className="p-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
@@ -827,8 +819,10 @@ export default function MyPage() {
                   )}
                 </div>
               </Surface>
+              )}
 
-              {/* 공식 링크 (SNS, 유튜브 등) */}
+              {/* 공식 링크 (그룹 멤버 계정은 비노출) */}
+              {!isGroupMember && (
               <Surface variant="primary" className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -875,93 +869,11 @@ export default function MyPage() {
                   <p className="text-[11px] text-white/55 italic">등록된 공식 링크가 없습니다. 링크 추가/수정에서 등록하세요.</p>
                 )}
               </Surface>
-
-              {/* 그룹/멤버 정보 - 그룹이 있거나 멤버가 있을 때만 표시 */}
-              {(artistTeamInfo?.type === "GROUP" || (artistTeamInfo?.members?.length > 0)) && (
-                <Surface variant="primary" className="p-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 className="text-lg font-black tracking-tight text-white">그룹 / 멤버 정보</h3>
-                      <p className="text-[11px] text-white/55 font-medium">아티스트 계정 정보입니다.</p>
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] space-y-2">
-                    <p className="text-sm font-bold text-white">
-                      유형: {artistTeamInfo.type === "GROUP" ? "그룹" : "솔로"}
-                    </p>
-                    {artistTeamInfo.members && artistTeamInfo.members.length > 0 && (
-                      <div className="pt-2">
-                        <p className="text-[10px] text-white/55 uppercase tracking-wider mb-2">멤버</p>
-                        <ul className="space-y-1">
-                          {artistTeamInfo.members.map((m) => (
-                            <li key={m.id ?? m.userId} className="text-sm text-white/80">
-                              {m.nickname}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </Surface>
               )}
             </>
           )}
         </section>
       </div>
-
-      {showArtistCreateModal && (
-        <Surface variant="primary" className="p-8 max-w-lg fixed inset-4 md:inset-8 m-auto max-h-[90vh] overflow-y-auto z-50">
-          <h3 className="text-lg font-bold text-white mb-4">아티스트 계정 생성</h3>
-          {artistCreateMessage && (
-            <p className="text-sm text-white/70 mb-4">{artistCreateMessage}</p>
-          )}
-          <div className="space-y-4">
-            <div>
-              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">이메일</label>
-              <input
-                type="email"
-                value={artistCreateForm.email}
-                onChange={(e) => setArtistCreateForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">닉네임</label>
-              <input
-                type="text"
-                value={artistCreateForm.nickname}
-                onChange={(e) => setArtistCreateForm((f) => ({ ...f, nickname: e.target.value }))}
-                className="w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">비밀번호</label>
-              <input
-                type="password"
-                value={artistCreateForm.password}
-                onChange={(e) => setArtistCreateForm((f) => ({ ...f, password: e.target.value }))}
-                className="w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
-              />
-            </div>
-            <div className="flex gap-2 pt-4">
-              <Button
-                variant="primary"
-                className="flex-1 py-2.5 text-xs"
-                onClick={handleArtistCreate}
-                disabled={artistCreateLoading}
-              >
-                {artistCreateLoading ? "생성 중..." : "생성"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="py-2.5 text-xs border border-white/10"
-                onClick={() => setShowArtistCreateModal(false)}
-              >
-                취소
-              </Button>
-            </div>
-          </div>
-        </Surface>
       )}
 
       {showArtistProfileEdit && (

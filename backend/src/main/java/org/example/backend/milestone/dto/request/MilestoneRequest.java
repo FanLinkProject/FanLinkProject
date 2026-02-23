@@ -12,7 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class MilestoneRequest {
-    private Long artistId;
+    private Long groupId;
     private String name;
     private String description;
     private Integer sortOrder;

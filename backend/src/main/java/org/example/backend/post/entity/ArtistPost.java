@@ -44,6 +44,9 @@ public class ArtistPost {
     @Column(name = "is_membership_only", nullable = false, columnDefinition = "TINYINT(1) default 0")
     private Boolean isMembershipOnly; // 멤버십만 볼 수 있는 게시글 여부 (0: false, 1: true)
 
+    @Column(name = "is_notice", nullable = false, columnDefinition = "TINYINT(1) default 0")
+    private Boolean isNotice; // 개인 아티스트 공지 여부 (그룹 계정은 role로 공지 판별)
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -60,13 +63,14 @@ public class ArtistPost {
 
     @Builder
     public ArtistPost(User user, User group, String title, String content, Boolean status, Boolean isMembershipOnly,
-                      Long representativeMediaAssetId) {
+                      Boolean isNotice, Long representativeMediaAssetId) {
         this.user = user;
         this.group = group;
         this.title = title;
         this.content = content;
         this.status = status != null ? status : false;
         this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        this.isNotice = isNotice != null ? isNotice : false;
         this.representativeMediaAssetId = representativeMediaAssetId;
     }
 
@@ -75,10 +79,13 @@ public class ArtistPost {
         this.deletedAt = Instant.now();
     }
 
-    public void update(String title, String content, Boolean isMembershipOnly, Long representativeMediaAssetId) {
+    public void update(String title, String content, Boolean isMembershipOnly, Boolean isNotice, Long representativeMediaAssetId) {
         this.title = title;
         this.content = content;
         this.isMembershipOnly = isMembershipOnly != null ? isMembershipOnly : false;
+        if (isNotice != null) {
+            this.isNotice = isNotice;
+        }
         this.representativeMediaAssetId = representativeMediaAssetId;
     }
 }

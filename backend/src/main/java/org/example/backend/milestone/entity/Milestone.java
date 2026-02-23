@@ -19,8 +19,10 @@ public class Milestone {
     @GeneratedValue
     private Long id;
 
+    /** 그룹 계정(GROUP 역할 User)이 담당 */
     @ManyToOne(optional = false)
-    private User artist;
+    @JoinColumn(name = "group_id")
+    private User group;
 
     private String name;
     private String description;

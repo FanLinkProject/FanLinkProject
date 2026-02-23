@@ -101,7 +101,7 @@ public class CommentService {
         Comment parent = null;
         if (request.parentId() != null) {
             parent = commentRepository.findById(request.parentId())
-                    .filter(p -> p.getStatus() == 1)
+                    .filter(p -> Boolean.FALSE.equals(p.getStatus()))
                     .orElseThrow(() -> new CommentException(CommentErrorCode.PARENT_COMMENT_NOT_FOUND));
 
             // 2단계 깊이 제한: 대댓글에 답글 불가
@@ -134,6 +134,14 @@ public class CommentService {
             throw new CommentException(CommentErrorCode.UNAUTHORIZED_ACCESS);
         }
         comment.update(content);
+    }
+
+    /**
+     * 게시글 삭제 시 해당 게시글의 모든 댓글 일괄 삭제 처리
+     */
+    @Transactional
+    public void deleteAllByTarget(TargetType targetType, Long targetId) {
+        commentRepository.updateStatusByTarget(targetType, targetId, true);
     }
 
     /**
@@ -173,7 +181,7 @@ public class CommentService {
     /**
      * 내가 작성한 댓글 목록 조회 (페이징 방식)
      * - 부모 댓글과 대댓글 모두 포함
-     * - 활성 상태(status=1)인 것만 조회
+     * - 활성 상태(status=false)인 것만 조회
      * - 최신순 정렬
      * - targetType, targetId 정보 포함하여 어떤 게시물에 달린 댓글인지 식별 가능
      *
@@ -206,13 +214,12 @@ public class CommentService {
      * @param isIncrease true면 증가, false면 감소
      */
     private void updateFanActivity(Long fanUserId, TargetType targetType, Long targetId, boolean isIncrease) {
-        // 1. 해당 게시물이 속한 아티스트(또는 그룹) ID 찾기
-        Long artistId = getGroupIdFromTarget(targetType, targetId);
-        if (artistId == null) return; // 아티스트 정보를 찾을 수 없으면 패스
+        // 1. 해당 게시물이 속한 그룹 ID 찾기
+        Long groupId = getGroupIdFromTarget(targetType, targetId);
+        if (groupId == null) return;
 
-        // 2. 해당 팬과 아티스트의 FanProfile 조회
-        // (팬 프로필이 없는 경우 - 예: 아티스트 본인이거나 가입 안 한 유저 - 무시)
-        Optional<FanProfile> fanProfileOpt = fanProfileRepository.findByFan_IdAndArtist_Id(fanUserId, artistId);
+        // 2. 해당 팬과 그룹의 FanProfile 조회 (그룹 기준)
+        Optional<FanProfile> fanProfileOpt = fanProfileRepository.findByFan_IdAndGroup_Id(fanUserId, groupId);
 
         if (fanProfileOpt.isPresent()) {
             Long profileId = fanProfileOpt.get().getId();
@@ -234,8 +241,10 @@ public class CommentService {
     private void validateTargetExists(TargetType targetType, Long targetId) {
         switch (targetType) {
             case FAN -> fanPostRepository.findById(targetId)
+                    .filter(post -> Boolean.FALSE.equals(post.getStatus()))
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case ARTIST -> artistPostRepository.findById(targetId)
+                    .filter(post -> Boolean.FALSE.equals(post.getStatus()))
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));
             case MEDIA -> artistMusicVideoRepository.findById(targetId)
                     .orElseThrow(() -> new CommentException(CommentErrorCode.TARGET_NOT_FOUND));

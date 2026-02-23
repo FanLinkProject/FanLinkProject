@@ -129,7 +129,7 @@ function PostDetailContent({ id }) {
       });
       setLikeCount(p.likes || 0);
       if (!groupId) {
-        const a = MOCK_ARTISTS.find((x) => x.id === p.artistId);
+      const a = MOCK_ARTISTS.find((x) => x.id === p.artistId);
         if (a) setBackArtistId(a.id);
       }
       return;
@@ -162,6 +162,7 @@ function PostDetailContent({ id }) {
           postType: type,
           // 서버가 content를 null로 반환 = 멤버십 전용 + 접근 권한 없음
           isLocked: !!(postData.isMembershipOnly && postData.content === null),
+          isNotice: !!postData.isNotice,
         });
         const countVal = countRes?.[numericId] ?? countRes?.[String(numericId)] ?? 0;
         const isLikedVal = Array.isArray(checkRes)
@@ -442,12 +443,16 @@ function PostDetailContent({ id }) {
         });
         const newReply = {
           id: typeof createdId === "number" ? createdId : Date.now(),
+          userId: myUserId,
           nickname: myNickname || "나",
           profileImageUrl: myProfileImageUrl || null,
           content: replyContent.trim(),
           createdAt: new Date().toISOString(),
-          status: 1,
+          status: false,
           isArtist: false,
+          likeCount: 0,
+          isLiked: false,
+          isEdited: false,
         };
         setComments((prev) =>
           prev.map((c) =>
@@ -465,12 +470,16 @@ function PostDetailContent({ id }) {
       } else {
         const newReply = {
           id: Date.now(),
+          userId: myUserId,
           nickname: myNickname || "팬",
           profileImageUrl: myProfileImageUrl || null,
           content: replyContent.trim(),
           createdAt: new Date().toISOString(),
-          status: 1,
+          status: false,
           isArtist: false,
+          likeCount: 0,
+          isLiked: false,
+          isEdited: false,
         };
         setComments((prev) =>
           prev.map((c) =>
@@ -503,7 +512,7 @@ function PostDetailContent({ id }) {
       }
       setComments((prev) =>
         prev.map((c) =>
-          c.id === commentId ? { ...c, status: 0, content: "삭제된 댓글입니다." } : c
+          c.id === commentId ? { ...c, status: true, content: "삭제된 댓글입니다." } : c
         )
       );
     } catch (err) {
@@ -523,7 +532,7 @@ function PostDetailContent({ id }) {
             ? {
                 ...c,
                 replies: c.replies.map((r) =>
-                  r.id === replyId ? { ...r, status: 0, content: "삭제된 댓글입니다." } : r
+                  r.id === replyId ? { ...r, status: true, content: "삭제된 댓글입니다." } : r
                 ),
               }
             : c
@@ -638,11 +647,12 @@ function PostDetailContent({ id }) {
         setComments((prev) => [
           enhanceComment({
             id: typeof createdId === "number" ? createdId : Date.now(),
+            userId: myUserId,
             nickname: myNickname || "나",
             profileImageUrl: myProfileImageUrl || null,
             content: newComment.trim(),
             createdAt: new Date().toISOString(),
-            status: 1,
+            status: false,
             replyCount: 0,
             hasReplies: false,
           }),
@@ -652,11 +662,12 @@ function PostDetailContent({ id }) {
         setComments((prev) => [
           enhanceComment({
             id: Date.now(),
+            userId: myUserId,
             nickname: myNickname || "팬",
             profileImageUrl: myProfileImageUrl || null,
             content: newComment,
             createdAt: new Date().toISOString(),
-            status: 1,
+            status: false,
             replyCount: 0,
             hasReplies: false,
           }),
@@ -722,7 +733,7 @@ function PostDetailContent({ id }) {
                 <p className="text-white/40 text-sm">멤버십에 가입하면 모든 콘텐츠를 즐길 수 있습니다</p>
               </div>
             ) : (
-              <div className="prose max-w-none">
+            <div className="prose max-w-none">
                 <p className="text-white/85 text-xl leading-relaxed font-light">
                   &quot;{post.content}&quot;
                 </p>
@@ -760,6 +771,7 @@ function PostDetailContent({ id }) {
         </article>
       </div>
 
+      {post != null && !post.isNotice && (
       <aside className="w-full lg:w-96 flex flex-col gap-6 shrink-0">
         <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-[calc(100vh-160px)] sticky top-24">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
@@ -782,7 +794,7 @@ function PostDetailContent({ id }) {
             ) : (
               <>
                 {comments.map((c) => {
-                  const isDeleted = c.status === 0;
+                  const isDeleted = c.status === true || c.status === 1;
                   return (
                     <div key={c.id}>
                       {/* 부모 댓글 */}
@@ -793,7 +805,7 @@ function PostDetailContent({ id }) {
                           alt=""
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1">
                             <span className={`text-sm font-bold ${isDeleted ? "text-white/35" : "text-white"}`}>
                               {isDeleted ? "알 수 없음" : (c.nickname || "익명")}
                             </span>
@@ -961,7 +973,7 @@ function PostDetailContent({ id }) {
                       {c.repliesExpanded && (
                         <div className="ml-12 mt-3 space-y-4 border-l border-white/[0.06] pl-4">
                           {c.replies.map((r) => {
-                            const rDeleted = r.status === 0;
+                            const rDeleted = r.status === true || r.status === 1;
                             return (
                               <div key={r.id} className="flex gap-3">
                                 <img
@@ -1071,7 +1083,7 @@ function PostDetailContent({ id }) {
                           )}
                         </div>
                       )}
-                    </div>
+                  </div>
                   );
                 })}
 
@@ -1112,6 +1124,7 @@ function PostDetailContent({ id }) {
           </div>
         </div>
       </aside>
+      )}
     </div>
   );
 }

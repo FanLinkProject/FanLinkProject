@@ -10,6 +10,8 @@ import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.product.dto.request.ProductRequestDto;
 import org.example.backend.product.dto.response.ProductDetailResponse;
 import org.example.backend.product.dto.response.ProductMediaAssetResponse;
+import org.example.backend.product.enums.ProductPaymentMethod;
+import org.example.backend.product.enums.ProductType;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.entity.ProductMediaAsset;
 import org.example.backend.product.exception.ProductErrorCode;
@@ -52,11 +54,20 @@ public class ProductService {
     }
 
     /**
-     * 마켓 전체 굿즈 탐색용. artistId가 null인 플랫폼 상품(캔디 충전 등)은 제외.
+     * 마켓 전체 굿즈 탐색용.
+     * - 아티스트/그룹 상품 (artistId != null)
+     * - 플랫폼 제공 상품 (artistId null, paymentMethod CANDY_ONLY, type CANDY) 포함.
+     * 캔디 충전 상품(CASH)은 제외.
      */
     public List<ProductDetailResponse> getMarketProducts() {
-        List<Product> products = productRepository.findByArtistIdIsNotNull();
-        return products.stream().map(this::toSummaryResponse).toList();
+        List<Product> artistProducts = productRepository.findByArtistIdIsNotNull();
+        List<Product> platformCandy = productRepository.findByArtistIdIsNull().stream()
+                .filter(p -> ProductPaymentMethod.CANDY_ONLY.equals(p.getPaymentMethod())
+                        && ProductType.CANDY.equals(p.getType()))
+                .toList();
+        List<Product> combined = new ArrayList<>(artistProducts);
+        combined.addAll(platformCandy);
+        return combined.stream().map(this::toSummaryResponse).toList();
     }
 
     public List<ProductDetailResponse> getProductsByArtistId(Long artistId) {
@@ -116,6 +127,7 @@ public class ProductService {
     @Transactional
     public ProductDetailResponse createProduct(Long userId, UserRole role, ProductRequestDto request) {
         validateManageAccountForArtist(request.artistId(), userId, role);
+        validateNoDuplicateDmProduct(request, userId);
 
         boolean isMembershipOnly = request.isMembershipOnly() != null && request.isMembershipOnly();
         boolean isMembership = request.isMembership() != null && request.isMembership();
@@ -234,12 +246,37 @@ public class ProductService {
         productRepository.delete(product);
     }
 
+    private void validateNoDuplicateDmProduct(ProductRequestDto request, Long userId) {
+        if (request.artistId() == null || request.artistId().equals(userId)) {
+            return;
+        }
+        if (!ProductPaymentMethod.CANDY_ONLY.equals(request.paymentMethod())
+                || !Boolean.TRUE.equals(request.isSubscription())) {
+            return;
+        }
+        List<Product> candyProducts = productRepository.findByArtistIdAndPaymentMethod(
+                request.artistId(), ProductPaymentMethod.CANDY_ONLY);
+        boolean hasDmProduct = candyProducts.stream()
+                .anyMatch(p -> Boolean.TRUE.equals(p.getIsSubscription()));
+        if (hasDmProduct) {
+            throw new ProductException(ProductErrorCode.DUPLICATE_DM_PRODUCT);
+        }
+    }
+
     private void validateManageAccountForArtist(Long artistId, Long userId, UserRole role) {
         if (artistId == null) {
             return;
         }
         if (userId == null || role == null) {
             throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);
+        }
+        if (role == UserRole.GROUP && userId.equals(artistId)) {
+            return;
+        }
+        if (role == UserRole.GROUP) {
+            if (groupMemberRepository.existsByGroupIdAndMemberId(userId, artistId)) {
+                return;
+            }
         }
         Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
         if (!ownerUserId.equals(userId)) {

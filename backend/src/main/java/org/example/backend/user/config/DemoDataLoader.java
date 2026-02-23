@@ -85,7 +85,7 @@ public class DemoDataLoader implements CommandLineRunner {
         createGroupMembership("group.cosmicboys@fanlink.test", "artist.cosmic.zen@fanlink.test", "코스믹 보이즈");
         createGroupMembership("group.cosmicboys@fanlink.test", "artist.cosmic.rio@fanlink.test", "코스믹 보이즈");
 
-        // 그룹 계정 자체도 GroupMember에 추가 (그룹 = 멤버로 자기 자신 등록)
+        // 그룹 계정 자체도 GroupMember에 멤버로 등록해 둠 (멤버 조회 시 group_id = member_id 인 행은 제외)
         createGroupMembership("group.stellar@fanlink.test", "group.stellar@fanlink.test", "스텔라");
         createGroupMembership("group.neondreams@fanlink.test", "group.neondreams@fanlink.test", "네온 드림즈");
         createGroupMembership("group.cosmicboys@fanlink.test", "group.cosmicboys@fanlink.test", "코스믹 보이즈");

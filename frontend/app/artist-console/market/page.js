@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getProducts, deleteProduct } from "@/lib/productApi";
+import { getProducts, getProduct, updateProduct, deleteProduct } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
@@ -23,11 +23,20 @@ function formatPrice(product) {
   return `${product.price?.toLocaleString()}원`;
 }
 
+function isDmProduct(product) {
+  return product.isSubscription && product.paymentMethod === "CANDY_ONLY";
+}
+
 export default function ArtistMarketMgmtPage() {
   const router = useRouter();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [artistId, setArtistId] = useState(null);
+  const [isGroupAccount, setIsGroupAccount] = useState(false);
+  const [dmEditModalOpen, setDmEditModalOpen] = useState(false);
+  const [dmEditProduct, setDmEditProduct] = useState(null);
+  const [dmEditCandyPrice, setDmEditCandyPrice] = useState("");
+  const [dmEditLoading, setDmEditLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -35,18 +44,21 @@ export default function ArtistMarketMgmtPage() {
       router.push("/login");
       return;
     }
-    // 아티스트 ID는 /api/artist/mypage에서 가져옴
-    fetch("http://localhost:8080/api/artist/mypage", {
-      headers: { Authorization: token.startsWith("Bearer") ? token : `Bearer ${token}` },
-    })
+    const authHeader = token.startsWith("Bearer") ? token : `Bearer ${token}`;
+    fetch("http://localhost:8080/api/artist/mypage", { headers: { Authorization: authHeader } })
       .then((r) => r.json())
       .then((data) => {
         const id = data?.profile?.id;
+        const teamType = data?.teamInfo?.type;
+        const members = data?.teamInfo?.members ?? [];
         setArtistId(id);
-        if (id) {
-          return getProducts({ artistId: id });
+        setIsGroupAccount(teamType === "GROUP");
+        if (!id) return [];
+        if (teamType === "GROUP") {
+          const artistIds = [id, ...members.map((m) => m.id).filter(Boolean)];
+          return getProducts({ artistIds });
         }
-        return [];
+        return getProducts({ artistId: id });
       })
       .then((list) => {
         setProducts(Array.isArray(list) ? list : []);
@@ -65,6 +77,64 @@ export default function ArtistMarketMgmtPage() {
     }
   };
 
+  const handleOpenDmEdit = async (product) => {
+    setDmEditLoading(true);
+    try {
+      const detail = await getProduct(product.id);
+      setDmEditProduct(detail);
+      setDmEditCandyPrice(String(detail.candyPrice ?? 0));
+      setDmEditModalOpen(true);
+    } catch (e) {
+      alert(e.message || "상품 정보를 불러올 수 없습니다.");
+    } finally {
+      setDmEditLoading(false);
+    }
+  };
+
+  const handleCloseDmEditModal = () => {
+    setDmEditModalOpen(false);
+    setDmEditProduct(null);
+    setDmEditCandyPrice("");
+  };
+
+  const handleDmEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!dmEditProduct) return;
+    const candyPrice = Number(dmEditCandyPrice);
+    if (!Number.isFinite(candyPrice) || candyPrice < 1) {
+      alert("캔디 개수를 1 이상으로 입력해 주세요.");
+      return;
+    }
+    setDmEditLoading(true);
+    try {
+      const mediaAssetIds = dmEditProduct.attachments?.map((a) => a.mediaAssetId) ?? [];
+      await updateProduct(dmEditProduct.id, {
+        artistId: dmEditProduct.artistId,
+        name: dmEditProduct.name,
+        price: dmEditProduct.price ?? 0,
+        candyPrice,
+        type: dmEditProduct.type ?? "SETTLEMENT_CANDY",
+        paymentMethod: dmEditProduct.paymentMethod ?? "CANDY_ONLY",
+        isSubscription: true,
+        quantity: 0,
+        isMembershipOnly: dmEditProduct.isMembershipOnly ?? false,
+        isExclusive: dmEditProduct.isExclusive ?? true,
+        isMembership: dmEditProduct.isMembership ?? false,
+        concertId: dmEditProduct.concertId ?? null,
+        mediaAssetIds,
+        representativeMediaAssetId: dmEditProduct.representativeMediaAssetId ?? null,
+      });
+      setProducts((prev) =>
+        prev.map((p) => (p.id === dmEditProduct.id ? { ...p, candyPrice } : p))
+      );
+      handleCloseDmEditModal();
+    } catch (err) {
+      alert(err?.message || "수정 실패");
+    } finally {
+      setDmEditLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 lg:p-12 max-w-5xl mx-auto">
@@ -80,13 +150,24 @@ export default function ArtistMarketMgmtPage() {
           <SectionTitle className="text-2xl font-bold">상품 관리</SectionTitle>
           <p className="text-sm text-white/55 font-medium mt-1">공식 스토어 상품을 등록하고 주문을 처리하세요.</p>
         </div>
-        <Button
-          variant="primary"
-          className="text-xs uppercase tracking-widest"
-          onClick={() => router.push("/artist-console/market/new")}
-        >
-          상품 등록
-        </Button>
+        <div className="flex gap-2">
+          {isGroupAccount && (
+            <Button
+              variant="primary"
+              className="text-xs uppercase tracking-widest"
+              onClick={() => router.push("/artist-console/market/dm/new")}
+            >
+              DM 상품 등록
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            className="text-xs uppercase tracking-widest"
+            onClick={() => router.push("/artist-console/market/new")}
+          >
+            상품 등록
+          </Button>
+        </div>
       </header>
 
       <div className="space-y-4">
@@ -116,7 +197,12 @@ export default function ArtistMarketMgmtPage() {
               <Button
                 variant="ghost"
                 className="px-4 py-2 text-[10px] uppercase tracking-widest"
-                onClick={() => router.push(`/artist-console/market/${product.id}/edit`)}
+                onClick={() =>
+                  isDmProduct(product)
+                    ? handleOpenDmEdit(product)
+                    : router.push(`/artist-console/market/${product.id}/edit`)
+                }
+                disabled={dmEditLoading}
               >
                 수정
               </Button>
@@ -144,6 +230,43 @@ export default function ArtistMarketMgmtPage() {
           </Surface>
         )}
       </div>
+
+      {/* DM 상품 수정 모달: 캔디 개수만 변경 */}
+      {dmEditModalOpen && dmEditProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={handleCloseDmEditModal}
+        >
+          <div
+            className="bg-[#1a1525] border border-white/10 rounded-2xl shadow-xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-white mb-4">DM 상품 수정</h3>
+            <p className="text-sm text-white/70 mb-2">{dmEditProduct.name}</p>
+            <form onSubmit={handleDmEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-white/80 mb-2">캔디 개수</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={dmEditCandyPrice}
+                  onChange={(e) => setDmEditCandyPrice(e.target.value)}
+                  className="w-full px-4 py-3 bg-[#201a33] border border-white/[0.06] rounded-xl text-white tabular-nums"
+                  required
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button type="button" variant="ghost" onClick={handleCloseDmEditModal}>
+                  취소
+                </Button>
+                <Button type="submit" variant="primary" disabled={dmEditLoading}>
+                  {dmEditLoading ? "저장 중..." : "저장"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

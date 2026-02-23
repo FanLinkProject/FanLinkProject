@@ -29,13 +29,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 상태 조회
     Page<User> findByStatus(UserStatus status, Pageable pageable);
 
-    // 아티스트 검색 (닉네임 또는 그룹명으로 검색, ACTIVE 상태만)
+    // 아티스트 검색 (닉네임, 실명(name), 그룹명으로 검색, ACTIVE 상태만)
     @Query("SELECT DISTINCT u FROM User u " +
            "LEFT JOIN GroupMember gm ON gm.member = u " +
            "WHERE u.role = :role " +
            "AND u.status = :status " +
            "AND u.deletedAt IS NULL " +
-           "AND (u.nickname LIKE CONCAT('%', :keyword, '%') OR gm.groupName LIKE CONCAT('%', :keyword, '%'))")
+           "AND (u.nickname LIKE CONCAT('%', :keyword, '%') OR u.name LIKE CONCAT('%', :keyword, '%') OR gm.groupName LIKE CONCAT('%', :keyword, '%'))")
     Page<User> findArtistsByNicknameOrGroupName(
             @Param("role") UserRole role,
             @Param("status") UserStatus status,
@@ -106,6 +106,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
            nativeQuery = true)
     Page<User> findRecommendedArtists(
             @Param("artistRole") String artistRole,
+            @Param("groupRole") String groupRole,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    // 비로그인 홈용: 추천 그룹만 (GROUP 역할만 랜덤 조회)
+    @Query(value = "SELECT * FROM users u " +
+           "WHERE u.role = :groupRole " +
+           "AND u.status = :status " +
+           "AND u.deleted_at IS NULL " +
+           "ORDER BY RAND()",
+           nativeQuery = true)
+    Page<User> findRecommendedGroups(
             @Param("groupRole") String groupRole,
             @Param("status") String status,
             Pageable pageable

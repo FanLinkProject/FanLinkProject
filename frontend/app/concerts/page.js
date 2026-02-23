@@ -18,17 +18,27 @@ function filterByChip(concerts, chip) {
   const now = new Date();
   if (chip === FILTER_OPEN) return list.filter((c) => getTicketStatus(c) === "OPEN");
   if (chip === FILTER_THIS_WEEK) {
+    // 이번 주: 오늘 ~ 이번 주 일요일 23:59:59 (getDay() 0=일요일)
     const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() + 7);
+    const daysUntilSunday = (7 - now.getDay()) % 7;
+    weekEnd.setDate(weekEnd.getDate() + daysUntilSunday);
+    weekEnd.setHours(23, 59, 59, 999);
     return list.filter((c) => {
-      const start = new Date(c.startDateTime);
+      const startStr = c.startDateTime ?? c.startDate;
+      if (!startStr) return false;
+      const start = new Date(startStr);
+      if (Number.isNaN(start.getTime())) return false;
       return start >= now && start <= weekEnd;
     });
   }
   if (chip === FILTER_THIS_MONTH) {
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // 이번 달: 오늘 ~ 이번 달 말일 23:59:59
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
     return list.filter((c) => {
-      const start = new Date(c.startDateTime);
+      const startStr = c.startDateTime ?? c.startDate;
+      if (!startStr) return false;
+      const start = new Date(startStr);
+      if (Number.isNaN(start.getTime())) return false;
       return start >= now && start <= monthEnd;
     });
   }
@@ -164,7 +174,10 @@ function ConcertsPageInner() {
             <TicketingSection concerts={filtered} status="UPCOMING" />
             {filtered.length === 0 && (
               <div className="py-16 text-center text-white/55">
-                다가오는 공연이 없습니다.
+                {filterChip === FILTER_OPEN && "예매 중인 공연이 없습니다."}
+                {filterChip === FILTER_THIS_WEEK && "이번 주 공연이 없습니다."}
+                {filterChip === FILTER_THIS_MONTH && "이번 달 공연이 없습니다."}
+                {filterChip === FILTER_UPCOMING && "다가오는 공연이 없습니다."}
               </div>
             )}
           </>

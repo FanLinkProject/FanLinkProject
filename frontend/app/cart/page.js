@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getProduct } from "@/lib/productApi";
+import { getPaymentConfig } from "@/lib/paymentApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
-const SHIPPING_FEE = 3000;
+const DEFAULT_SHIPPING_FEE = 3000;
 
 function getProductImageUrl(product) {
   const rep = product?.attachments?.find(
@@ -29,6 +30,7 @@ export default function CartPage() {
   const [items, setItems] = useState([]);
   const [productDetails, setProductDetails] = useState({});
   const [loading, setLoading] = useState(true);
+  const [shippingFee, setShippingFee] = useState(DEFAULT_SHIPPING_FEE);
 
   useEffect(() => {
     const raw = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -45,6 +47,21 @@ export default function CartPage() {
         setProductDetails(map);
       })
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    getPaymentConfig()
+      .then((config) => {
+        const parsed = Number(config?.shippingFee);
+        if (mounted && Number.isFinite(parsed)) {
+          setShippingFee(parsed);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const updateQuantity = (productId, delta) => {
@@ -83,7 +100,7 @@ export default function CartPage() {
     const p = productDetails[i.productId];
     return p && p.artistId != null && !p.isMembership && !p.concertId;
   });
-  const totalAmount = totalCash + (hasShippableItem ? SHIPPING_FEE : 0);
+  const totalAmount = totalCash + (hasShippableItem ? shippingFee : 0);
 
   return (
     <div className="p-8 lg:p-12 max-w-5xl mx-auto space-y-12">
@@ -216,7 +233,7 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between text-sm text-white/55">
                 <span>배송비</span>
-                <span>{hasShippableItem ? `${SHIPPING_FEE.toLocaleString()}원` : "0원"}</span>
+                <span>{hasShippableItem ? `${shippingFee.toLocaleString()}원` : "0원"}</span>
               </div>
               <div className="h-px bg-white/[0.06]" />
               <div className="flex justify-between font-black text-xl text-violet-300">

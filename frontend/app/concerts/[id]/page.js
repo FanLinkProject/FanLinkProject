@@ -102,14 +102,28 @@ export default function ConcertDetailPage() {
     router.back();
   };
 
+  // 목록과 동일한 필드 형태로 통일 + 날짜 필드 camelCase 보장 (API가 snake_case로 올 수 있음)
+  const concertForDisplay = {
+    ...concert,
+    concertId: concert.concertId ?? concert.id,
+    concertImageUrl: concert.concertImageUrl ?? concert.posterImageUrl,
+    venueName: concert.venueName ?? concert.location?.placeName,
+    startDateTime: concert.startDateTime ?? concert.start_date_time,
+    endDateTime: concert.endDateTime ?? concert.end_date_time,
+    presaleStartDateTime: concert.presaleStartDateTime ?? concert.presale_start_date_time,
+    presaleEndDateTime: concert.presaleEndDateTime ?? concert.presale_end_date_time,
+    saleStartDateTime: concert.saleStartDateTime ?? concert.sale_start_date_time,
+    saleEndDateTime: concert.saleEndDateTime ?? concert.sale_end_date_time,
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-6 pb-20">
       <div className="pt-6" />
 
-      <ConcertHero concert={concert} onBack={handleBack} onShare={handleShare} />
+      <ConcertHero concert={concertForDisplay} onBack={handleBack} onShare={handleShare} />
 
       <div className="mt-8 space-y-0">
-        <ConcertInfoCards concert={concert} />
+        <ConcertInfoCards concert={concertForDisplay} />
         <ConcertArtistList artists={concert.artists} />
 
         {concert.description && (
