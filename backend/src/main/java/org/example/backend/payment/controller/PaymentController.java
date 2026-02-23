@@ -34,12 +34,16 @@ public class PaymentController {
     @Value("${payment.frontend-url}")
     private String frontendUrl;
 
+    @Value("${payment.shipping-fee:3000}")
+    private Long shippingFee;
+
     @GetMapping("/config")
     public ResponseEntity<PaymentConfigResponse> getConfig() {
         return ResponseEntity.ok(new PaymentConfigResponse(
                 tossPaymentConfig.getClientKey(),
                 tossPaymentConfig.getSuccessUrl(),
-                tossPaymentConfig.getFailUrl()));
+                tossPaymentConfig.getFailUrl(),
+                shippingFee));
     }
 
     @GetMapping("/toss/success")

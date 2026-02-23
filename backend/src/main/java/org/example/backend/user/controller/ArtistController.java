@@ -72,5 +72,17 @@ public class ArtistController {
         List<ConcertListItemResponse> list = concertService.getUpcomingConcertsForArtistIds(artistIds);
         return ResponseEntity.ok(list);
     }
+
+	/**
+	 * 현재 로그인한 아티스트/유저의 채널 ARN 조회
+	 */
+	@GetMapping("/me/channel-arn")
+	public ResponseEntity<String> getMyChannelArn(
+		@AuthenticationPrincipal PrincipalDetails principalDetails
+	) {
+		// PrincipalDetails에서 User 객체를 꺼내고 ID를 전달
+		String arn = artistService.getChannelArn(principalDetails.getUser().getId());
+		return ResponseEntity.ok(arn);
+	}
 }
 

@@ -21,10 +21,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final OAuthAuthorizationCodeStore oauthAuthorizationCodeStore;
 
-    @Value("${oauth2.redirect-uri:http://localhost:3000/oauth2/login/success}")
+    @Value("${oauth2.redirect-uri}")
     private String redirectUri;
 
-    private static final String DEFAULT_FRONT_REDIRECT = "http://localhost:3000/oauth2/login/success";
+    private static final String DEFAULT_FRONT_REDIRECT = "https://fan-link-project.vercel.app/oauth2/login/success";
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -50,7 +50,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             getRedirectStrategy().sendRedirect(request, response, targetUrl);
         } catch (Exception e) {
             log.error("OAuth2 login success handling failed", e);
-            response.sendRedirect("http://localhost:3000?error=oauth2_failed");
+            String resolvedRedirectUri = (redirectUri == null || redirectUri.isBlank())
+                    ? DEFAULT_FRONT_REDIRECT
+                    : redirectUri;
+            String failureUrl = UriComponentsBuilder.fromUriString(resolvedRedirectUri)
+                    .replaceQueryParam("error", "oauth2_failed")
+                    .build()
+                    .encode()
+                    .toUriString();
+            response.sendRedirect(failureUrl);
         }
     }
 }

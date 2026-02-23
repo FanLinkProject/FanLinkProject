@@ -1,5 +1,6 @@
 package org.example.backend.user.service;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.exception.BusinessException;
 import org.example.backend.post.entity.ArtistPost;
@@ -15,6 +16,7 @@ import org.example.backend.user.exception.UserErrorCode;
 import org.example.backend.product.repository.ProductRepository;
 import org.example.backend.settlement.repository.SettlementPendingRepository;
 import org.example.backend.settlement.service.SettlementDashboardService;
+import org.example.backend.user.exception.UserException;
 import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.user.repository.UserRepository;
@@ -312,5 +314,13 @@ public class ArtistService {
         }
         return List.of();
     }
+
+	@Transactional(readOnly = true)
+	public String getChannelArn(Long userId) {
+		User user = userRepository.findById(userId)
+			.orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+
+		return user.getChannelArn();
+	}
 }
 
