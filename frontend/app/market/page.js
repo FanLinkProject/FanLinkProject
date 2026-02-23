@@ -47,7 +47,7 @@ function ProductCard({ product }) {
         <div className="flex-1 px-1">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[10px] font-black text-white/55 uppercase tracking-widest">
-              {product.artistName || "아티스트"}
+              {product.artistName || (product.artistId == null ? "FanLink" : "아티스트")}
             </span>
           </div>
           <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
@@ -75,6 +75,16 @@ function MarketTabButton({ icon, label, href }) {
   );
 }
 
+function shuffleSlice(arr, limit) {
+  if (!Array.isArray(arr) || arr.length === 0) return [];
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, limit);
+}
+
 export default function MarketPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [allProducts, setAllProducts] = useState([]);
@@ -87,23 +97,27 @@ export default function MarketPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredProducts = allProducts.filter(
-    (product) =>
-      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.artistName || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const artistProducts = allProducts.filter((p) => p.artistId != null);
+  const platformProducts = allProducts.filter((p) => p.artistId == null);
+  const recommendedProducts = shuffleSlice(artistProducts, 4);
 
-  // 그룹계정 스토어: groupId != null인 상품만 groupId별로 묶음
+  const searchFilter = (product) =>
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (product.artistName || "").toLowerCase().includes(searchTerm.toLowerCase());
+  const searchResults = searchTerm.trim()
+    ? allProducts.filter(searchFilter)
+    : [];
+
   const groupStores = [];
   const seenGroups = new Set();
-  for (const p of allProducts) {
+  for (const p of artistProducts) {
     if (p.groupId && !seenGroups.has(p.groupId)) {
       seenGroups.add(p.groupId);
       groupStores.push({
         id: p.groupId,
         name: p.groupName || "그룹",
         type: "group",
-        products: allProducts.filter((x) => x.groupId === p.groupId),
+        products: artistProducts.filter((x) => x.groupId === p.groupId),
       });
     }
   }
@@ -144,45 +158,58 @@ export default function MarketPage() {
         />
       </div>
 
-      <div className="space-y-10">
-        <div className="flex items-center justify-between px-2">
-          <SectionTitle>전체 굿즈 탐색</SectionTitle>
-          {searchTerm && (
-            <p className="text-sm text-white/55 font-medium">
-              &apos;<span className="text-violet-300 font-bold">{searchTerm}</span>&apos; 검색 결과{" "}
-              <span className="text-white font-bold">{filteredProducts.length}</span>건
+      {loading ? (
+        <p className="text-white/55 py-12">로딩 중...</p>
+      ) : searchTerm.trim() ? (
+        <div className="space-y-10">
+          <div className="px-2">
+            <SectionTitle>검색 결과</SectionTitle>
+            <p className="text-sm text-white/55 font-medium mt-1">
+              &apos;<span className="text-violet-300 font-bold">{searchTerm}</span>&apos;{" "}
+              <span className="text-white font-bold">{searchResults.length}</span>건
             </p>
-          )}
-        </div>
-        {loading ? (
-          <p className="text-white/55 py-12">로딩 중...</p>
-        ) : (
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => (
+            {searchResults.length > 0 ? (
+              searchResults.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))
             ) : (
-              <Surface
-                variant="primary"
-                className="col-span-full py-24 text-center border-dashed border-white/[0.08]"
-              >
-                <span className="material-symbols-outlined text-5xl text-white/30 mb-4 block">
-                  search_off
-                </span>
-                <p className="text-white/55 font-medium italic">
-                  검색 결과와 일치하는 상품이 없습니다.
-                </p>
+              <Surface variant="primary" className="col-span-full py-24 text-center border-dashed border-white/[0.08]">
+                <span className="material-symbols-outlined text-5xl text-white/30 mb-4 block">search_off</span>
+                <p className="text-white/55 font-medium italic">검색 결과와 일치하는 상품이 없습니다.</p>
               </Surface>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="space-y-16">
+          {recommendedProducts.length > 0 && (
+            <section className="space-y-8">
+              <SectionTitle className="px-2">FanLink 추천 상품</SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                {recommendedProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            </section>
+          )}
 
-      {!searchTerm && groupStores.length > 0 && (
-        <div className="space-y-16 pt-12 border-t border-white/10">
-          <div className="space-y-10">
-              <SectionTitle className="px-2 mb-8">그룹계정 스토어</SectionTitle>
+          {platformProducts.length > 0 && (
+            <section className="space-y-8 pt-12 border-t border-white/10">
+              <SectionTitle className="px-2">플랫폼 제공 상품</SectionTitle>
+              <p className="text-sm text-white/60 px-2">FanLink에서 제공하는 캔디로 구매할 수 있는 상품입니다.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {platformProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {groupStores.length > 0 && (
+            <section className="space-y-10 pt-12 border-t border-white/10">
+              <SectionTitle className="px-2 mb-8">그룹별 스토어</SectionTitle>
               {groupStores.map((store) => {
                 const preview = store.products.slice(0, 4);
                 if (preview.length === 0) return null;
@@ -233,7 +260,8 @@ export default function MarketPage() {
                   </div>
                 );
               })}
-            </div>
+            </section>
+          )}
         </div>
       )}
     </div>

@@ -181,11 +181,13 @@ public class ArtistDashboardService {
                 ))
                 .collect(Collectors.toList());
 
+        boolean isGroup = artist.getRole() == UserRole.GROUP;
         return new ArtistDashboardResponse(
                 artistInfo,
                 followStatus,
                 membershipInfo,
                 isGroupMember,
+                isGroup,
                 memberItems,
                 postItems,
                 liveNotificationItems,

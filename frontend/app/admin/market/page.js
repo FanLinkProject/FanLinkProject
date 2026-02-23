@@ -52,7 +52,7 @@ function ProductCard({ product }) {
         <div className="flex-1 px-1">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[10px] font-black text-white/55 uppercase tracking-widest">
-              {product.artistName || "아티스트"}
+              {product.artistName || (product.artistId == null ? "FanLink" : "아티스트")}
             </span>
           </div>
           <h3 className="text-lg font-bold text-white mb-1">{product.name}</h3>
@@ -112,7 +112,7 @@ export default function AdminMarketPage() {
         <div>
           <SectionTitle className="text-2xl font-bold">마켓 (관리자)</SectionTitle>
           <p className="text-white/55 text-sm font-medium mt-1">
-            전체 굿즈 조회 · 상품 상세 후 돌아오기 경로: 관리자 마켓
+            전체 굿즈 조회
           </p>
         </div>
       </header>
@@ -168,7 +168,7 @@ export default function AdminMarketPage() {
       {!searchTerm && groupStores.length > 0 && (
         <div className="space-y-16 pt-12 border-t border-white/10">
           <div className="space-y-10">
-            <SectionTitle className="px-2 mb-8">그룹계정 스토어</SectionTitle>
+            <SectionTitle className="px-2 mb-8">그룹별 스토어</SectionTitle>
             {groupStores.map((store) => {
               const preview = store.products.slice(0, 4);
               if (preview.length === 0) return null;

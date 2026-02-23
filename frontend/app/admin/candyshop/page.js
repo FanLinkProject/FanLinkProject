@@ -7,6 +7,7 @@ import { getCandyRechargeProducts, createProduct } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
+import Toggle from "@/components/ui/Toggle";
 
 const CARD_PADDING = "p-6";
 const CARD_MIN_HEIGHT = "min-h-[180px]";
@@ -255,6 +256,13 @@ export default function AdminCandyshopPage() {
                   placeholder="1 이상"
                   required
                 />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-sm font-bold text-white/80 mb-1">구독 상품</label>
+                  <p className="text-xs text-white/50">ON 시 매월 해당 캔디가 자동 차감됩니다. 부족 시 갱신되지 않습니다.</p>
+                </div>
+                <Toggle checked={candySpendIsSubscription} onChange={setCandySpendIsSubscription} />
               </div>
               <div className="flex gap-2 justify-end pt-2">
                 <Button type="button" variant="ghost" onClick={closeCandySpendModal}>

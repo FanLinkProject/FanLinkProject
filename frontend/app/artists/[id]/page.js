@@ -911,7 +911,14 @@ function ArtistDetailPageInner({ id }) {
                     {/* ARTIST 탭 */}
                     {activeTab === "ARTIST" && (
                         <>
-                            {artistPostsLoading ? (
+                            {!currentUser ? (
+                                <Surface variant="primary" className="py-16 text-center">
+                                    <p className="text-white/80 font-medium mb-6">로그인 후 이용할 수 있습니다.</p>
+                                    <Button variant="primary" onClick={() => router.push("/login")}>
+                                        로그인하기
+                                    </Button>
+                                </Surface>
+                            ) : artistPostsLoading ? (
                                 <Surface variant="primary" className="py-12 text-center">
                                     <p className="text-white/55">로딩 중...</p>
                                 </Surface>
@@ -953,7 +960,14 @@ function ArtistDetailPageInner({ id }) {
                     {/* FAN 탭 */}
                     {activeTab === "FAN" && (
                         <>
-                            {(artist.isFollowing || isGroupMember) ? (
+                            {!currentUser ? (
+                                <Surface variant="primary" className="py-16 text-center">
+                                    <p className="text-white/80 font-medium mb-6">로그인 후 이용할 수 있습니다.</p>
+                                    <Button variant="primary" onClick={() => router.push("/login")}>
+                                        로그인하기
+                                    </Button>
+                                </Surface>
+                            ) : (artist.isFollowing || isGroupMember) ? (
                                 <>
                                     {canCreateFanPost && (
                                         <div className="flex justify-end items-center px-2 mb-4">

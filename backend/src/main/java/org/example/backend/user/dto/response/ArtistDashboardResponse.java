@@ -9,6 +9,7 @@ public record ArtistDashboardResponse(
         FollowStatus followStatus,
         MembershipInfo membershipInfo,
         boolean isGroupMember,
+        boolean isGroup,
         List<MemberItem> members,
         List<PostItem> posts,
         List<LiveNotification> liveNotifications,
