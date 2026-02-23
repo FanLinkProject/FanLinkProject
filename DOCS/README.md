@@ -535,6 +535,23 @@ cd backend
 1. Zookeeper가 먼저 실행되었는지 확인
 2. `docker-compose logs kafka`로 로그 확인
 
+### Port 8080 이미 사용 중 (로컬)
+```bash
+# Windows: 8080 사용 프로세스 확인 후 종료
+netstat -ano | findstr :8080
+
+# 또는 다른 포트로 실행
+SERVER_PORT=8081 ./gradlew bootRun
+```
+
+### WebSocket/SSE 502 Bad Gateway, CORS, X-Frame-Options (배포 환경)
+`api.fanlink.site` 앞에 **CloudFront**가 있으면 WebSocket·SSE가 동작하지 않습니다. CloudFront는 WebSocket 업그레이드와 장시간 연결을 지원하지 않습니다.
+
+**해결 방법:**
+1. **api.fanlink.site**를 CloudFront 없이 **ALB → EC2**로 직접 연결
+2. 또는 WebSocket/SSE 전용 서브도메인(예: `ws.fanlink.site`)을 만들어 ALB로 직접 연결
+3. ALB 유휴 타임아웃을 300초 이상으로 설정 (SSE·SockJS 장시간 연결용)
+
 ---
 
 ## 📚 추가 문서 (Additional Documentation)

@@ -533,7 +533,7 @@ function ArtistDetailPageInner({ paramsId }) {
         { id: "FAN", label: "Fan" },
         { id: "LIVE", label: "Live" },
         { id: "MARKET", label: "Market" },
-        { id: "MV", label: "뮤직비디오" },
+        { id: "MV", label: "MV." },
     ];
 
     // VOD (Mock 기반 유지)
@@ -851,7 +851,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">뮤직비디오가 없습니다.</p>
+                            <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">MV가 없습니다.</p>
                         )
                     )}
 
