@@ -31,6 +31,7 @@ export default function EditPostPage() {
   const [attachmentPreviews, setAttachmentPreviews] = useState([]);
   const [groupId, setGroupId] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [canSetNotice, setCanSetNotice] = useState(false);
   const fileInputRef = useRef(null);
 
   const postGroupId = groupId ?? artistId;

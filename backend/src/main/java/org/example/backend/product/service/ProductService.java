@@ -278,6 +278,10 @@ public class ProductService {
                 return;
             }
         }
+        // 개인 아티스트가 소속 그룹 ID로 상품 등록하는 경우 허용 (예: 콘서트 티켓 자동 생성)
+        if (role == UserRole.ARTIST && groupMemberRepository.existsByGroupIdAndMemberId(artistId, userId)) {
+            return;
+        }
         Long ownerUserId = fanPageGateway.getOwnerUserId(artistId);
         if (!ownerUserId.equals(userId)) {
             throw new ProductException(ProductErrorCode.PRODUCT_ACCESS_DENIED);

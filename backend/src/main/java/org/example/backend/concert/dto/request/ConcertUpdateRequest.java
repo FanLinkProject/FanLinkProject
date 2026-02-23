@@ -23,6 +23,8 @@ public class ConcertUpdateRequest {
     private Long posterMediaAssetId;
     private Integer presaleTicketCount;
     private Integer saleTicketCount;
+    private Long presaleTicketPrice;
+    private Long saleTicketPrice;
     private Instant presaleStartDateTime;
     private Instant presaleEndDateTime;
     private Instant saleStartDateTime;
