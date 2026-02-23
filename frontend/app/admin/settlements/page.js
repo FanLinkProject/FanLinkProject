@@ -130,11 +130,38 @@ export default function AdminSettlementsPage() {
   }, []);
 
   const loadFailureLogs = useCallback(async (page = 0, filter = "ALL") => {
-    const query = { page: String(page), size: "10", sort: "createdAt,desc" };
-    if (filter === "PROCESSED") query.processed = "true";
-    if (filter === "UNPROCESSED") query.processed = "false";
+    // 필터 조건(PROCESSED/UNPROCESSED)을 서버 쿼리로 던지지 않고, 프론트엔드에서 수동으로 필터링하기 위해 무조건 ALL을 가져옵니다.
+    const query = { page: String(page), size: "50", sort: "createdAt,desc" }; // 클라이언트 필터링을 위해 size를 조금 넉넉히 잡습니다.
     const res = await settlementApi.getFailureLogs(query);
-    setFailurePage(res || { content: [], number: 0, totalPages: 0 });
+
+    if (!res || !res.content) {
+      setFailurePage({ content: [], number: 0, totalPages: 0 });
+      return;
+    }
+
+    // 포기(ABANDONED) 처리된 건을 별도 식별하고 화면용 상태(displayIsProcessed)를 만듭니다.
+    const formattedContent = res.content.map(f => {
+      const isAbandoned = f.errorMessage?.includes("[ABANDONED]");
+      return {
+        ...f,
+        isAbandoned,
+        // 서버상으로는 true(처리완료)지만, 포기된 건이면 프론트 화면에서는 무조건 false(미처리)로 취급
+        displayIsProcessed: isAbandoned ? false : f.isProcessed
+      };
+    });
+
+    // 탭 선택(filter)에 따라 프론트엔드 메모리 상에서 필터링
+    let filteredContent = formattedContent;
+    if (filter === "PROCESSED") {
+      filteredContent = formattedContent.filter(f => f.displayIsProcessed === true);
+    } else if (filter === "UNPROCESSED") {
+      filteredContent = formattedContent.filter(f => f.displayIsProcessed === false);
+    }
+
+    setFailurePage({ 
+      ...res, 
+      content: filteredContent 
+    });
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -528,13 +555,20 @@ export default function AdminSettlementsPage() {
                   <td className="px-6 py-5 text-white">{f.orderNo}</td>
                   <td className="px-6 py-5 text-white/75 line-clamp-1 max-w-[360px]">{f.errorMessage}</td>
                   <td className="px-6 py-5 whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap leading-none ${
-                        f.isProcessed ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
-                      }`}
-                    >
-                      {f.isProcessed ? "완료" : "미처리"}
-                    </span>
+                    {f.isAbandoned ? (
+                      <span className="inline-flex flex-col items-center justify-center px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest leading-tight bg-red-500/20 text-red-400 border border-red-500/30">
+                        <span>포기됨</span>
+                        <span className="text-[9px] opacity-80">(해결 요망)</span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap leading-none ${
+                          f.displayIsProcessed ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+                        }`}
+                      >
+                        {f.displayIsProcessed ? "완료" : "미처리"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-5 text-sm text-white/70">
                     <LocalDateWithUtcTooltip iso={f.createdAt} />
