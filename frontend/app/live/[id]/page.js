@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
@@ -106,9 +106,6 @@ function isNumericId(id) {
 export default function LiveSessionPage({ params }) {
     const resolvedParams = React.use(params);
     const id = resolvedParams?.id;
-
-    const searchParams = useSearchParams();
-    const liveSessionIdParam = searchParams?.get("liveSessionId");
 
     const [live, setLive] = useState(null);
     const [accessError, setAccessError] = useState("");
@@ -338,18 +335,13 @@ export default function LiveSessionPage({ params }) {
 
     // IVS Playback Token 발급 (LIVE일 때) + 만료 전 자동 갱신
     useEffect(() => {
-        const sessionId =
-            liveSessionIdParam && Number(liveSessionIdParam)
-                ? Number(liveSessionIdParam)
-                : numericId;
-
-        if (!sessionId || !live || live.status !== "LIVE") return;
+        if (!numericId || !live || live.status !== "LIVE") return;
 
         setIvsError(null);
         setIvsToken(null);
 
         const fetchToken = () =>
-            createPlaybackToken(sessionId, 300)
+            createPlaybackToken(numericId, 300)
                 .then((res) => setIvsToken(res))
                 .catch((e) =>
                     setIvsError(e?.data?.message || e.message || "IVS 토큰 발급 실패")
@@ -360,7 +352,7 @@ export default function LiveSessionPage({ params }) {
         const refreshMs = 240 * 1000; // recommendedRefreshInSeconds 기본값
         const timer = setInterval(fetchToken, refreshMs);
         return () => clearInterval(timer);
-    }, [liveSessionIdParam, numericId, live?.status]);
+    }, [numericId, live?.status]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -522,7 +514,7 @@ export default function LiveSessionPage({ params }) {
 
     return (
         <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
-            {(liveSessionIdParam || numericId) && isLive && (
+            {numericId && isLive && (
                 <div className="absolute top-2 left-2 right-2 z-10 flex justify-center">
                     <div className="bg-black/80 rounded-lg px-3 py-2 text-xs text-white/90">
                         {ivsToken?.playbackUrl && ivsToken?.token ? (
