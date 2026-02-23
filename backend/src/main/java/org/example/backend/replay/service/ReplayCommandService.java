@@ -10,6 +10,8 @@ import org.example.backend.media_asset.exception.MediaAssetException;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
 import org.example.backend.replay.dto.ReplayAccessResponse;
 import org.example.backend.replay.dto.ReplayAccessResult;
+import org.example.backend.replay.dto.ReplayCreateManualRequest;
+import org.example.backend.replay.dto.ReplayCreateManualResponse;
 import org.example.backend.replay.dto.ReplayPublishRequest;
 import org.example.backend.replay.dto.ReplayPublishResponse;
 import org.example.backend.replay.entity.Replay;
@@ -141,6 +143,9 @@ public class ReplayCommandService {
                 : Duration.ofMinutes(60);
         String playbackUrl = playbackUrlCalculator.buildPlaybackUrl(awsProperties.getCloudfront().getDomain(), replay);
         String pathPattern = playbackUrlCalculator.buildPlaybackPathPattern(awsProperties.getCloudfront().getDomain(), replay);
+        if (playbackUrl == null || pathPattern == null) {
+            throw new ReplayException(ReplayErrorCode.REPLAY_NOT_READY, "재생 준비가 되지 않았습니다.");
+        }
         CloudFrontCookieSigner cookieSigner = cookieSignerProvider.getIfAvailable();
         if (cookieSigner == null) {
             throw new ReplayException(ReplayErrorCode.COOKIE_ISSUE_FAILED, "CloudFront signer is not configured");
@@ -157,6 +162,66 @@ public class ReplayCommandService {
                 Instant.now().plusSeconds(ttl.getSeconds())
         );
         return new ReplayAccessResult(response, cookies);
+    }
+
+    /**
+     * 다시보기 수동 업로드 슬롯을 생성한다.
+     * 라이브 녹화가 없을 때(직접 녹화본·행사/TV 영상 업로드) 사용.
+     * 반환된 replayId로 REPLAY_VIDEO presign 후 업로드 → complete 시 MediaConvert 자동 제출.
+     */
+    public ReplayCreateManualResponse createManualReplay(ReplayCreateManualRequest request, Long userId, UserRole role) {
+        if (!artistPermissionService.canManagePage(request.artistId(), userId, role, true)) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
+        }
+        Replay replay = new Replay(
+                request.artistId(),
+                null,
+                request.accessType(),
+                ReplayStatus.UPLOADING,
+                null,
+                null,
+                null
+        );
+        replayRepository.save(replay);
+        return new ReplayCreateManualResponse(
+                replay.getId(),
+                replay.getArtistId(),
+                replay.getAccessType(),
+                replay.getStatus(),
+                replay.getCreatedAt()
+        );
+    }
+
+    /**
+     * 수동 업로드 Replay를 발행한다.
+     * 상태가 READY(HLS 변환 완료)일 때만 가능.
+     */
+    public ReplayPublishResponse publishManualReplay(Long replayId, Long userId, UserRole role) {
+        Replay replay = replayRepository.findById(replayId)
+                .orElseThrow(() -> new ReplayException(ReplayErrorCode.REPLAY_NOT_FOUND));
+        if (replay.getLiveSessionId() != null) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION, "라이브 발행은 /publish를 사용하세요.");
+        }
+        if (!artistPermissionService.canManagePage(replay.getArtistId(), userId, role, true)) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
+        }
+        if (replay.getStatus() != ReplayStatus.READY) {
+            throw new ReplayException(ReplayErrorCode.INVALID_SESSION_STATE,
+                    "변환 완료(READY) 후에만 발행할 수 있습니다. 현재 상태: " + replay.getStatus());
+        }
+        Instant now = Instant.now();
+        replay.markPublished(now);
+        replayRepository.save(replay);
+        String playbackUrl = playbackUrlCalculator.buildPlaybackUrl(awsProperties.getCloudfront().getDomain(), replay);
+        return new ReplayPublishResponse(
+                replay.getId(),
+                replay.getArtistId(),
+                replay.getLiveSessionId(),
+                replay.getAccessType(),
+                replay.getStatus(),
+                playbackUrl,
+                replay.getPublishedAt()
+        );
     }
 
     // RECORDED/READY 상태만 통과시킨다.

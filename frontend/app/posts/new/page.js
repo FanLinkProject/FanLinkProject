@@ -58,7 +58,9 @@ export default function NewPostPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
-    if (!artistId && !groupId) {
+    // 게시글 소유 주체 = groupId(그룹/소속 그룹 id) ?? artistId(솔로일 때 본인 id)
+    const postGroupId = groupId ?? artistId;
+    if (!postGroupId) {
       router.push("/home");
       return;
     }
@@ -67,7 +69,7 @@ export default function NewPostPage() {
       await request("/api/artist-posts", {
         method: "POST",
         body: {
-          groupId: groupId ?? artistId,
+          groupId: postGroupId,
           title: "",
           content: content.trim(),
           isMembershipOnly: false,
@@ -84,15 +86,18 @@ export default function NewPostPage() {
     }
   };
 
+  // 아티스트 마이페이지에서 프로필 로드. groupId = 게시글이 소속될 팬페이지(그룹) ID.
+  // 그룹 계정이면 본인 id, 소속 아티스트면 소속 그룹 id, 솔로 아티스트면 본인 id.
   useEffect(() => {
     const headers = getAuthHeaders();
     if (!headers.Authorization) return;
     axios.get(`${BASE_URL}/api/artist/mypage`, { headers })
       .then((res) => {
         const p = res.data?.profile;
-        if (p?.id != null) setArtistId(p.id);
-        if (p?.groupId != null) setGroupId(p.groupId);
         setProfile(p ?? null);
+        if (p?.id != null) setArtistId(p.id);
+        // groupId가 있으면 사용, 없으면 id 사용 (솔로 아티스트 또는 구 API 호환)
+        setGroupId(p?.groupId ?? p?.id ?? null);
       })
       .catch(() => { setArtistId(null); setGroupId(null); setProfile(null); });
   }, []);

@@ -68,9 +68,13 @@ public class ArtistService {
             }
         }
 
-        // 1) 프로필
+        // 1) 프로필 (groupId = 게시글/팬페이지 소유 주체: 그룹이면 본인 id, 소속 아티스트면 소속 그룹 id, 솔로면 본인 id)
+        Long profileGroupId = artistOrGroup.getRole() == UserRole.GROUP
+                ? artistOrGroup.getId()
+                : (membership != null && membership.getGroup() != null ? membership.getGroup().getId() : artistOrGroup.getId());
         ArtistMyPageResponse.Profile profile = new ArtistMyPageResponse.Profile(
                 artistOrGroup.getId(),
+                profileGroupId,
                 artistOrGroup.getNickname(),
                 artistOrGroup.getProfileImageUrl(),
                 artistOrGroup.getBannerImageUrl(),
@@ -204,8 +208,14 @@ public class ArtistService {
             user.setOfficialLinks(request.officialLinks());
         }
         User saved = userRepository.save(user);
+        Long returnGroupId = saved.getRole() == UserRole.GROUP
+                ? saved.getId()
+                : groupMemberRepository.findByMember(saved)
+                        .map(gm -> gm.getGroup() != null ? gm.getGroup().getId() : saved.getId())
+                        .orElse(saved.getId());
         return new ArtistMyPageResponse.Profile(
                 saved.getId(),
+                returnGroupId,
                 saved.getNickname(),
                 saved.getProfileImageUrl(),
                 saved.getBannerImageUrl(),
