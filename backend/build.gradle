@@ -26,6 +26,7 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-batch'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     testImplementation 'org.springframework.batch:spring-batch-test'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
@@ -75,6 +76,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     // HTTP 요청을 쉽게 보내기 위한 라이브러리 (OkHttp)
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 }
 
 tasks.named('test') {
