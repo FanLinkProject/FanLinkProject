@@ -1,6 +1,6 @@
 "use client";
 
-import { getTicketStatus, getDaysUntilSaleStart, formatDateShort } from "@/lib/concertUtils";
+import { getTicketStatus, formatDateShort, formatUpcomingSaleDday, formatClosedLabel } from "@/lib/concertUtils";
 
 /**
  * Hero: 공연 제목 + 날짜 + 예매상태. 상단 오버레이에 목록(좌)/공유(우) 버튼.
@@ -8,10 +8,10 @@ import { getTicketStatus, getDaysUntilSaleStart, formatDateShort } from "@/lib/c
 export function ConcertHero({ concert, onBack, onShare }) {
   if (!concert) return null;
   const status = getTicketStatus(concert);
-  const dday = getDaysUntilSaleStart(concert);
 
+  const saleDdayStr = formatUpcomingSaleDday(concert);
   const statusLabel =
-    status === "OPEN" ? "예매중" : status === "UPCOMING" ? (dday != null ? `예매 D-${dday}` : "예매 예정") : "마감";
+    status === "OPEN" ? "예매중" : status === "UPCOMING" ? (saleDdayStr ?? "예매 예정") : formatClosedLabel(concert);
   const statusClass =
     status === "OPEN" ? "bg-emerald-500/90" : status === "UPCOMING" ? "bg-amber-500/90" : "bg-white/20";
 

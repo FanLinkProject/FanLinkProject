@@ -8,7 +8,7 @@ import axios from "axios";
 // 데이터 및 유틸리티
 import { MOCK_ARTISTS, MOCK_POSTS, MOCK_LIVES } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
-import { request, apiGet, apiPost, BASE_URL } from "@/lib/api";
+import { request, apiGet, apiPost, BASE_URL, getToken } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
@@ -28,7 +28,7 @@ const CANDY_COST = 500;
 const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
 
 function getAuthHeaders() {
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    const token = typeof window !== "undefined" ? getToken() : "";
     return {
         "Content-Type": "application/json",
         ...(token && { Authorization: token }),
@@ -120,6 +120,7 @@ function ArtistDetailPageInner({ paramsId }) {
     const [likedPostIds, setLikedPostIds] = useState(new Set());
 
     const fanPostFileInputRef = useRef(null);
+    const fanProfileCreateInProgressRef = useRef(null); // 동일 그룹에 대한 중복 생성 방지
     const groupId = Number(paramsId);
     const isRealGroup = !isNaN(groupId);
 
@@ -186,14 +187,43 @@ function ArtistDetailPageInner({ paramsId }) {
     }, [artist]);
 
     // 4. 팬 프로필 (출석용) 로드
+    const fetchFanProfiles = useCallback(() => {
+        const token = getToken();
+        if (!token) return Promise.resolve();
+        return axios.get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
+            .then(res => setFanProfiles(res.data || []))
+            .catch(() => {});
+    }, []);
+
     useEffect(() => {
         const user = getCurrentUser();
         setCurrentUser(user);
         if (!user) return;
-        axios.get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
-            .then(res => setFanProfiles(res.data || []))
-            .catch(() => {});
-    }, []);
+        fetchFanProfiles();
+    }, [fetchFanProfiles]);
+
+    // 4-2. 구독 중인데 해당 아티스트/그룹에 대한 팬 프로필이 없으면 생성 후 다시 로드 (팬 계정으로 로그인 시에만, 중복 생성 방지)
+    useEffect(() => {
+        if (!artist?.isSubscribed || artist?.backendId == null) return;
+        const artistBackendId = Number(artist.backendId);
+        if (Number.isNaN(artistBackendId)) return;
+        const hasProfile = fanProfiles.some(
+            (p) => String(p.groupId) === String(artistBackendId) || p.groupName === artist?.name
+        );
+        if (hasProfile) return;
+        if (fanProfileCreateInProgressRef.current === artistBackendId) return; // 이미 생성 요청 중
+        fanProfileCreateInProgressRef.current = artistBackendId;
+        axios.post(`${FAN_PROFILES_API}`, { groupId: artistBackendId }, { headers: getAuthHeaders() })
+            .then(() => fetchFanProfiles())
+            .catch((err) => {
+                if (err.response?.status === 403) {
+                    console.warn("[fan-profiles] 생성 불가:", err.response?.data?.message || "권한 없음 (팬 계정으로 로그인해 주세요)");
+                }
+            })
+            .finally(() => {
+                fanProfileCreateInProgressRef.current = null;
+            });
+    }, [artist?.isSubscribed, artist?.backendId, artist?.name, fanProfiles, fetchFanProfiles]);
 
     // 5. MV 탭 활성화 시 로드
     useEffect(() => {
@@ -217,19 +247,40 @@ function ArtistDetailPageInner({ paramsId }) {
     };
 
     const handleAttendance = async () => {
-        const fanProfile = fanProfiles.find(p => String(p.artistId) === String(paramsId) || p.artistName === artist?.name);
+        const artistBackendId = artist?.backendId ?? paramsId;
+        const fanProfile = fanProfiles.find(
+            (p) => String(p.groupId) === String(artistBackendId) || String(p.groupId) === String(paramsId) || p.groupName === artist?.name
+        );
         if (!fanProfile || attendanceLoading) return;
         setAttendanceLoading(true);
         try {
             await axios.post(`${FAN_PROFILES_API}/${fanProfile.id}/increase-visit`, {}, { headers: getAuthHeaders() });
-            setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, visitCount: (p.visitCount || 0) + 1 } : p));
+            const today = new Date().toISOString().slice(0, 10);
+            setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, visitCount: (p.visitCount || 0) + 1, lastVisitDate: today } : p));
             alert("출석 완료!");
         } catch (err) {
-            console.error(err);
+            const msg = err.response?.data?.message || err.message || "출석 처리에 실패했습니다.";
+            alert(msg);
         } finally {
             setAttendanceLoading(false);
         }
     };
+
+    const artistBackendIdForAttendance = artist?.backendId ?? paramsId;
+    const fanProfileForAttendance = fanProfiles.find(
+        (p) => String(p.groupId) === String(artistBackendIdForAttendance) || String(p.groupId) === String(paramsId) || p.groupName === artist?.name
+    );
+    const todayStr =
+        typeof window !== "undefined"
+            ? (() => {
+                  const d = new Date();
+                  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              })()
+            : "";
+    const isAlreadyVisitedToday =
+        fanProfileForAttendance != null &&
+        fanProfileForAttendance.lastVisitDate != null &&
+        String(fanProfileForAttendance.lastVisitDate).slice(0, 10) === todayStr;
 
     const handleLiveCardClick = async (session) => {
         if (liveCardCheckingId != null) return;
@@ -290,7 +341,11 @@ function ArtistDetailPageInner({ paramsId }) {
         <div className="flex flex-col min-h-full relative pb-20">
             {/* 커버 섹션 */}
             <div className="h-64 w-full relative overflow-hidden shrink-0">
-                <img src={artist.cover} className="w-full h-full object-cover" alt="" />
+                {artist.cover ? (
+                    <img src={artist.cover} className="w-full h-full object-cover" alt="" />
+                ) : (
+                    <div className="w-full h-full bg-gradient-to-b from-violet-900/30 to-[#0b0814]" aria-hidden />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
             </div>
 
@@ -298,8 +353,12 @@ function ArtistDetailPageInner({ paramsId }) {
             <div className="max-w-6xl w-full mx-auto px-8 relative -mt-20 z-10 shrink-0">
                 <Surface variant="primary" className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]">
                     <div className="flex items-end gap-6">
-                        <div className="rounded-2xl border-2 border-white/[0.08] shadow-2xl -mt-24 overflow-hidden bg-[#201a33] size-40">
-                            <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} />
+                        <div className="rounded-2xl border-2 border-white/[0.08] shadow-2xl -mt-24 overflow-hidden bg-[#201a33] size-40 flex items-center justify-center">
+                            {artist.avatar ? (
+                                <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} />
+                            ) : (
+                                <span className="material-symbols-outlined text-white/30 text-6xl" aria-hidden>person</span>
+                            )}
                         </div>
                         <div className="pb-1">
                             <div className="flex items-center gap-2">
@@ -315,8 +374,13 @@ function ArtistDetailPageInner({ paramsId }) {
                         {artist.isSubscribed ? (
                             <>
                                 <Button variant="ghost" className="px-8" disabled>구독 중</Button>
-                                <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading}>
-                                    {attendanceLoading ? "..." : "출석"}
+                                <Button
+                                    variant="primary"
+                                    className="px-6"
+                                    onClick={handleAttendance}
+                                    disabled={attendanceLoading || isAlreadyVisitedToday}
+                                >
+                                    {attendanceLoading ? "..." : isAlreadyVisitedToday ? "오늘 출석 완료" : "출석"}
                                 </Button>
                             </>
                         ) : artist.isFollowing ? (
@@ -347,17 +411,20 @@ function ArtistDetailPageInner({ paramsId }) {
                 <div className="max-w-6xl w-full mx-auto px-8 mt-12">
                     <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {artistConcerts.map((c) => (
-                            <Link key={c.id} href={`/concerts/${c.id}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
-                                <div className="aspect-[16/10] overflow-hidden">
-                                    <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                </div>
-                                <div className="p-5">
-                                    <h4 className="font-bold text-white truncate">{c.title}</h4>
-                                    <p className="text-white/50 text-xs mt-2">{formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}</p>
-                                </div>
-                            </Link>
-                        ))}
+                        {artistConcerts.map((c) => {
+                            const concertId = c.concertId ?? c.id;
+                            return (
+                                <Link key={concertId} href={`/concerts/${concertId}`} className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden">
+                                    <div className="aspect-[16/10] overflow-hidden">
+                                        <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    </div>
+                                    <div className="p-5">
+                                        <h4 className="font-bold text-white truncate">{c.title}</h4>
+                                        <p className="text-white/50 text-xs mt-2">{formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}</p>
+                                    </div>
+                                </Link>
+                            );
+                        })}
                     </div>
                 </div>
             )}

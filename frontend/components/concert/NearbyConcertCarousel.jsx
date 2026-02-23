@@ -3,7 +3,8 @@
 import Link from "next/link";
 import {
   getTicketStatus,
-  getDaysUntilSaleStart,
+  formatUpcomingSaleDday,
+  formatClosedLabel,
   haversineKm,
   formatDateShort,
   getArtistNamesArray,
@@ -36,7 +37,7 @@ export function NearbyConcertCarousel({ concerts, userCoords }) {
       <div className="flex gap-4 overflow-x-auto pb-2">
         {sorted.slice(0, 12).map((c) => {
           const status = getTicketStatus(c);
-          const dday = getDaysUntilSaleStart(c);
+          const saleDdayStr = formatUpcomingSaleDday(c);
           const dist =
             userCoords && c.latitude != null && c.longitude != null
               ? haversineKm(userCoords.latitude, userCoords.longitude, c.latitude, c.longitude).toFixed(1)
@@ -64,7 +65,7 @@ export function NearbyConcertCarousel({ concerts, userCoords }) {
                           : "bg-white/20 text-white/90"
                     }`}
                   >
-                    {status === "OPEN" ? "예매중" : status === "UPCOMING" ? (dday != null ? `D-${dday}` : "예매 예정") : "마감"}
+                    {status === "OPEN" ? "예매중" : status === "UPCOMING" ? (saleDdayStr ?? "예매 예정") : formatClosedLabel(c)}
                   </span>
                 </div>
               </div>

@@ -7,7 +7,7 @@ import { apiGet } from "@/lib/api";
 import {
   searchConcerts,
   getTicketStatus,
-  getDaysUntilSaleStart,
+  formatUpcomingSaleDday,
   getArtistNamesArray,
   formatArtists,
   getPrimaryMeta,
@@ -120,7 +120,7 @@ function ConcertSearchPageInner() {
               const placeName = c.placeName ?? c.venueName;
               const imageUrl = c.concertImageUrl ?? c.posterImageUrl;
               const status = getTicketStatus(c);
-              const dday = getDaysUntilSaleStart(c);
+              const saleDdayStr = formatUpcomingSaleDday(c);
               return (
                 <Link key={id} href={`/concerts/${id}`}>
                   <Surface
@@ -146,8 +146,8 @@ function ConcertSearchPageInner() {
                           </p>
                         )}
                         <p className="text-white/55 text-xs mt-1">{getPrimaryMeta(c) || placeName}</p>
-                        {status === "UPCOMING" && dday != null && (
-                          <span className="text-violet-400 font-medium text-sm mt-0.5">D-{dday}</span>
+                        {status === "UPCOMING" && saleDdayStr != null && (
+                          <span className="text-violet-400 font-medium text-sm mt-0.5">{saleDdayStr}</span>
                         )}
                         {status === "OPEN" && (
                           <span className="text-emerald-400 font-medium text-sm mt-0.5">예매중</span>

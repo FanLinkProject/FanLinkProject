@@ -3,7 +3,7 @@
 import Link from "next/link";
 import {
   getTicketStatus,
-  getDaysUntilSaleStart,
+  formatUpcomingSaleDday,
   getSoonestSaleEnd,
   formatDateShort,
   getArtistNamesArray,
@@ -29,7 +29,7 @@ export function TicketingSection({ concerts, status }) {
       <h2 className="text-lg font-bold text-white mb-4 px-1">{title}</h2>
       <div className="space-y-3">
         {filtered.map((c) => {
-          const dday = getDaysUntilSaleStart(c);
+          const saleDdayStr = formatUpcomingSaleDday(c);
           const id = c.concertId ?? c.id;
           const placeName = c.placeName ?? c.venueName;
           const imageUrl = c.concertImageUrl ?? c.posterImageUrl;
@@ -56,8 +56,8 @@ export function TicketingSection({ concerts, status }) {
                       </p>
                     )}
                     <p className="text-white/55 text-xs mt-1">{getPrimaryMeta(c) || placeName}</p>
-                    {status === "UPCOMING" && dday != null && (
-                      <span className="text-violet-400 font-medium text-sm mt-0.5">D-{dday}</span>
+                    {status === "UPCOMING" && saleDdayStr != null && (
+                      <span className="text-violet-400 font-medium text-sm mt-0.5">{saleDdayStr}</span>
                     )}
                   </div>
                   <span className="material-symbols-outlined text-white/45 shrink-0">chevron_right</span>

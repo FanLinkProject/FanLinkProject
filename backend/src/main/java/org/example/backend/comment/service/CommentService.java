@@ -206,13 +206,12 @@ public class CommentService {
      * @param isIncrease true면 증가, false면 감소
      */
     private void updateFanActivity(Long fanUserId, TargetType targetType, Long targetId, boolean isIncrease) {
-        // 1. 해당 게시물이 속한 아티스트(또는 그룹) ID 찾기
-        Long artistId = getGroupIdFromTarget(targetType, targetId);
-        if (artistId == null) return; // 아티스트 정보를 찾을 수 없으면 패스
+        // 1. 해당 게시물이 속한 그룹 ID 찾기
+        Long groupId = getGroupIdFromTarget(targetType, targetId);
+        if (groupId == null) return;
 
-        // 2. 해당 팬과 아티스트의 FanProfile 조회
-        // (팬 프로필이 없는 경우 - 예: 아티스트 본인이거나 가입 안 한 유저 - 무시)
-        Optional<FanProfile> fanProfileOpt = fanProfileRepository.findByFan_IdAndArtist_Id(fanUserId, artistId);
+        // 2. 해당 팬과 그룹의 FanProfile 조회 (그룹 기준)
+        Optional<FanProfile> fanProfileOpt = fanProfileRepository.findByFan_IdAndGroup_Id(fanUserId, groupId);
 
         if (fanProfileOpt.isPresent()) {
             Long profileId = fanProfileOpt.get().getId();
