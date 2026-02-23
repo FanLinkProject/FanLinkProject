@@ -135,8 +135,20 @@ export default function LiveSessionPage({ params }) {
 
     const router = useRouter();
     const chatEndRef = useRef(null);
+    const chatInputRef = useRef(null);
     const commentEndRef = useRef(null);
     const stompRef = useRef(null);
+
+    /** 채팅 입력창: 내용에 따라 높이 확장, max 이상이면 스크롤 */
+    const MAX_CHAT_INPUT_HEIGHT = 96; // max-h-24
+    const adjustChatInputHeight = useCallback(() => {
+        const el = chatInputRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        const capped = Math.min(el.scrollHeight, MAX_CHAT_INPUT_HEIGHT);
+        el.style.height = `${capped}px`;
+        el.style.overflowY = el.scrollHeight > MAX_CHAT_INPUT_HEIGHT ? "auto" : "hidden";
+    }, []);
 
     /** 403 시 모달 중복 오픈 방지 */
     const membershipModalShownRef = useRef(false);
@@ -361,6 +373,10 @@ export default function LiveSessionPage({ params }) {
     useEffect(() => {
         commentEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [comments]);
+
+    useEffect(() => {
+        adjustChatInputHeight();
+    }, [message, adjustChatInputHeight]);
 
     const handleSend = () => {
         if (!message.trim()) return;
@@ -703,7 +719,7 @@ export default function LiveSessionPage({ params }) {
                                     <div
                                         key={i}
                                         className={`flex gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.03] ${
-                                            mine ? "justify-end text-right" : ""
+                                            mine ? "justify-end" : ""
                                         }`}
                                     >
                                         {!mine && (
@@ -714,7 +730,7 @@ export default function LiveSessionPage({ params }) {
 
                                         <div
                                             className={`min-w-0 max-w-[70%] ${
-                                                mine ? "order-first" : "flex-1"
+                                                mine ? "order-first flex flex-col items-end" : "flex-1"
                                             }`}
                                         >
                                             <div
@@ -729,10 +745,10 @@ export default function LiveSessionPage({ params }) {
                                             </div>
 
                                             <div
-                                                className={`inline-block text-[11px] leading-relaxed break-words px-3 py-2 ${
+                                                className={`text-[11px] leading-relaxed break-words px-3 py-2 ${
                                                     mine
-                                                        ? "rounded-2xl bg-violet-500/80 text-white"
-                                                        : "rounded-2xl bg-white/10 text-gray-100"
+                                                        ? "rounded-2xl bg-violet-500/80 text-white text-left whitespace-pre-wrap max-w-full"
+                                                        : "rounded-2xl bg-white/10 text-gray-100 inline-block"
                                                 }`}
                                             >
                                                 {msg.text}
@@ -751,29 +767,30 @@ export default function LiveSessionPage({ params }) {
                         </div>
 
                         <div className="shrink-0 border-t border-white/5 p-3">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
+                            <div className="flex gap-2 items-end">
+                                <textarea
+                                    ref={chatInputRef}
                                     value={message}
                                     onChange={(e) => setMessage(e.target.value)}
                                     onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                            if (!isLive) {
-                                                e.preventDefault();
-                                                return;
-                                            }
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            if (!isLive) return;
                                             handleSend();
                                         }
                                     }}
+                                    onInput={adjustChatInputHeight}
                                     placeholder={
                                         isLive
-                                            ? "채팅..."
+                                            ? "채팅... (Enter 전송, Shift+Enter 줄바꿈)"
                                             : "라이브가 종료되어 채팅을 보낼 수 없습니다."
                                     }
                                     disabled={!isLive}
-                                    className={`flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/20 ${
+                                    rows={1}
+                                    className={`min-h-[36px] max-h-24 flex-1 resize-none overflow-y-hidden rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/20 ${
                                         !isLive ? "opacity-50 cursor-not-allowed" : ""
                                     }`}
+                                    style={{ height: 36 }}
                                 />
                                 <button
                                     type="button"
