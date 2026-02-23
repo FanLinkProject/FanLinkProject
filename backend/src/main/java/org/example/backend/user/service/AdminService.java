@@ -1,6 +1,7 @@
 package org.example.backend.user.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.backend.global.exception.BusinessException;
 import org.example.backend.global.security.jwt.JwtTokenProvider;
 import org.example.backend.global.security.jwt.RefreshTokenStore;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.time.LocalDateTime;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class AdminService {
@@ -48,6 +50,8 @@ public class AdminService {
 
     // 아티스트 계정 생성
     public SignupResponse createArtistAccount(ArtistCreateRequest request) {
+        String normalizedPhone = normalizePhone(request.phoneNumber());
+
         // 이메일 중복 확인
         if (userRepository.existsByEmail(request.email())) {
             throw new BusinessException(UserErrorCode.EMAIL_ALREADY_EXISTS);
@@ -57,7 +61,7 @@ public class AdminService {
             throw new BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
         }
         // 전화번호 중복 확인
-        if (userRepository.existsByPhoneNumber(request.phoneNumber())) {
+        if (userRepository.existsByPhoneNumber(normalizedPhone)) {
             throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
         }
 
@@ -100,7 +104,7 @@ public class AdminService {
                 passwordEncoder.encode(request.password()),
                 request.gender(),
                 request.birth(),
-                request.phoneNumber(),
+                normalizedPhone,
                 request.privacyPolicyAgreed(),
                 role
         );
@@ -130,9 +134,19 @@ public class AdminService {
         
         String accessToken = jwtTokenProvider.createAccessToken(savedUser.getEmail(), savedUser.getRole().getValue());
         String refreshToken = jwtTokenProvider.createRefreshToken(savedUser.getEmail(), savedUser.getRole().getValue());
-        refreshTokenStore.save(savedUser.getEmail(), refreshToken);
+        try {
+            refreshTokenStore.save(savedUser.getEmail(), refreshToken);
+        } catch (Exception e) {
+            // Redis unavailable should not break account creation itself.
+            // Token refresh may be unavailable until Redis recovers.
+            log.warn("Artist account creation succeeded, but failed to store refresh token in Redis: {}", e.getMessage());
+        }
 
         return SignupResponse.from(savedUser, accessToken, refreshToken);
+    }
+
+    private String normalizePhone(String phoneNumber) {
+        return phoneNumber == null ? "" : phoneNumber.replaceAll("[^0-9]", "");
     }
 
     // 패널티 부여

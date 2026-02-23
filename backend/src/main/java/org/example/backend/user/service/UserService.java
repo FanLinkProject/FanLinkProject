@@ -79,20 +79,24 @@ public class UserService {
 
     // 전화번호 수정
     public void updatePhoneNumber(User user, PhoneNumberUpdateRequest request) {
+        String newPhone = normalizePhone(request.phoneNumber());
+
         // 전화번호 인증 확인
-        if (!verificationCodeService.verifyPhoneCode(request.phoneNumber(), request.verificationCode())) {
+        if (!verificationCodeService.verifyPhoneCode(newPhone, request.verificationCode())) {
             throw new BusinessException(UserErrorCode.PHONE_VERIFICATION_FAILED);
         }
 
+        String currentPhone = normalizePhone(user.getPhoneNumber());
+
         // 전화번호 중복 확인 (다른 사용자가 사용 중인지 확인)
-        if (!user.getPhoneNumber().equals(request.phoneNumber()) 
-                && userRepository.existsByPhoneNumber(request.phoneNumber())) {
+        if (!currentPhone.equals(newPhone)
+                && userRepository.existsByPhoneNumber(newPhone)) {
             throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
         }
 
         User currentUser = userRepository.findById(user.getId())
                 .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
-        currentUser.setPhoneNumber(request.phoneNumber());
+        currentUser.setPhoneNumber(newPhone);
         userRepository.save(currentUser);
     }
 
@@ -153,14 +157,18 @@ public class UserService {
             currentUser.setBirth(request.birth());
         }
         if (request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
-            String newPhone = request.phoneNumber().trim();
+            String newPhone = normalizePhone(request.phoneNumber());
             String currentPhone = currentUser.getPhoneNumber();
             boolean isPlaceholder = currentPhone == null || currentPhone.isBlank()
                     || currentPhone.startsWith("kakao_") || currentPhone.startsWith("google_")
                     || currentPhone.startsWith("naver_") || currentPhone.startsWith("instagram_");
-            if (isPlaceholder || !currentPhone.equals(newPhone)) {
+            String normalizedCurrentPhone = isPlaceholder ? "" : normalizePhone(currentPhone);
+            if (isPlaceholder || !normalizedCurrentPhone.equals(newPhone)) {
                 if (userRepository.existsByPhoneNumber(newPhone)) {
                     throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
+                }
+                if (!verificationCodeService.consumePhoneVerified(newPhone)) {
+                    throw new BusinessException(UserErrorCode.PHONE_VERIFICATION_FAILED);
                 }
                 currentUser.setPhoneNumber(newPhone);
             }
@@ -623,5 +631,9 @@ public class UserService {
                 lastMessage.getCreatedAt().toString(),
                 false
         ));
+    }
+
+    private String normalizePhone(String phoneNumber) {
+        return phoneNumber == null ? "" : phoneNumber.replaceAll("[^0-9]", "");
     }
 }

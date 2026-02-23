@@ -24,7 +24,7 @@ public class JwtTokenProvider {
 
     private final PrincipalDetailsService principalDetailsService;
 
-    @Value("${jwt.secret}")//이거 나중에.. 32자..써야되요
+    @Value("${jwt.secret}")
     private String secretKey;
 
     private SecretKey key;

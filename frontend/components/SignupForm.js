@@ -106,6 +106,17 @@ function SocialSignupButton({ provider, onClick }) {
   );
 }
 
+function getApiErrorMessage(data, fallback = "요청에 실패했습니다.") {
+  const msg = data?.message || fallback;
+  if (data?.details && typeof data.details === "object") {
+    const detailStr = Object.entries(data.details)
+      .map(([k, v]) => (typeof v === "string" ? v : `${k}: ${JSON.stringify(v)}`))
+      .join(" ");
+    return detailStr || msg;
+  }
+  return msg;
+}
+
 export default function SignupForm({ role }) {
   const router = useRouter();
   const [step, setStep] = useState("INFO");
@@ -193,6 +204,10 @@ export default function SignupForm({ role }) {
       setError("모든 필수 정보를 입력해주세요.");
       return;
     }
+    if (formData.nickname.trim().length < 2) {
+      setError("닉네임을 2자 이상 입력하세요.");
+      return;
+    }
     if (formData.password !== formData.passwordConfirm) {
       setError("비밀번호가 일치하지 않습니다.");
       return;
@@ -219,15 +234,15 @@ export default function SignupForm({ role }) {
     setError("");
     try {
       const res = await signupApi({
-        email: formData.email,
-        nickname: formData.nickname,
-        name: formData.name,
+        email: formData.email?.trim(),
+        nickname: formData.nickname?.trim(),
+        name: formData.name?.trim(),
         password: formData.password,
         gender: formData.gender,
         birth: formData.birth,
         privacyPolicyAgreed: formData.privacyPolicyAgreed ?? true,
         phoneNumber: formData.phoneNumber || phoneNumberCombined,
-        phoneVerificationCode: phoneCode,
+        phoneVerificationCode: phoneCode || undefined,
         role: role === "ARTIST" ? "ARTIST" : "USER",
       });
 
@@ -242,7 +257,7 @@ export default function SignupForm({ role }) {
 
       router.push(role === "ARTIST" ? "/artist-console" : "/home");
     } catch (err) {
-      setError(err?.data?.message || err?.message || "회원가입에 실패했습니다.");
+      setError(getApiErrorMessage(err?.data, err?.message || "회원가입에 실패했습니다."));
     }
   };
 
@@ -250,9 +265,17 @@ export default function SignupForm({ role }) {
   const stepIndex = steps.indexOf(step);
 
   return (
-    <div className="min-h-full flex items-center justify-center p-6 bg-[#0b0814]">
+    <div className="min-h-full flex items-center justify-center p-6 bg-[#0b0814] relative">
       <div className="w-full max-w-xl">
-        <div className="bg-[#201a33] rounded-[2.5rem] p-10 border border-white/[0.08]">
+        <div className="bg-[#201a33] rounded-[2.5rem] p-10 border border-white/[0.08] relative">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="absolute top-6 right-6 size-10 rounded-full bg-white/[0.08] flex items-center justify-center text-white/70 hover:bg-white/[0.12] hover:text-white transition-colors"
+            aria-label="닫기"
+          >
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
           <div className="text-center mb-10">
             <span className="bg-violet-500/20 text-violet-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-4 inline-block">
               {role === "ARTIST" ? "Artist Membership" : "Fan Community"}

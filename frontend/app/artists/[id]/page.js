@@ -550,6 +550,7 @@ function ArtistDetailPageInner({ paramsId }) {
         { id: "ARTIST", label: "Artist" },
         { id: "FAN", label: "Fan" },
         { id: "LIVE", label: "Live" },
+        { id: "CONCERT", label: "공연" },
         { id: "MARKET", label: "Market" },
         { id: "MV", label: "MV" },
     ];
@@ -575,7 +576,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                 <span className="material-symbols-outlined text-violet-300 text-2xl">verified</span>
                             </div>
                             <p className="text-white/55 font-medium mt-2">
-                                아티스트 팔로우 수 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트(게시글) 수 {Number(artist.postCount ?? 0).toLocaleString()}개
+                                팔로우 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트 {Number(artist.postCount ?? 0).toLocaleString()}개
                             </p>
                         </div>
                     </div>
@@ -865,6 +866,43 @@ function ArtistDetailPageInner({ paramsId }) {
                                     <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">다시보기가 없습니다.</p>
                                 )}
                             </section>
+                        </div>
+                    )}
+
+                    {activeTab === "CONCERT" && (
+                        <div className="space-y-6">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-white/40 px-1">
+                                Upcoming Concerts
+                            </h3>
+                            {artistConcerts.length === 0 ? (
+                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">
+                                    예정된 공연이 없습니다.
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    {artistConcerts.map((c, i) => (
+                                        <Link
+                                            key={c.id ?? `concert-${i}`}
+                                            href={`/concerts/${c.id}`}
+                                            className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden"
+                                        >
+                                            <div className="aspect-[16/10] overflow-hidden">
+                                                <img
+                                                    src={c.concertImageUrl || c.posterImageUrl}
+                                                    alt=""
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                />
+                                            </div>
+                                            <div className="p-5">
+                                                <h4 className="font-bold text-white truncate">{c.title}</h4>
+                                                <p className="text-white/50 text-xs mt-2">
+                                                    {formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}
+                                                </p>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

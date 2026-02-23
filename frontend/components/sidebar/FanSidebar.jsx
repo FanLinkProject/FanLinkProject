@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
+import { signout } from "@/lib/authApi";
+import WithdrawConfirmModal from "@/components/common/WithdrawConfirmModal";
 
 import { BASE_URL } from "@/lib/api";
 
@@ -17,10 +19,10 @@ function getAuthHeaders() {
 
 export default function FanSidebar({ hideDm = false }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [followingArtists, setFollowingArtists] = useState([]);
   const [dmRooms, setDmRooms] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   useEffect(() => {
     setIsLoggedIn(!!getAuthHeaders().Authorization);
@@ -54,6 +56,15 @@ export default function FanSidebar({ hideDm = false }) {
     `https://picsum.photos/seed/${room?.roomId || room?.hostName || "dm"}/100/100`;
 
   const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      window.location.href = "/home";
+    }
+  };
+
+  const handleWithdrawConfirm = async (password) => {
+    await signout(password);
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
@@ -154,7 +165,7 @@ export default function FanSidebar({ hideDm = false }) {
         </section>
       </div>
       {isLoggedIn && (
-        <div className="mt-4 pt-3 border-t border-white/[0.06]">
+        <div className="mt-4 pt-3 border-t border-white/[0.06] space-y-1">
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleLogout(); }}
@@ -163,8 +174,21 @@ export default function FanSidebar({ hideDm = false }) {
             <span className="material-symbols-outlined text-sm">logout</span>
             <span className="font-medium">로그아웃</span>
           </button>
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowWithdrawModal(true); }}
+            className="w-full text-left text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-xl flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">person_remove</span>
+            <span className="font-medium">회원탈퇴</span>
+          </button>
         </div>
       )}
+      <WithdrawConfirmModal
+        isOpen={showWithdrawModal}
+        onClose={() => setShowWithdrawModal(false)}
+        onConfirm={handleWithdrawConfirm}
+      />
     </aside>
   );
 }
