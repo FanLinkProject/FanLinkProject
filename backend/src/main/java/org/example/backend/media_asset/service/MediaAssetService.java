@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
+import org.example.backend.user.service.ArtistPermissionService;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -241,7 +242,8 @@ public class MediaAssetService {
 
     /**
      * 아티스트 프로필 이미지용 MediaAsset의 공개 CDN URL을 반환한다.
-     * 소유자가 해당 아티스트 페이지를 관리할 수 있는 경우에만 허용.
+     * 업로드 소유자(owner)가 해당 아티스트 페이지의 본인(artistId와 동일한 user)인 경우에만 허용.
+     * 그룹 멤버가 그룹 프로필 이미지를 올리는 것은 허용하지 않음.
      */
     @Transactional(readOnly = true)
     public String getPublicUrlForArtistProfileImage(Long mediaAssetId, Long artistId) {
@@ -254,10 +256,9 @@ public class MediaAssetService {
             throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 프로필 이미지만 사용할 수 있습니다.");
         }
         Long ownerUserId = mediaAsset.getOwnerUserId();
-        User owner = userRepository.findById(ownerUserId).orElse(null);
-        UserRole ownerRole = owner != null ? owner.getRole() : null;
-        if (!artistPermissionService.canManagePage(artistId, ownerUserId, ownerRole, true)) {
-            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
+        if (!java.util.Objects.equals(ownerUserId, artistId)) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED,
+                    "프로필 이미지는 해당 아티스트 본인만 설정할 수 있습니다.");
         }
         return buildCdnUrl(mediaAsset.getObjectKey());
     }
@@ -282,6 +283,9 @@ public class MediaAssetService {
     // presign 요청의 owner/userRole이 로그인 사용자와 일치하는지 확인한다.
     // HEAD 결과가 정책/요청값과 일치하는지 검사하고 거부 사유를 리턴한다.
     private MediaAssetRejectedReason validateHead(MediaAsset mediaAsset, String actualContentType, long actualSizeBytes) {
+        if (actualSizeBytes <= 0) {
+            return MediaAssetRejectedReason.SIZE_EXCEEDED;
+        }
         if (!mediaPolicyValidator.isContentTypeAllowed(mediaAsset.getCategory(), actualContentType)) {
             return MediaAssetRejectedReason.CONTENT_TYPE_MISMATCH;
         }

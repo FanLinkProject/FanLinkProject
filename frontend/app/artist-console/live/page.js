@@ -10,7 +10,7 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 import { apiGet, getToken, normalizeToken, WS_CHAT_URL } from "@/lib/api";
-import { getCandidates, publish, ReplayAccessType } from "@/lib/replayApi";
+import { getCandidates, publish, createManualReplay, publishManualReplay, getReplay, ReplayAccessType } from "@/lib/replayApi";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
@@ -159,6 +159,22 @@ export default function ArtistLivePage() {
     const [publishedReplay, setPublishedReplay] = useState(null);
     const [publishError, setPublishError] = useState(null);
 
+    // --- 다시보기 수동 업로드 (라이브 녹화 없이 직접 영상 업로드) ---
+    const [manualStep, setManualStep] = useState("idle"); // idle | created | uploading | processing | ready | published
+    const [manualReplay, setManualReplay] = useState(null);
+    const [manualAccessType, setManualAccessType] = useState(ReplayAccessType.FREE);
+    const [manualError, setManualError] = useState("");
+    const [manualPublishing, setManualPublishing] = useState(false);
+    const manualVideoPresignItem = manualReplay?.replayId
+        ? {
+            category: MediaAssetCategory.REPLAY_VIDEO,
+            scope: MediaAssetScope.RESTRICTED,
+            artistId: artistId ?? undefined,
+            replayIdOrTemp: String(manualReplay.replayId),
+        }
+        : null;
+    const { upload: uploadManualVideo } = useMediaUpload(manualVideoPresignItem ?? { category: MediaAssetCategory.REPLAY_VIDEO, scope: MediaAssetScope.RESTRICTED, artistId: artistId ?? undefined, replayIdOrTemp: "tmp_manual" });
+
     useEffect(() => {
         const numericArtistId = artistId != null ? Number(artistId) : NaN;
         if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
@@ -217,6 +233,86 @@ export default function ArtistLivePage() {
         } finally {
             setPublishing(false);
         }
+    };
+
+    // 수동 업로드: 슬롯 생성
+    const handleCreateManualSlot = async (e) => {
+        e.preventDefault();
+        const numericArtistId = artistId != null ? Number(artistId) : NaN;
+        if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
+            setManualError("artistId를 확인해 주세요.");
+            return;
+        }
+        setManualError("");
+        try {
+            const res = await createManualReplay({ artistId: numericArtistId, accessType: manualAccessType });
+            setManualReplay({
+                replayId: res.replayId,
+                artistId: res.artistId,
+                accessType: res.accessType,
+                status: res.status,
+                createdAt: res.createdAt,
+            });
+            setManualStep("created");
+        } catch (e) {
+            setManualError(e?.data?.message || e?.message || "슬롯 생성 실패");
+        }
+    };
+
+    // 수동 업로드: 영상 파일 업로드 후 변환 대기
+    const handleManualVideoUpload = async (e) => {
+        const file = e?.target?.files?.[0];
+        if (!file || !manualReplay?.replayId || !uploadManualVideo) return;
+        setManualStep("uploading");
+        setManualError("");
+        try {
+            await uploadManualVideo(file);
+            setManualStep("processing");
+        } catch (err) {
+            setManualError(err?.message || "업로드 실패");
+            setManualStep("created");
+        }
+        e.target.value = "";
+    };
+
+    // 수동 업로드: READY 상태 폴링
+    useEffect(() => {
+        if (manualStep !== "processing" || !manualReplay?.replayId) return;
+        const interval = setInterval(async () => {
+            try {
+                const r = await getReplay(manualReplay.replayId);
+                const status = r?.status;
+                if (status === "READY") {
+                    setManualReplay((prev) => (prev ? { ...prev, status: "READY" } : null));
+                    setManualStep("ready");
+                } else if (status === "REJECTED") {
+                    setManualError("변환 실패");
+                    setManualStep("created");
+                }
+            } catch (_) {}
+        }, 4000);
+        return () => clearInterval(interval);
+    }, [manualStep, manualReplay?.replayId]);
+
+    // 수동 업로드: 발행
+    const handlePublishManual = async () => {
+        if (!manualReplay?.replayId) return;
+        setManualPublishing(true);
+        setManualError("");
+        try {
+            await publishManualReplay(manualReplay.replayId);
+            setManualStep("published");
+        } catch (e) {
+            setManualError(e?.data?.message || e?.message || "발행 실패");
+        } finally {
+            setManualPublishing(false);
+        }
+    };
+
+    const resetManualFlow = () => {
+        setManualStep("idle");
+        setManualReplay(null);
+        setManualError("");
     };
 
     return (
@@ -526,6 +622,73 @@ export default function ArtistLivePage() {
                         {publishing ? "발행 중..." : "발행"}
                     </Button>
                 </form>
+            </Surface>
+
+            {/* 다시보기 수동 업로드: 라이브 녹화 없이 직접 영상 업로드 (직접 녹화본·행사/TV 영상 등) */}
+            <Surface variant="primary" className="p-6">
+                <SectionTitle className="text-lg font-bold mb-2">
+                    다시보기 수동 업로드
+                </SectionTitle>
+                <p className="text-sm text-white/55 mb-4">
+                    라이브 녹화가 없을 때 사용합니다. 직접 녹화한 영상이나 행사·TV 출연 영상을 올려 다시보기로 발행할 수 있습니다.
+                </p>
+                {manualError && (
+                    <p className="text-red-400 text-sm mb-3">{manualError}</p>
+                )}
+
+                {manualStep === "idle" && (
+                    <form onSubmit={handleCreateManualSlot} className="space-y-3 max-w-md">
+                        <label className="block">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55">접근 타입</span>
+                            <select
+                                value={manualAccessType}
+                                onChange={(e) => setManualAccessType(e.target.value)}
+                                className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
+                            >
+                                <option value={ReplayAccessType.FREE}>FREE</option>
+                                <option value={ReplayAccessType.PAID}>PAID</option>
+                            </select>
+                        </label>
+                        <Button type="submit" variant="primary">슬롯 생성 후 영상 업로드</Button>
+                    </form>
+                )}
+
+                {manualStep === "created" && manualReplay && (
+                    <div className="space-y-3 max-w-md">
+                        <p className="text-white/70 text-sm">replayId {manualReplay.replayId}. 영상 파일을 선택해 업로드하세요.</p>
+                        <input
+                            type="file"
+                            accept="video/*"
+                            className="block w-full text-sm text-white/70 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-violet-500/80 file:text-white"
+                            onChange={handleManualVideoUpload}
+                            disabled={manualStep === "uploading"}
+                        />
+                        {manualStep === "uploading" && <p className="text-white/55 text-sm">업로드 중...</p>}
+                        <Button type="button" variant="ghost" className="text-xs" onClick={resetManualFlow}>취소</Button>
+                    </div>
+                )}
+
+                {manualStep === "processing" && (
+                    <p className="text-white/70 text-sm">영상 변환 중입니다. 잠시만 기다려 주세요.</p>
+                )}
+
+                {manualStep === "ready" && manualReplay && (
+                    <div className="space-y-3">
+                        <p className="text-green-400 text-sm">변환 완료. 발행하면 팬 페이지에 노출됩니다.</p>
+                        <Button type="button" variant="primary" onClick={handlePublishManual} disabled={manualPublishing}>
+                            {manualPublishing ? "발행 중..." : "발행"}
+                        </Button>
+                        <Button type="button" variant="ghost" className="ml-2 text-xs" onClick={resetManualFlow}>취소</Button>
+                    </div>
+                )}
+
+                {manualStep === "published" && manualReplay && (
+                    <div className="space-y-2">
+                        <p className="text-green-400 text-sm">발행되었습니다.</p>
+                        <Link href={`/replay/${manualReplay.replayId}`} className="text-violet-300 underline text-sm">시청하기</Link>
+                        <Button type="button" variant="ghost" className="block text-xs mt-2" onClick={resetManualFlow}>새로 올리기</Button>
+                    </div>
+                )}
             </Surface>
         </div>
     );

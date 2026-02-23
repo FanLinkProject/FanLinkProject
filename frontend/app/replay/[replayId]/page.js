@@ -4,6 +4,31 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { getReplay, access } from "@/lib/replayApi";
 
+function useHls(videoRef, playbackUrl) {
+  useEffect(() => {
+    if (!playbackUrl || !videoRef?.current) return;
+    const isHls = playbackUrl.includes(".m3u8");
+    if (!isHls) return;
+    let hls = null;
+    const loadHls = async () => {
+      try {
+        const Hls = (await import("hls.js")).default;
+        if (Hls.isSupported()) {
+          hls = new Hls({ enableWorker: true });
+          hls.loadSource(playbackUrl);
+          hls.attachMedia(videoRef.current);
+        } else if (videoRef.current?.canPlayType?.("application/vnd.apple.mpegurl")) {
+          videoRef.current.src = playbackUrl;
+        }
+      } catch {
+        videoRef.current.src = playbackUrl;
+      }
+    };
+    loadHls();
+    return () => { if (hls) hls.destroy(); };
+  }, [playbackUrl, videoRef]);
+}
+
 export default function ReplayWatchPage({ params }) {
   const resolvedParams = typeof params?.then === "function" ? null : params;
   const replayId = resolvedParams?.replayId
@@ -43,7 +68,7 @@ export default function ReplayWatchPage({ params }) {
           result?.playbackUrl ??
           result?.response?.playbackUrl ??
           replay.playbackUrl;
-        setPlaybackUrl(url);
+        setPlaybackUrl(url || null);
       })
       .catch((e) => {
         setError(
@@ -54,6 +79,10 @@ export default function ReplayWatchPage({ params }) {
       })
       .finally(() => setLoading(false));
   }, [replay, replayId, playbackUrl]);
+
+  useHls(videoRef, playbackUrl);
+  const isHls = playbackUrl?.includes(".m3u8");
+  const videoSrc = !isHls ? playbackUrl : undefined;
 
   if (loading && !replay) {
     return (
@@ -78,10 +107,15 @@ export default function ReplayWatchPage({ params }) {
     <div className="min-h-screen bg-black flex flex-col">
       <div className="flex-1 flex flex-col items-center p-4">
         <div className="w-full max-w-4xl">
+          {replay?.thumbnailUrl && !playbackUrl && (
+            <div className="w-full aspect-video rounded-lg overflow-hidden bg-black/40">
+              <img src={replay.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
           {playbackUrl && (
             <video
               ref={videoRef}
-              src={playbackUrl}
+              src={videoSrc}
               controls
               className="w-full aspect-video bg-black rounded-lg"
               crossOrigin="use-credentials"

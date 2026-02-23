@@ -22,7 +22,7 @@ import java.time.Instant;
 @Entity
 @Table(
         name = "replays",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"live_session_id"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"live_session_id"}, name = "replays_live_session_id_unique")
 )
 @EntityListeners(AuditingEntityListener.class)
 @Getter
@@ -36,7 +36,8 @@ public class Replay {
     @Column(name = "artist_id", nullable = false)
     private Long artistId;
 
-    @Column(name = "live_session_id", nullable = false)
+    /** 라이브 세션 ID. 수동 업로드 시 null. */
+    @Column(name = "live_session_id")
     private Long liveSessionId;
 
     @Enumerated(EnumType.STRING)
@@ -47,10 +48,10 @@ public class Replay {
     @Column(name = "status", nullable = false, length = 20)
     private ReplayStatus status;
 
-    @Column(name = "recording_s3_bucket", nullable = false, length = 255)
+    @Column(name = "recording_s3_bucket", length = 255)
     private String recordingS3Bucket;
 
-    @Column(name = "recording_s3_prefix", nullable = false, length = 512)
+    @Column(name = "recording_s3_prefix", length = 512)
     private String recordingS3Prefix;
 
     @Column(name = "hls_master_manifest_key", length = 512)
@@ -130,5 +131,11 @@ public class Replay {
     // 거부 사유를 갱신한다.
     public void updateRejectReason(String rejectReason) {
         this.rejectReason = rejectReason;
+    }
+
+    /** 수동 업로드 발행: 상태를 PUBLISHED로 하고 발행 시각을 기록한다. */
+    public void markPublished(Instant at) {
+        this.status = ReplayStatus.PUBLISHED;
+        this.publishedAt = at;
     }
 }

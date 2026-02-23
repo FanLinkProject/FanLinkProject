@@ -850,7 +850,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                 ) : vodList.length > 0 ? (
                                     <div className="grid grid-cols-2 gap-6">
                                         {vodList.map((vod) => (
-                                            <Link key={vod.replayId} href={`/live/${vod.replayId}`} className="group">
+                                            <Link key={vod.replayId} href={`/replay/${vod.replayId}`} className="group">
                                                 <div className="aspect-video rounded-2xl overflow-hidden relative mb-3">
                                                     <img src={vod.thumbnailUrl || "https://picsum.photos/seed/vod/800/450"} className="w-full h-full object-cover" alt="" />
                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">

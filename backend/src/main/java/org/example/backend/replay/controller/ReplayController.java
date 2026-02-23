@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
 import org.example.backend.replay.dto.ReplayAccessResult;
 import org.example.backend.replay.dto.ReplayCandidateResponse;
+import org.example.backend.replay.dto.ReplayCreateManualRequest;
+import org.example.backend.replay.dto.ReplayCreateManualResponse;
 import org.example.backend.replay.dto.ReplayPublishRequest;
 import org.example.backend.replay.dto.ReplayPublishResponse;
 import org.example.backend.replay.dto.ReplayResponse;
@@ -47,6 +49,28 @@ public class ReplayController {
     ) {
         Long userId = principalDetails != null ? principalDetails.getUserId() : null;
         return ResponseEntity.ok(replayQueryService.listCandidates(artistId, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null));
+    }
+
+    /** 다시보기 수동 업로드 슬롯 생성. 반환된 replayId로 영상 presign 업로드 후 complete. */
+    @PostMapping("/manual")
+    public ResponseEntity<ReplayCreateManualResponse> createManual(
+            @Valid @RequestBody ReplayCreateManualRequest request,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        return ResponseEntity.ok(replayCommandService.createManualReplay(request, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null));
+    }
+
+    /** 수동 업로드 Replay 발행. 상태가 READY일 때만 가능. */
+    @PostMapping("/{replayId}/publish-manual")
+    public ResponseEntity<ReplayPublishResponse> publishManual(
+            @PathVariable Long replayId,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        return ResponseEntity.ok(replayCommandService.publishManualReplay(replayId, userId,
                 principalDetails != null ? principalDetails.getUser().getRole() : null));
     }
 

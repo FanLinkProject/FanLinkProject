@@ -33,7 +33,12 @@ public class ReplayQueryService {
     private final PlaybackUrlCalculator playbackUrlCalculator;
     private final AwsProperties awsProperties;
 
-    // 아티스트별 발행된 Replay 목록을 조회한다. (공개용)
+    /**
+     * 아티스트별 이미 발행된 Replay(VOD) 목록을 조회한다. (공개용)
+     * - 용도: 팬이 아티스트 페이지에서 보는 "다시보기 목록"
+     * - 인증 불필요 (permitAll)
+     * - 데이터 소스: replays 테이블 (status = PUBLISHED)
+     */
     public List<ReplayResponse> listByArtist(Long artistId) {
         List<Replay> replays = replayRepository.findAllByArtistIdOrderByCreatedAtDesc(artistId);
         return replays.stream()
@@ -42,7 +47,12 @@ public class ReplayQueryService {
                 .toList();
     }
 
-    // Replay 후보 목록을 조회한다. 방송 주체(session.artistId)만 발행 가능하므로 본인 채널 세션만 반환.
+    /**
+     * "지금 발행할 수 있는" 라이브 세션 후보 목록을 조회한다. (아티스트 콘솔 전용)
+     * - 용도: 아티스트가 다시보기 발행 시 선택하는 "발행 가능한 라이브" 목록
+     * - 인증 필요 (canManagePage 검사)
+     * - 데이터 소스: LiveSession 서비스 (RECORDED/READY 이면서 아직 Replay로 발행되지 않은 세션)
+     */
     public List<ReplayCandidateResponse> listCandidates(Long artistId, Long userId, UserRole role) {
         if (!artistPermissionService.canManagePage(artistId, userId, role, true)) {
             throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);

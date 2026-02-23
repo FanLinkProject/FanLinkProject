@@ -18,7 +18,8 @@ public class MediaPolicyValidator {
     private static final Set<String> IMAGE_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/png",
-            "image/webp"
+            "image/webp",
+            "image/gif"
     );
 
     private static final Set<String> VIDEO_CONTENT_TYPES = Set.of(
