@@ -10,7 +10,12 @@ import org.example.backend.global.security.details.PrincipalDetails;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -21,10 +26,6 @@ public class DeliveryController {
 
     private final DeliveryService deliveryService;
 
-    /**
-     * 배송 조회 API
-     * GET /api/deliveries/{deliveryId}
-     */
     @GetMapping("/{deliveryId}")
     public ResponseEntity<DeliveryResponseDto> getDeliveryInfo(
             @PathVariable Long deliveryId,
@@ -50,18 +51,24 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * [관리자용] 운송장 번호 등록 및 배송 시작 API
-     * POST /api/deliveries/{deliveryId}/start?courier=cj&number=1234
-     */
     @PostMapping("/{deliveryId}/start")
     @PreAuthorize("hasAnyRole('ADMIN','ARTIST','GROUP')")
     public ResponseEntity<DeliveryResponseDto> startShipping(
-             @PathVariable Long deliveryId,
-             @RequestParam String courier,  // 예: cj, post
-            @RequestParam String number    // 예: 123456789
+            @PathVariable Long deliveryId,
+            @RequestParam String courier,
+            @RequestParam String number,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
     ) {
-        DeliveryResponseDto response = deliveryService.startShipping(deliveryId, courier, number);
+        if (principalDetails == null) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+        DeliveryResponseDto response = deliveryService.startShipping(
+                deliveryId,
+                courier,
+                number,
+                principalDetails.getUserId(),
+                principalDetails.getUser().getRole()
+        );
         return ResponseEntity.ok(response);
     }
 }

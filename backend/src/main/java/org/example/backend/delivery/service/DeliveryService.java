@@ -15,13 +15,21 @@ import org.example.backend.global.integration.DeliveryTracker;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.notification.service.NotificationService;
+import org.example.backend.order.entity.Order;
+import org.example.backend.order.entity.OrderItem;
+import org.example.backend.product.entity.Product;
+import org.example.backend.user.enums.UserRole;
+import org.example.backend.user.service.ArtistPermissionService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -34,33 +42,36 @@ public class DeliveryService {
     private final DeliveryStatusHistoryRepository deliveryStatusHistoryRepository;
     private final NotificationService notificationService;
     private final DeliveryMetricsRecorder deliveryMetricsRecorder;
+    private final ArtistPermissionService artistPermissionService;
 
-    /**
-     * [관리자] 배송 시작 (송장 번호 입력)
-     */
     @Transactional
-    public DeliveryResponseDto startShipping(Long deliveryId, String courierCode, String trackingNumber) {
+    public DeliveryResponseDto startShipping(
+            Long deliveryId,
+            String courierCode,
+            String trackingNumber,
+            Long operatorUserId,
+            UserRole operatorRole
+    ) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
-        validateStartShippingInput(courierCode, trackingNumber);
-        assertTrackingUnique(deliveryId, courierCode, trackingNumber);
+        authorizeStartShipping(delivery, operatorUserId, operatorRole);
+
+        String normalizedCourierCode = normalizeRequired(courierCode);
+        String normalizedTrackingNumber = normalizeRequired(trackingNumber);
+        assertTrackingUnique(deliveryId, normalizedCourierCode, normalizedTrackingNumber);
 
         DeliveryStatus before = delivery.getStatus();
-        delivery.startShipping(courierCode, trackingNumber);
-
-        // 상태 이력 기록
-        recordStatusChange(delivery, before, delivery.getStatus(), "START_SHIPPING");
+        try {
+            delivery.startShipping(normalizedCourierCode, normalizedTrackingNumber);
+            recordStatusChange(delivery, before, delivery.getStatus(), "START_SHIPPING");
+            deliveryRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new DeliveryException(DeliveryErrorCode.DUPLICATE_TRACKING_INFO);
+        }
 
         return DeliveryResponseDto.from(delivery, "Ready");
     }
 
-    /**
-     * [사용자] 배송 추적 조회
-     * 
-     * 트래커 선택 우선순위:
-     * 1. FakeDeliveryTracker (개발 모드 + courierCode = "TEST")
-     * 2. 국가별 트래커 (국내 = SweetTracker, 해외 = AfterShip)
-     */
     @Transactional
     public DeliveryResponseDto trackDelivery(Long deliveryId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
@@ -69,14 +80,13 @@ public class DeliveryService {
         String currentStatus = "Unknown";
 
         if (delivery.getTrackingNumber() == null || delivery.getCourierCode() == null) {
-            log.warn("배송 추적 정보가 없습니다. deliveryId={}", deliveryId);
+            log.warn("Delivery tracking info is missing. deliveryId={}", deliveryId);
             return DeliveryResponseDto.from(delivery, "READY");
         }
 
         DeliveryTracker tracker = deliveryTrackerResolver.resolve(delivery.getCountry(), delivery.getCourierCode());
-        
         if (tracker == null) {
-            log.warn("지원하지 않는 배송 추적 조합입니다. countryCode={}, courierCode={}, deliveryId={}",
+            log.warn("Unsupported delivery tracker route. countryCode={}, courierCode={}, deliveryId={}",
                     delivery.getCountry(), delivery.getCourierCode(), deliveryId);
             throw new DeliveryException(DeliveryErrorCode.UNSUPPORTED_COURIER_CODE);
         }
@@ -90,15 +100,12 @@ public class DeliveryService {
                     Duration.between(start, Instant.now())
             );
 
-            // 외부 상태를 내부 DeliveryStatus 로 매핑
             DeliveryStatus mappedStatus = DeliveryStatus.mapAfterShipStatus(currentStatus);
             DeliveryStatus before = delivery.getStatus();
 
             if (mappedStatus != null && before != mappedStatus) {
                 delivery.updateStatus(mappedStatus);
                 recordStatusChange(delivery, before, mappedStatus, "TRACKING_POLLING");
-
-                // 배송 이슈 발생 시 알림 발송
                 if (mappedStatus == DeliveryStatus.ISSUE) {
                     notifyDeliveryIssue(delivery, currentStatus);
                 }
@@ -109,9 +116,11 @@ public class DeliveryService {
                     "error",
                     Duration.between(start, Instant.now())
             );
-            deliveryMetricsRecorder.incrementTrackingApiFailed(tracker.getClass().getSimpleName(), e.getClass().getSimpleName());
-            log.error("배송 추적 조회 중 오류 발생. deliveryId={}, courierCode={}", 
-                    deliveryId, delivery.getCourierCode(), e);
+            deliveryMetricsRecorder.incrementTrackingApiFailed(
+                    tracker.getClass().getSimpleName(),
+                    e.getClass().getSimpleName()
+            );
+            log.error("Delivery tracking failed. deliveryId={}, courierCode={}", deliveryId, delivery.getCourierCode(), e);
             currentStatus = "ERROR";
         }
 
@@ -139,11 +148,12 @@ public class DeliveryService {
     public void handleAfterShipWebhook(String trackingNumber, String courierCode, String externalStatus) {
         deliveryMetricsRecorder.incrementWebhookReceived("aftership");
         try {
-            if (trackingNumber == null || trackingNumber.isBlank()) {
+            String normalizedTrackingNumber = normalizeNullable(trackingNumber);
+            if (normalizedTrackingNumber == null) {
                 throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
             }
 
-            Delivery delivery = resolveWebhookTargetDelivery(trackingNumber, courierCode)
+            Delivery delivery = resolveWebhookTargetDelivery(normalizedTrackingNumber, courierCode)
                     .orElseThrow(() -> new DeliveryException(DeliveryErrorCode.DELIVERY_NOT_FOUND));
 
             DeliveryStatus mapped = DeliveryStatus.mapAfterShipStatus(externalStatus);
@@ -162,6 +172,59 @@ public class DeliveryService {
         }
     }
 
+    private void authorizeStartShipping(Delivery delivery, Long operatorUserId, UserRole operatorRole) {
+        if (operatorUserId == null || operatorRole == null) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+        if (operatorRole == UserRole.ADMIN) {
+            return;
+        }
+        if (operatorRole != UserRole.ARTIST && operatorRole != UserRole.GROUP) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+
+        Order order = delivery.getOrder();
+        if (order == null || order.getOrderItems() == null || order.getOrderItems().isEmpty()) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+
+        Set<Long> shippableArtistIds = new HashSet<>();
+        for (OrderItem item : order.getOrderItems()) {
+            if (item == null) {
+                continue;
+            }
+            Product product = item.getProduct();
+            if (product == null) {
+                continue;
+            }
+            if (product.getArtistId() == null) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(product.getIsMembership())) {
+                continue;
+            }
+            if (product.getConcertId() != null) {
+                continue;
+            }
+            shippableArtistIds.add(product.getArtistId());
+        }
+
+        if (shippableArtistIds.isEmpty()) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+
+        boolean canManageAll = shippableArtistIds.stream()
+                .allMatch(artistId -> artistPermissionService.canManagePage(
+                        artistId,
+                        operatorUserId,
+                        operatorRole,
+                        true
+                ));
+        if (!canManageAll) {
+            throw new DeliveryException(DeliveryErrorCode.DELIVERY_ACCESS_DENIED);
+        }
+    }
+
     private void recordStatusChange(Delivery delivery, DeliveryStatus from, DeliveryStatus to, String reason) {
         if (from == null || from == to) {
             return;
@@ -172,21 +235,16 @@ public class DeliveryService {
     }
 
     private Optional<Delivery> resolveWebhookTargetDelivery(String trackingNumber, String courierCode) {
-        if (courierCode != null && !courierCode.isBlank()) {
-            Optional<Delivery> byTrackingAndCourier =
-                    deliveryRepository.findByTrackingNumberAndCourierCode(trackingNumber, courierCode);
-            if (byTrackingAndCourier.isPresent()) {
-                return byTrackingAndCourier;
-            }
+        String normalizedCourierCode = normalizeNullable(courierCode);
+        if (normalizedCourierCode != null) {
+            return deliveryRepository.findByTrackingNumberAndCourierCode(trackingNumber, normalizedCourierCode);
         }
-        return deliveryRepository.findByTrackingNumber(trackingNumber);
-    }
 
-    private void validateStartShippingInput(String courierCode, String trackingNumber) {
-        if (courierCode == null || courierCode.isBlank()
-                || trackingNumber == null || trackingNumber.isBlank()) {
-            throw new DeliveryException(DeliveryErrorCode.INVALID_TRACKING_NUMBER);
+        List<Delivery> byTrackingNumber = deliveryRepository.findAllByTrackingNumber(trackingNumber);
+        if (byTrackingNumber.size() > 1) {
+            throw new DeliveryException(DeliveryErrorCode.INVALID_WEBHOOK_PAYLOAD);
         }
+        return byTrackingNumber.stream().findFirst();
     }
 
     private void assertTrackingUnique(Long deliveryId, String courierCode, String trackingNumber) {
@@ -196,6 +254,22 @@ public class DeliveryService {
                         throw new DeliveryException(DeliveryErrorCode.DUPLICATE_TRACKING_INFO);
                     }
                 });
+    }
+
+    private String normalizeRequired(String value) {
+        String normalized = normalizeNullable(value);
+        if (normalized == null) {
+            throw new DeliveryException(DeliveryErrorCode.INVALID_TRACKING_NUMBER);
+        }
+        return normalized;
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private void notifyDeliveryIssue(Delivery delivery, String trackingStatus) {
@@ -208,14 +282,14 @@ public class DeliveryService {
         }
 
         String content = String.format(
-                "주문 '%s' 의 배송에 이슈가 발생했습니다. 현재 상태: %s",
+                "Order '%s' has a delivery issue. Current status: %s",
                 delivery.getOrder().getName(),
                 trackingStatus
         );
 
         NotificationSendRequest request = NotificationSendRequest.builder()
                 .receiverId(receiverId)
-                .senderId(receiverId) // 별도 시스템 유저가 없어서 수신자 기준으로 설정
+                .senderId(receiverId)
                 .type(NotificationType.DELIVERY_ISSUE)
                 .content(content)
                 .build();

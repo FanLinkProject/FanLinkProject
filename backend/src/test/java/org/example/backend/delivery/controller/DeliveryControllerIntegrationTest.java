@@ -32,6 +32,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -91,7 +93,7 @@ class DeliveryControllerIntegrationTest {
                         .with(authentication(authenticationFor(10L, UserRole.USER))))
                 .andExpect(status().isForbidden());
 
-        verify(deliveryService, never()).startShipping(eq(1L), anyString(), anyString());
+        verify(deliveryService, never()).startShipping(eq(1L), anyString(), anyString(), anyLong(), any(UserRole.class));
     }
 
     @Test
@@ -99,7 +101,7 @@ class DeliveryControllerIntegrationTest {
     void startShipping_allowedForAdminRole() throws Exception {
         DeliveryResponseDto response = new DeliveryResponseDto(
                 1L, "홍길동", "서울시", "101동", "04", "123456", "배송 중", "Ready");
-        when(deliveryService.startShipping(1L, "04", "123456")).thenReturn(response);
+        when(deliveryService.startShipping(1L, "04", "123456", 1L, UserRole.ADMIN)).thenReturn(response);
 
         mockMvc.perform(post("/api/deliveries/1/start")
                         .param("courier", "04")
@@ -108,7 +110,7 @@ class DeliveryControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.trackingNumber").value("123456"));
 
-        verify(deliveryService).startShipping(1L, "04", "123456");
+        verify(deliveryService).startShipping(1L, "04", "123456", 1L, UserRole.ADMIN);
     }
 
     @Test
