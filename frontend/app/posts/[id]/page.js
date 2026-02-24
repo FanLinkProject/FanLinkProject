@@ -83,6 +83,17 @@ function AttachmentCarousel({ attachments }) {
     el.scrollTo({ left: el.clientWidth * idx, behavior: "smooth" });
   }, []);
 
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.querySelectorAll("video").forEach((video, idx) => {
+      if (idx !== currentIdx) {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [currentIdx]);
+
   if (count === 1) {
     const att = attachments[0];
     const isVideo = att.contentType?.startsWith("video/") || att.category === "POST_VIDEO";

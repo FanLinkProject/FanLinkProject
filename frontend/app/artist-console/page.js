@@ -63,14 +63,14 @@ function formatTimestamp(instant) {
     }
 }
 
-function transformArtistPost(p, groupAvatar = "") {
+function transformArtistPost(p) {
     const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
         writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
-        authorAvatar: p.writerProfileImageUrl || groupAvatar,
+        authorAvatar: p.writerProfileImageUrl || getDefaultAvatarUrl(p.writerNickname || "?"),
         content: p.content || "",
         image: attachments[0]?.url || null,
         attachmentCount: attachments.length,
@@ -446,8 +446,7 @@ export default function ArtistConsolePage() {
                 const raw = Array.isArray(data)
                     ? data
                     : (data?.content ?? data?.posts ?? []);
-                const groupAvatar = myProfile?.profileImageUrl || "";
-                const transformed = raw.map((p) => transformArtistPost(p, groupAvatar));
+                const transformed = raw.map((p) => transformArtistPost(p));
                 setArtistPosts(transformed);
                 setArtistPostsHasNext(raw.length === POSTS_LIMIT);
                 if (transformed.length > 0)
@@ -493,8 +492,7 @@ export default function ArtistConsolePage() {
             const raw = Array.isArray(data)
                 ? data
                 : (data?.content ?? data?.posts ?? []);
-            const groupAvatar = myProfile?.profileImageUrl || "";
-            const newPosts = raw.map((p) => transformArtistPost(p, groupAvatar));
+            const newPosts = raw.map((p) => transformArtistPost(p));
             setArtistPosts((prev) => [...prev, ...newPosts]);
             setArtistPostsHasNext(raw.length === POSTS_LIMIT);
             if (newPosts.length > 0)
@@ -583,8 +581,7 @@ export default function ArtistConsolePage() {
                     representativeMediaAssetId: newPostRepresentativeId,
                 },
             });
-            const groupAvatar = myProfile?.profileImageUrl || "";
-            const newPost = transformArtistPost(created, groupAvatar);
+            const newPost = transformArtistPost(created);
             setArtistPosts((prev) => [newPost, ...prev]);
             closeCreateModal();
         } catch (err) {

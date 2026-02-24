@@ -44,13 +44,13 @@ function formatTimestamp(instant) {
   }
 }
 
-function transformArtistPost(p, groupId, groupAvatar = "") {
+function transformArtistPost(p, groupId) {
   return {
     id: p.id,
     groupId,
     authorName: p.writerNickname || "",
     authorMemberName: null,
-    authorAvatar: p.writerProfileImageUrl || groupAvatar,
+    authorAvatar: p.writerProfileImageUrl || getDefaultAvatarUrl(p.writerNickname || "?"),
     content: p.content || "",
     image: p.attachments?.[0]?.url || null,
     timestamp: formatTimestamp(p.createdAt),

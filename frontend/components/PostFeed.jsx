@@ -28,7 +28,7 @@ export default function PostFeed({
 }) {
   if (!posts?.length) return null;
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${className}`}>
       {posts.map((post) => (
         <PostCard
           key={post.id}

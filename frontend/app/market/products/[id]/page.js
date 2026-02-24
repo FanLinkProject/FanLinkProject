@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getProduct, getProductsByArtist } from "@/lib/productApi";
@@ -11,12 +11,137 @@ import { request } from "@/lib/api";
 import { apiGet } from "@/lib/api";
 import { isArtistOrGroupAccount } from "@/lib/authRedirect";
 
+function getProductImages(product) {
+  return (product.attachments || []).filter(
+    (a) => a?.url && a.category === "PRODUCT_IMAGE"
+  );
+}
+
+function getDescribeImages(product) {
+  return (product.attachments || []).filter(
+    (a) => a?.url && a.category === "PRODUCT_DESCRIBE_IMAGE"
+  );
+}
+
 function getProductImageUrl(product) {
   const rep = product.attachments?.find(
     (a) => a.mediaAssetId === product.representativeMediaAssetId
   );
   if (rep?.url) return rep.url;
-  return product.attachments?.[0]?.url || null;
+  const images = getProductImages(product);
+  return images[0]?.url || product.attachments?.[0]?.url || null;
+}
+
+function ProductImageCarousel({ images }) {
+  const scrollRef = useRef(null);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const count = images.length;
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setCurrentIdx(Math.min(Math.max(idx, 0), count - 1));
+  }, [count]);
+
+  const goTo = useCallback((idx) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: el.clientWidth * idx, behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.querySelectorAll("video").forEach((video, idx) => {
+      if (idx !== currentIdx) {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [currentIdx]);
+
+  if (count === 0) {
+    return (
+      <div className="aspect-square rounded-[3rem] overflow-hidden bg-white/5 border border-white/[0.06] flex items-center justify-center text-white/30">
+        <span className="material-symbols-outlined text-8xl">image</span>
+      </div>
+    );
+  }
+
+  if (count === 1) {
+    const att = images[0];
+    const isVideo = att.contentType?.startsWith("video/");
+    return (
+      <div className="aspect-square rounded-[3rem] overflow-hidden bg-black/20 border border-white/[0.06]">
+        {isVideo ? (
+          <video src={att.url} controls preload="metadata" className="w-full h-full object-contain" />
+        ) : (
+          <img src={att.url} alt="" className="w-full h-full object-cover" />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide aspect-square rounded-[3rem] border border-white/[0.06]"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+      >
+        {images.map((att, idx) => {
+          const isVideo = att.contentType?.startsWith("video/");
+          return (
+            <div key={att.mediaAssetId || idx} className="w-full h-full shrink-0 snap-center bg-black/20">
+              {isVideo ? (
+                <video src={att.url} controls preload="metadata" className="w-full h-full object-contain" />
+              ) : (
+                <img src={att.url} alt="" className="w-full h-full object-cover" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {currentIdx > 0 && (
+        <button
+          type="button"
+          onClick={() => goTo(currentIdx - 1)}
+          className="absolute left-4 top-1/2 -translate-y-1/2 size-10 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+        >
+          <span className="material-symbols-outlined text-lg">chevron_left</span>
+        </button>
+      )}
+      {currentIdx < count - 1 && (
+        <button
+          type="button"
+          onClick={() => goTo(currentIdx + 1)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 size-10 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+        >
+          <span className="material-symbols-outlined text-lg">chevron_right</span>
+        </button>
+      )}
+
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+        {images.map((_, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => goTo(idx)}
+            className={`rounded-full transition-all ${
+              idx === currentIdx ? "w-6 h-2 bg-white" : "size-2 bg-white/40 hover:bg-white/60"
+            }`}
+          />
+        ))}
+      </div>
+
+      <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-xs font-bold">
+        {currentIdx + 1} / {count}
+      </span>
+    </div>
+  );
 }
 
 function formatPrice(product) {
@@ -214,8 +339,8 @@ export default function ProductDetailPage({ params }) {
     );
   }
 
-  const imgUrl = getProductImageUrl(product);
-  const detailImages = (product.attachments || []).filter((a) => a?.url);
+  const productImages = getProductImages(product);
+  const describeImages = getDescribeImages(product);
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-16">
@@ -228,15 +353,7 @@ export default function ProductDetailPage({ params }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 bg-[#201a33] rounded-[3.5rem] p-12 border border-white/[0.08]">
         <div>
-          <div className="aspect-square rounded-[3rem] overflow-hidden bg-white/5 border border-white/[0.06]">
-            {imgUrl ? (
-              <img src={imgUrl} className="w-full h-full object-cover" alt={product.name} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-white/30">
-                <span className="material-symbols-outlined text-8xl">image</span>
-              </div>
-            )}
-          </div>
+          <ProductImageCarousel images={productImages} />
         </div>
         <div className="flex flex-col">
           {product.artistId != null ? (
@@ -317,17 +434,29 @@ export default function ProductDetailPage({ params }) {
         </div>
       </div>
 
-      {detailImages.length > 0 && (
-        <section className="space-y-4">
+      {describeImages.length > 0 && (
+        <section className="space-y-6">
+          <h3 className="text-2xl font-black text-white px-2">상세 정보</h3>
           <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-            {detailImages.map((a) => (
-              <img
-                key={a.mediaAssetId}
-                src={a.url}
-                alt=""
-                className="w-full rounded-2xl border border-white/[0.06]"
-              />
-            ))}
+            {describeImages.map((a) => {
+              const isVideo = a.contentType?.startsWith("video/");
+              return isVideo ? (
+                <video
+                  key={a.mediaAssetId}
+                  src={a.url}
+                  controls
+                  preload="metadata"
+                  className="w-full rounded-2xl border border-white/[0.06]"
+                />
+              ) : (
+                <img
+                  key={a.mediaAssetId}
+                  src={a.url}
+                  alt=""
+                  className="w-full rounded-2xl border border-white/[0.06]"
+                />
+              );
+            })}
           </div>
         </section>
       )}
