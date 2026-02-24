@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getProducts } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
+import { isArtistOrGroupAccount } from "@/lib/authRedirect";
 
 function getProductImageUrl(product) {
   const rep = product.attachments?.find(
@@ -89,6 +90,11 @@ export default function MarketPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hideCartButton, setHideCartButton] = useState(false);
+
+  useEffect(() => {
+    setHideCartButton(isArtistOrGroupAccount());
+  }, []);
 
   useEffect(() => {
     getProducts({ market: true })
@@ -140,9 +146,11 @@ export default function MarketPage() {
 
   return (
     <div className="p-8 lg:p-12 max-w-7xl mx-auto space-y-12">
-      <div className="flex justify-end gap-3 mb-6">
-        <MarketTabButton icon="shopping_cart" label="장바구니" href="/cart" />
-      </div>
+      {!hideCartButton && (
+        <div className="flex justify-end gap-3 mb-6">
+          <MarketTabButton icon="shopping_cart" label="장바구니" href="/cart" />
+        </div>
+      )}
 
       <header className="relative h-64 rounded-2xl overflow-hidden border border-white/[0.06] shadow-[0_6px_20px_rgba(0,0,0,0.45),0_0_12px_rgba(140,90,255,0.12)] group mb-12">
         <img
