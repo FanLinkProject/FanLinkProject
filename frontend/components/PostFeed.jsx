@@ -38,9 +38,9 @@ export default function PostFeed({
           isLiked={isLikedMap[post.id]}
           onLike={onLike}
           likeCount={likeCountMap[post.id] ?? undefined}
-          commentCount={post.isNotice ? undefined : (commentCountMap[post.id] ?? undefined)}
-          onComment={post.isNotice ? undefined : onComment}
-          showCommentButton={!post.isNotice}
+          commentCount={commentCountMap[post.id] ?? undefined}
+          onComment={onComment}
+          showCommentButton={true}
           isLocked={isLockedMap[post.id] ?? false}
           isMembershipOnly={post.isMembershipOnly ?? false}
           onDelete={onDelete && canDeleteSet?.has(post.id) ? onDelete : undefined}

@@ -883,16 +883,29 @@ function PostDetailContent({ id }) {
     ? "팬 페이지로 돌아가기"
     : "아티스트 페이지로 돌아가기";
 
+  const BackButton = fromNotices ? (
+    <button
+      type="button"
+      onClick={() => router.replace("/notices")}
+      className="inline-flex items-center justify-start gap-2 text-left text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0 self-start"
+    >
+      <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+      {backLabel}
+    </button>
+  ) : (
+    <Link
+      href={backHref}
+      className="inline-flex items-center justify-start gap-2 text-left text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0 self-start"
+    >
+      <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+      {backLabel}
+    </Link>
+  );
+
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-8 flex flex-col md:flex-row gap-6 h-[calc(100vh-80px)]">
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <Link
-          href={backHref}
-          className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0"
-        >
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          {backLabel}
-        </Link>
+        {BackButton}
 
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
         <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden relative">
@@ -1003,7 +1016,7 @@ function PostDetailContent({ id }) {
         </div>
       </div>
 
-      {post != null && !post.isNotice && (
+      {post != null && (
       <aside className="w-full md:w-96 shrink-0 min-h-0">
         <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-full">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
