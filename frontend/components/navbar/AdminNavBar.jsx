@@ -66,7 +66,7 @@ export default function AdminNavBar({ showSidebarToggle, sidebarOpen, onSidebarT
               ? "text-violet-300"
               : "text-white/80 hover:text-violet-300"
           }`}>
-          System Admin
+          홈
         </Link>
       </nav>
 

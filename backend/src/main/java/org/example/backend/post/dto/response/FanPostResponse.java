@@ -3,6 +3,7 @@ package org.example.backend.post.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 import org.example.backend.post.entity.FanPost;
+import org.example.backend.user.enums.UserRole;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -17,6 +18,8 @@ public class FanPostResponse {
     private String writerProfileImageUrl;
     /** 해당 그룹(아티스트) 기준 팬의 마일스톤 칭호 */
     private String writerGradeName;
+    /** 작성자가 아티스트(ARTIST/GROUP)인지 — 신고 버튼 비활성화용 */
+    private Boolean writerIsArtist;
     private String title;
     private String content;
     private Instant createdAt;
@@ -32,12 +35,15 @@ public class FanPostResponse {
     }
 
     public static FanPostResponse from(FanPost post, List<PostMediaAssetResponse> attachments, String writerGradeName) {
+        boolean writerIsArtist = post.getUser() != null
+                && (post.getUser().getRole() == UserRole.ARTIST || post.getUser().getRole() == UserRole.GROUP);
         return FanPostResponse.builder()
                 .id(post.getId())
                 .writerId(post.getUser().getId())
                 .writerNickname(post.getUser().getNickname())
                 .writerProfileImageUrl(post.getUser().getProfileImageUrl())
                 .writerGradeName(writerGradeName)
+                .writerIsArtist(writerIsArtist)
                 .title(post.getTitle())
                 .content(post.getContent())
                 .createdAt(post.getCreatedAt())

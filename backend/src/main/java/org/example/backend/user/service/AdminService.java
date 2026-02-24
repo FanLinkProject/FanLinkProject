@@ -180,17 +180,38 @@ public class AdminService {
         return AdminPenaltyResponse.from(saved);
     }
 
-    // 신고 내역 조회
+    // 신고 내역 조회 (nickname, email, status 검색 지원)
     @Transactional(readOnly = true)
-    public Page<ReportResponse> getAllReports(Pageable pageable) {
-        Page<Report> reports = reportRepository.findAll(pageable);
+    public Page<ReportResponse> getAllReports(Pageable pageable, String nickname, String email, Boolean status) {
+        Page<Report> reports = reportRepository.findWithFilters(
+                trimToNull(nickname),
+                trimToNull(email),
+                status,
+                pageable);
         return reports.map(ReportResponse::from);
     }
 
-    // 패널티 내역 조회
+    private static String trimToNull(String value) {
+        return (value != null && !value.isBlank()) ? value.trim() : null;
+    }
+
+    /** 신고 기각: 해당 신고의 처리 상태만 true로 변경 (패널티 부여 없음) */
+    public void markReportProcessed(Long reportId) {
+        int updated = reportRepository.markStatusTrueById(reportId);
+        if (updated == 0) {
+            throw new BusinessException(UserErrorCode.REPORT_NOT_FOUND);
+        }
+    }
+
+    // 패널티 내역 조회 (닉네임/이메일 검색, created_at 최신순)
     @Transactional(readOnly = true)
-    public Page<AdminPenaltyResponse> getMyGivenPenalties(User admin, Pageable pageable) {
-        Page<Penalty> penalties = penaltyRepository.findByAdminId(admin.getId(), pageable);
+    public Page<AdminPenaltyResponse> getMyGivenPenalties(User admin, Pageable pageable,
+                                                          String nickname, String email) {
+        Page<Penalty> penalties = penaltyRepository.findWithFilters(
+                admin.getId(),
+                trimToNull(nickname),
+                trimToNull(email),
+                pageable);
         return penalties.map(AdminPenaltyResponse::from);
     }
 
