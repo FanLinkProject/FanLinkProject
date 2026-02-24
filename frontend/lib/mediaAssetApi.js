@@ -106,16 +106,29 @@ export async function uploadFile(file, presignItem) {
   }
   if (!presignResults?.[0]) throw new Error("Presign 응답이 비어 있습니다.");
   const { objectKey, uploadUrl, requiredHeaders } = presignResults[0];
-  const putHeaders = { ...(requiredHeaders || {}) };
-  if (!putHeaders["Content-Type"] && !putHeaders["content-type"]) {
+  // S3 presigned PUT: 서명에 포함된 헤더와 일치시켜야 403 방지. Content-Type은 requiredHeaders 값 우선.
+  const signedContentType =
+    (requiredHeaders && (requiredHeaders["Content-Type"] ?? requiredHeaders["content-type"])) || null;
+  const putHeaders = {};
+  if (signedContentType) {
+    putHeaders["Content-Type"] = signedContentType;
+  } else {
     putHeaders["Content-Type"] = contentType;
   }
 
-  const putRes = await fetch(uploadUrl, {
+  let putRes = await fetch(uploadUrl, {
     method: "PUT",
     headers: putHeaders,
     body: file,
   });
+  // 403 시: 백엔드가 Content-Type을 서명에 넣지 않은 경우, 헤더 없이 재시도(일부 환경에서만 필요)
+  if (putRes.status === 403 && putHeaders["Content-Type"]) {
+    putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {},
+      body: file,
+    });
+  }
   if (!putRes.ok) {
     const text = await putRes.text().catch(() => "");
     throw new Error(`S3 업로드 실패 (${putRes.status})${text ? `: ${text.slice(0, 80)}` : ""}`);

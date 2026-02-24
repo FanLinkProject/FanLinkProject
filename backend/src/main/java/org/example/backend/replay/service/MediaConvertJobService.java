@@ -13,6 +13,8 @@ import software.amazon.awssdk.services.mediaconvert.model.CreateJobResponse;
 import software.amazon.awssdk.services.mediaconvert.model.Input;
 import software.amazon.awssdk.services.mediaconvert.model.JobSettings;
 
+import org.example.backend.replay.util.PlaybackUrlCalculator;
+
 import java.util.Map;
 
 @Slf4j
@@ -41,7 +43,7 @@ public class MediaConvertJobService {
         if (inputKey == null || inputKey.isBlank()) {
             return null;
         }
-        String inputUrl = "s3://" + awsProperties.getS3().getBucketName() + "/" + trimLeadingSlash(inputKey);
+        String inputUrl = "s3://" + awsProperties.getS3().getBucketName() + "/" + PlaybackUrlCalculator.trimLeadingSlash(inputKey);
         JobSettings settings = JobSettings.builder()
                 .inputs(Input.builder().fileInput(inputUrl).build())
                 .build();
@@ -70,20 +72,6 @@ public class MediaConvertJobService {
         if (master == null || master.isBlank()) {
             return null;
         }
-        return trimTrailingSlash(prefix) + "/" + replayId + "/" + trimLeadingSlash(subpath) + "/" + master;
-    }
-
-    private String trimLeadingSlash(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.startsWith("/") ? value.substring(1) : value;
-    }
-
-    private String trimTrailingSlash(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+        return PlaybackUrlCalculator.trimTrailingSlash(prefix) + "/" + replayId + "/" + PlaybackUrlCalculator.trimLeadingSlash(subpath) + "/" + master;
     }
 }

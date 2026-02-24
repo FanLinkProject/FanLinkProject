@@ -38,31 +38,27 @@ public class PlaybackUrlCalculator {
         return "https://" + domain + "/" + trimTrailingSlash(prefix) + "/*";
     }
 
-    // 도메인 문자열을 정규화한다.
-    private String normalizeDomain(String domain) {
+    public static String normalizeDomain(String domain) {
         if (domain == null || domain.isBlank()) {
             throw new IllegalArgumentException("CloudFront 도메인이 필요합니다.");
         }
         return domain.replace("https://", "").replace("http://", "").trim();
     }
 
-    // 앞의 슬래시를 제거한다.
-    private String trimLeadingSlash(String value) {
+    public static String trimLeadingSlash(String value) {
         if (value == null) {
             return "";
         }
         return value.startsWith("/") ? value.substring(1) : value;
     }
 
-    // 뒤의 슬래시를 제거한다.
-    private String trimTrailingSlash(String value) {
+    public static String trimTrailingSlash(String value) {
         if (value == null) {
             return "";
         }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
 
-    // 키에서 prefix를 추출한다.
     private String extractPrefix(String key) {
         String normalized = trimLeadingSlash(key);
         int idx = normalized.lastIndexOf('/');
