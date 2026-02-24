@@ -41,8 +41,8 @@ public class Report {
     @Column(name = "reason_detail", nullable = false)
     private String reasonDetail;
 
-    // 신고 유형 - TODO : 유저(userId), 게시글(postId) 받아와야함
-    @Column(name = "type", nullable = false)
+    // 신고 유형 (USER: 댓글/유저 신고, POST: 게시글 신고)
+    @Column(name = "type", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private ReportType type;
 
