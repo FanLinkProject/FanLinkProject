@@ -736,20 +736,31 @@ export default function ArtistConsolePage() {
                         { id: "FAN_POSTS", label: "Fan Posts" },
                         { id: "LIVE", label: "Live History" },
                         { id: "MV", label: "MV" },
-                    ].map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                                activeTab === tab.id
-                                    ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
-                                    : "text-white/55 hover:text-white/80"
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                        { id: "MARKET", label: "마켓", href: "/market" },
+                    ].map((tab) =>
+                        tab.href ? (
+                            <Link
+                                key={tab.id}
+                                href={tab.href}
+                                className="px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-white/55 hover:text-white/80"
+                            >
+                                {tab.label}
+                            </Link>
+                        ) : (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                    activeTab === tab.id
+                                        ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
+                                        : "text-white/55 hover:text-white/80"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        )
+                    )}
                 </div>
                 {activeTab === "POSTS" && (
                     <Button
