@@ -1262,9 +1262,9 @@ function ArtistDetailPageInner({ paramsId }) {
 
             {/* 팬 포스트 작성 모달 */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-                    <Surface className="w-full max-w-xl p-8">
-                        <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
+                    <Surface className="w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 sm:p-8">
+                        <div className="flex justify-between items-center mb-6 sticky top-0 z-10">
                             <h3 className="text-xl font-bold text-white">포스트 작성</h3>
                             <button onClick={closeFanPostModal} className="text-white/50 hover:text-white">
                                 <span className="material-symbols-outlined">close</span>
