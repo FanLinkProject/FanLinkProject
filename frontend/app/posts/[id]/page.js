@@ -100,7 +100,7 @@ function AttachmentCarousel({ attachments }) {
     return (
       <div className="mt-6 rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
         {isVideo ? (
-          <video src={att.url} controls preload="metadata" className="w-full max-h-[480px] object-contain" />
+          <video src={att.url} controls preload="metadata" className="w-full max-h-[480px] object-contain cursor-pointer" />
         ) : (
           <img
             src={att.url}
@@ -129,7 +129,7 @@ function AttachmentCarousel({ attachments }) {
               className="w-full shrink-0 snap-center bg-black/20"
             >
               {isVideo ? (
-                <video src={att.url} controls preload="metadata" className="w-full h-[400px] object-contain" />
+                <video src={att.url} controls preload="metadata" className="w-full h-[400px] object-contain cursor-pointer" />
               ) : (
                 <img
                   src={att.url}
