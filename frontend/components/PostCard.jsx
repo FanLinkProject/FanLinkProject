@@ -14,6 +14,7 @@ export default function PostCard({
   onComment,
   showCommentButton = true,
   isLocked = false,
+  isMembershipOnly = false,
   onDelete,
   onEdit,
   className = "",
@@ -51,7 +52,12 @@ export default function PostCard({
   };
 
   const cardContent = (
-    <Surface variant="card" className={"overflow-hidden p-8 " + (className || "")}>
+    <Surface variant="card" className={"overflow-hidden p-8 relative " + (className || "")}>
+      {isMembershipOnly && (
+        <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-violet-500/25 text-violet-300 text-[10px] font-black uppercase tracking-widest border border-violet-400/30">
+          멤버십
+        </span>
+      )}
       {/* 작성자 헤더 — 잠금 여부 관계없이 항상 표시 */}
       <div className="flex items-center gap-4 mb-6">
         <img src={post.authorAvatar} className="size-12 rounded-full border border-white/[0.08] shrink-0" alt="" />
@@ -67,11 +73,6 @@ export default function PostCard({
           </h4>
           <p className="text-[10px] text-white/55 font-bold uppercase tracking-widest mt-1">{post.timestamp}</p>
         </div>
-        {isLocked && (
-          <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest shrink-0">
-            멤버십 전용
-          </span>
-        )}
         {onEdit && (
           <button
             type="button"
