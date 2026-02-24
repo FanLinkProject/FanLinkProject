@@ -896,8 +896,8 @@ function ArtistDetailPageInner({ paramsId }) {
                 </div>
             </div>
 
-            {/* 공지사항 섹션 (탭과 피드 사이) */}
-            {(() => {
+            {/* 공지사항 섹션 (탭과 피드 사이) - Artist 탭 활성화 시에만 표시 */}
+            {activeTab === "ARTIST" && (() => {
                 const notices = isRealGroup ? artistNotices : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE");
                 if (notices.length === 0) return null;
                 const latest = notices[0];
@@ -927,8 +927,8 @@ function ArtistDetailPageInner({ paramsId }) {
                 );
             })()}
 
-            {/* 소속 멤버 섹션 (멤버 카드는 모두 표시, DM 연결하기는 dmProductId 있을 때만) */}
-            {artist?.members && artist.members.length > 0 && (
+            {/* 소속 멤버 섹션 (멤버 카드는 모두 표시, DM 연결하기는 dmProductId 있을 때만) - Artist 탭 활성화 시에만 표시 */}
+            {activeTab === "ARTIST" && artist?.members && artist.members.length > 0 && (
                 <div className="max-w-6xl w-full mx-auto px-8 pt-8">
                     <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-4">소속 멤버</h3>
                     <div className="flex flex-wrap gap-4">
