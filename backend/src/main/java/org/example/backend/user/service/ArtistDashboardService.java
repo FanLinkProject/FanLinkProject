@@ -10,8 +10,8 @@ import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.product.repository.ProductRepository;
-import org.example.backend.subscription.entity.Subscription;
-import org.example.backend.subscription.repository.SubscriptionRepository;
+import org.example.backend.order.enums.OrderStatus;
+import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.user.dto.response.ArtistDashboardResponse;
 import org.example.backend.user.entity.GroupMember;
 import org.example.backend.user.entity.User;
@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,7 +37,7 @@ public class ArtistDashboardService {
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
     private final GroupMemberRepository groupMemberRepository;
-    private final SubscriptionRepository subscriptionRepository;
+    private final OrderRepository orderRepository;
     private final ArtistPostRepository artistPostRepository;
     private final NotificationRepository notificationRepository;
     private final ProductRepository productRepository;
@@ -88,14 +89,15 @@ public class ArtistDashboardService {
         }
 
         // 5) 멤버십 정보 (팬 유저만 대상, 아티스트/관리자는 멤버십 가입 안 함)
+        // 멤버십 상품 일회 구매(10개월 내) 시에만 멤버십 인정
         boolean canSubscribeMembership = viewer != null && viewer.getRole() == UserRole.USER;
         boolean hasActiveMembership = false;
         if (canSubscribeMembership) {
-            List<Subscription> activeSubscriptions = subscriptionRepository
-                    .findByUserIdAndIsActive(viewer.getId(), true);
-            hasActiveMembership = activeSubscriptions.stream()
-                    .anyMatch(sub -> sub.getProduct().getArtistId() != null 
-                            && sub.getProduct().getArtistId().equals(artistId));
+            hasActiveMembership = orderRepository.existsPaidMembershipOrder(
+                    viewer.getId(),
+                    artistId,
+                    OrderStatus.COMPLETED,
+                    java.time.Instant.now().atZone(ZoneId.systemDefault()).minusMonths(10).toInstant());
         }
 
         String membershipButtonText = null;

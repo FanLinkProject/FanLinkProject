@@ -127,6 +127,7 @@ function PostDetailContent({ id }) {
         image: p.image || null,
         timestamp: p.timestamp,
         postType: p.type,
+        isMembershipOnly: p.isMembershipOnly ?? false,
       });
       setLikeCount(p.likes || 0);
       if (!groupId) {
@@ -164,6 +165,7 @@ function PostDetailContent({ id }) {
           postType: type,
           // 서버가 content를 null로 반환 = 멤버십 전용 + 접근 권한 없음
           isLocked: !!(postData.isMembershipOnly && postData.content === null),
+          isMembershipOnly: !!postData.isMembershipOnly,
           isNotice: !!postData.isNotice,
         });
         const countVal = countRes?.[numericId] ?? countRes?.[String(numericId)] ?? 0;
@@ -715,7 +717,12 @@ function PostDetailContent({ id }) {
           {backLabel}
         </Link>
 
-        <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden">
+        <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden relative">
+          {post.isMembershipOnly && (
+            <span className="absolute top-6 right-6 z-10 px-3 py-1.5 rounded-lg bg-violet-500/25 text-violet-300 text-xs font-black uppercase tracking-widest border border-violet-400/30">
+              멤버십
+            </span>
+          )}
           {post.image && (
             <div className="w-full aspect-video overflow-hidden">
               <img src={post.image} className="w-full h-full object-cover" alt="" />
@@ -734,6 +741,9 @@ function PostDetailContent({ id }) {
                     <span className="text-amber-300/90 text-sm font-bold shrink-0">[{post.authorGradeName}]</span>
                   )}
                   {post.authorName}
+                  {post.postType === "ARTIST" && (
+                    <span className="material-symbols-outlined text-violet-300 text-lg fill-icon shrink-0" aria-hidden>verified</span>
+                  )}
                 </h4>
                 <p className="text-xs text-white/55 font-semibold uppercase tracking-wider">
                   {post.timestamp}
