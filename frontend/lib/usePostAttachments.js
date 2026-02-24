@@ -113,6 +113,22 @@ export function usePostAttachments({ postGroupId, postIdOrTemp, initialAttachmen
     });
   }, []);
 
+  const reorderAttachments = useCallback((fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    setMediaAssetIds((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setAttachmentPreviews((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   const resetAttachments = useCallback(() => {
     setMediaAssetIds([]);
     setAttachmentPreviews([]);
@@ -126,6 +142,7 @@ export function usePostAttachments({ postGroupId, postIdOrTemp, initialAttachmen
     addAttachment,
     removeAttachment,
     setRepresentative,
+    reorderAttachments,
     setAttachmentsFromApi,
     resetAttachments,
     canAddAttachment: canAdd,

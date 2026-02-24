@@ -17,10 +17,10 @@ import org.example.backend.concert.repository.ConcertArtistRepository;
 import org.example.backend.concert.repository.ConcertMediaAssetRepository;
 import org.example.backend.concert.repository.ConcertRepository;
 import org.example.backend.concert.repository.LocationRepository;
-import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.media_asset.service.CdnUrlResolver;
 import org.example.backend.product.dto.request.ProductRequestDto;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.enums.ProductPaymentMethod;
@@ -55,7 +55,7 @@ public class ConcertService {
     private final UserRepository userRepository;
     private final ProductService productService;
     private final ProductRepository productRepository;
-    private final AwsProperties awsProperties;
+    private final CdnUrlResolver cdnUrlResolver;
 
     /**
      * 공연 생성
@@ -284,14 +284,7 @@ public class ConcertService {
     }
 
     private String getCdnBaseUrl() {
-        if (awsProperties.getCloudfront() == null) {
-            return null;
-        }
-        String domain = awsProperties.getCloudfront().getDomain();
-        if (domain == null || domain.isBlank()) {
-            return null;
-        }
-        return domain.startsWith("http") ? domain : "https://" + domain;
+        return cdnUrlResolver.getBaseUrl();
     }
 
     private MediaAsset validatePosterMediaAsset(Long mediaAssetId, Long ownerUserId) {

@@ -52,13 +52,9 @@ public class MediaOwnershipValidator {
         validateReplayOwnership(item, userId, role);
     }
 
-    // 프로필 업로드는 본인만 허용한다.
     private void validateProfileOwner(Long userId) {
         if (userId == null || userId <= 0) {
             throw new MediaAssetException(MediaAssetErrorCode.INVALID_OBJECT_KEY, "userId가 필요합니다.");
-        }
-        if (userId <= 0) {
-            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED);
         }
     }
 
@@ -70,8 +66,13 @@ public class MediaOwnershipValidator {
         }
     }
 
-    // 게시물 첨부: 공지=그룹 계정만, 아티스트 게시물=그룹+소속멤버.
+    // 게시물 첨부: 팬(USER)=팬포스트 첨부 허용, 아티스트/그룹=관리 권한 필요.
     private void validatePostOwnership(PresignItemRequest item, Long userId, UserRole role) {
+        if (role == UserRole.USER) {
+            requireValue(item.artistId(), "artistId");
+            requireText(item.postIdOrTemp(), "postIdOrTemp");
+            return;
+        }
         Long artistId = resolveArtistIdForPost(item);
         boolean includeMembers = resolveIncludeMembersForPost(item);
         if (!artistPermissionService.canManagePage(artistId, userId, role, includeMembers)) {
