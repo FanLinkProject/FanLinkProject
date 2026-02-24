@@ -9,16 +9,9 @@ import Button from "@/components/ui/Button";
 import SectionTitle from "@/components/ui/SectionTitle";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 import { redirectToGuestHome } from "@/lib/authRedirect";
-import { BASE_URL, request } from "@/lib/api";
+import { BASE_URL, request, getAuthHeaders } from "@/lib/api";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
-
-function getAuthHeaders() {
-  if (typeof window === "undefined") return {};
-  const token = localStorage.getItem("accessToken");
-  const pure = token?.replace(/^Bearer\s+/i, "").trim();
-  return pure ? { Authorization: `Bearer ${pure}` } : {};
-}
 
 /** JWT payload에서 관리자 여부 판단 (API 호출 없이, 403 방지) */
 function getIsAdminFromToken() {

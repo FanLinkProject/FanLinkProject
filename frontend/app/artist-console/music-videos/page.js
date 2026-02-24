@@ -7,6 +7,7 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import { list, create, remove } from "@/lib/musicVideoApi";
 import { request } from "@/lib/api";
+import { toYouTubeWatchUrl } from "@/lib/youtubeUtils";
 
 export default function ArtistMusicVideosPage() {
   const [artistId, setArtistId] = useState(null);
@@ -180,7 +181,7 @@ export default function ArtistMusicVideosPage() {
                 </div>
                 <div className="flex gap-2">
                   <a
-                    href={v.embedUrl}
+                    href={toYouTubeWatchUrl(v.embedUrl) || v.embedUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3 py-2 bg-white/10 text-white rounded-lg text-sm hover:bg-white/20"

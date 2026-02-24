@@ -1,22 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
 import Surface from "@/components/ui/Surface";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
-import { BASE_URL, request } from "@/lib/api";
+import { BASE_URL, request, getAuthHeaders } from "@/lib/api";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
-import { uploadFile, MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
-
-function getAuthHeaders() {
-  if (typeof window === "undefined") return {};
-  const token = localStorage.getItem("accessToken");
-  const pure = token?.replace(/^Bearer\s+/i, "").trim();
-  return pure ? { Authorization: `Bearer ${pure}` } : {};
-}
+import { usePostAttachments } from "@/lib/usePostAttachments";
+import { MAX_POST_ATTACHMENTS } from "@/lib/mediaAssetApi";
 
 export default function EditPostPage() {
   const router = useRouter();
@@ -27,15 +20,16 @@ export default function EditPostPage() {
   const [post, setPost] = useState(null);
   const [postLoaded, setPostLoaded] = useState(false);
   const [content, setContent] = useState("");
-  const [mediaAssetIds, setMediaAssetIds] = useState([]);
-  const [attachmentPreviews, setAttachmentPreviews] = useState([]);
   const [groupId, setGroupId] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [canSetNotice, setCanSetNotice] = useState(false);
   const fileInputRef = useRef(null);
 
   const postGroupId = groupId ?? artistId;
-  const canAddAttachment = !!postGroupId && mediaAssetIds.length < 5;
+  const attachments = usePostAttachments({
+    postGroupId,
+    postIdOrTemp: id,
+    initialAttachments: [],
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -44,50 +38,16 @@ export default function EditPostPage() {
       .then((data) => {
         setPost(data);
         setContent(data?.content ?? "");
-        const atts = data?.attachments ?? [];
-        setMediaAssetIds(atts.map((a) => a.mediaAssetId).filter(Boolean));
-        setAttachmentPreviews(atts.map((a) => ({ mediaAssetId: a.mediaAssetId, url: a.url, isVideo: a.contentType?.startsWith?.("video/") })));
+        attachments.setAttachmentsFromApi(data?.attachments ?? []);
       })
       .catch(() => setPost(null))
       .finally(() => setPostLoaded(true));
   }, [id]);
 
-  const handleAttachmentChange = async (e) => {
+  const handleAttachmentChange = (e) => {
     const file = e.target.files?.[0];
-    if (!file || !postGroupId || mediaAssetIds.length >= 5) {
-      e.target.value = "";
-      return;
-    }
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    if (!isImage && !isVideo) {
-      e.target.value = "";
-      return;
-    }
-    try {
-      const presignItem = {
-        category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
-        scope: MediaAssetScope.PUBLIC,
-        artistId: postGroupId,
-        postIdOrTemp: (id && String(id).trim() !== "") ? String(id) : "tmp_edit",
-        attachmentCountInPost: mediaAssetIds.length + 1,
-      };
-      if (isVideo) presignItem.durationSecondsRequested = 600;
-      const result = await uploadFile(file, presignItem);
-      if (result?.status === "READY" && result?.mediaAssetId && result?.url) {
-        setMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
-        setAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url, isVideo }]);
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err?.data?.message || err?.message || "업로드에 실패했습니다.");
-    }
     e.target.value = "";
-  };
-
-  const removeAttachment = (mediaAssetId) => {
-    setMediaAssetIds((prev) => prev.filter((id) => id !== mediaAssetId));
-    setAttachmentPreviews((prev) => prev.filter((p) => p.mediaAssetId !== mediaAssetId));
+    if (file) attachments.addAttachment(file);
   };
 
   const handleSubmit = async (e) => {
@@ -102,8 +62,8 @@ export default function EditPostPage() {
           content: content.trim(),
           isMembershipOnly: false,
           isNotice: false,
-          mediaAssetIds,
-          representativeMediaAssetId: mediaAssetIds[0] ?? null,
+          mediaAssetIds: attachments.mediaAssetIds,
+          representativeMediaAssetId: attachments.representativeMediaAssetId,
         },
       });
       router.push(artistId ? "/posts" : "/home");
@@ -183,30 +143,30 @@ export default function EditPostPage() {
           </label>
 
           <div className="mt-6">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">첨부 (이미지·영상 최대 5개, 목록 미리보기 첫 장)</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">첨부 (이미지·영상 최대 {MAX_POST_ATTACHMENTS}개, 목록 미리보기 첫 장)</span>
             <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleAttachmentChange} className="hidden" />
-            {attachmentPreviews.length > 0 ? (
+            {attachments.attachmentPreviews.length > 0 ? (
               <div className="space-y-3">
-                {attachmentPreviews.map((p) => (
+                {attachments.attachmentPreviews.map((p) => (
                   <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
                     {p.isVideo ? (
                       <video src={p.url} controls className="w-full max-h-80 object-contain bg-black/20" />
                     ) : (
                       <img src={p.url} alt="미리보기" className="w-full max-h-80 object-contain bg-black/20" />
                     )}
-                    <button type="button" onClick={() => removeAttachment(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+                    <button type="button" onClick={() => attachments.removeAttachment(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
                       <span className="material-symbols-outlined text-lg">close</span>
                     </button>
                   </div>
                 ))}
-                {canAddAttachment && (
+                {attachments.canAddAttachment && (
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">+ 추가</button>
                 )}
               </div>
             ) : (
-              <button type="button" onClick={() => canAddAttachment && fileInputRef.current?.click()} disabled={!canAddAttachment} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
+              <button type="button" onClick={() => attachments.canAddAttachment && fileInputRef.current?.click()} disabled={!attachments.canAddAttachment} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
                 <span className="material-symbols-outlined text-4xl">add_photo_alternate</span>
-                <span className="text-sm font-bold">{!postGroupId ? "프로필 로딩 중…" : "이미지 또는 영상 추가 (최대 5개)"}</span>
+                <span className="text-sm font-bold">{!postGroupId ? "프로필 로딩 중…" : "이미지 또는 영상 추가 (최대 " + MAX_POST_ATTACHMENTS + "개)"}</span>
               </button>
             )}
           </div>
