@@ -14,6 +14,7 @@ import org.example.backend.user.dto.response.SignupResponse;
 import org.example.backend.user.service.AdminService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -76,25 +77,42 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // 신고 내역 조회
+    // 신고 내역 조회 (최신 신고가 1페이지에 오도록 created_at 내림차순, nickname/email/status 검색)
     @GetMapping("/mypage/reports")
     public ResponseEntity<Page<ReportResponse>> getAllReports(
             @AuthenticationPrincipal PrincipalDetails principalDetails,
-            @PageableDefault(size = 10) Pageable pageable
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @RequestParam(required = false) String nickname,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Boolean status
     ) {
-        Page<ReportResponse> response = adminService.getAllReports(pageable);
+        Page<ReportResponse> response = adminService.getAllReports(pageable, nickname, email, status);
         return ResponseEntity.ok(response);
     }
 
-    // 패널티 내역 조회
+    // 신고 기각 (처리 상태만 true로 변경)
+    @PatchMapping("/mypage/reports/{reportId}/dismiss")
+    public ResponseEntity<Void> dismissReport(
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @PathVariable Long reportId
+    ) {
+        adminService.markReportProcessed(reportId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // 패널티 내역 조회 (created_at 최신순, 닉네임/이메일 검색)
     @GetMapping("/mypage/penalties")
     public ResponseEntity<Page<AdminPenaltyResponse>> getMyGivenPenalties(
             @AuthenticationPrincipal PrincipalDetails principalDetails,
-            @PageableDefault(size = 10) Pageable pageable
+            @PageableDefault(size = 10) Pageable pageable,
+            @RequestParam(required = false) String nickname,
+            @RequestParam(required = false) String email
     ) {
         Page<AdminPenaltyResponse> response = adminService.getMyGivenPenalties(
                 principalDetails.getUser(),
-                pageable
+                pageable,
+                nickname,
+                email
         );
         return ResponseEntity.ok(response);
     }

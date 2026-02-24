@@ -56,6 +56,15 @@ function enhanceComment(c) {
   };
 }
 
+const REPORT_CATEGORY_OPTIONS = [
+  { value: "", label: "카테고리를 선택하세요." },
+  { value: "SPAM", label: "스팸" },
+  { value: "ABUSE", label: "욕설/비방" },
+  { value: "FRAUD", label: "사기/사칭" },
+  { value: "PLASTER", label: "도배" },
+  { value: "OTHER", label: "기타" },
+];
+
 function AttachmentCarousel({ attachments }) {
   const scrollRef = useRef(null);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -205,6 +214,15 @@ function PostDetailContent({ id }) {
   const [myProfileImageUrl, setMyProfileImageUrl] = useState("");
   const [backArtistId, setBackArtistId] = useState(groupId || null);
 
+  // 신고 모달
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTargetType, setReportTargetType] = useState(null); // "fan_post" | "comment"
+  const [reportTargetId, setReportTargetId] = useState(null);
+  const [reportCategory, setReportCategory] = useState("");
+  const [reportReasonDetail, setReportReasonDetail] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportMessage, setReportMessage] = useState("");
+
   // 댓글 컨테이너 & 무한스크롤 sentinel
   const commentsContainerRef = useRef(null);
   const commentsBottomRef = useRef(null);
@@ -268,6 +286,7 @@ function PostDetailContent({ id }) {
           authorName: postData.writerNickname || "",
           authorAvatar: postData.writerProfileImageUrl || "",
           authorGradeName: postData.writerGradeName || null,
+          writerIsArtist: type === "FAN" ? !!(postData.writerIsArtist) : true,
           content: postData.content || "",
           attachments,
           timestamp: formatTimestamp(postData.createdAt),
@@ -713,6 +732,56 @@ function PostDetailContent({ id }) {
     }
   };
 
+  const openReportModal = (targetType, targetId) => {
+    setReportTargetType(targetType);
+    setReportTargetId(targetId);
+    setReportCategory("");
+    setReportReasonDetail("");
+    setReportModalOpen(true);
+    setReportMessage("");
+  };
+
+  const closeReportModal = () => {
+    setReportModalOpen(false);
+    setReportTargetType(null);
+    setReportTargetId(null);
+    setReportCategory("");
+    setReportReasonDetail("");
+    setReportMessage("");
+  };
+
+  const handleReportSubmit = async () => {
+    if (!reportTargetType || reportTargetId == null || reportSubmitting) return;
+    if (!currentUser) { router.push("/login"); return; }
+    if (!reportCategory) {
+      setReportMessage("카테고리를 선택해 주세요.");
+      return;
+    }
+    setReportSubmitting(true);
+    setReportMessage("");
+    const body = {
+      targetId: reportTargetId,
+      category: reportCategory,
+      reasonDetail: reportReasonDetail.trim() || undefined,
+    };
+    try {
+      if (reportTargetType === "fan_post") {
+        await request("/api/reports/fan-posts", { method: "POST", body });
+        setReportMessage("신고가 접수되었습니다.");
+        setTimeout(() => { closeReportModal(); }, 1200);
+      } else if (reportTargetType === "comment") {
+        await request("/api/reports/comments", { method: "POST", body });
+        setReportMessage("신고가 접수되었습니다.");
+        setTimeout(() => { closeReportModal(); }, 1200);
+      }
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || "";
+      setReportMessage(msg || "신고 처리에 실패했습니다.");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
   const handleDeletePost = async () => {
     if (!window.confirm("게시글을 삭제하시겠습니까?")) return;
     try {
@@ -917,6 +986,17 @@ function PostDetailContent({ id }) {
                   </button>
                 </div>
               )}
+              {isRealPost && type === "FAN" && myUserId && post.writerId !== myUserId && !post.writerIsArtist && (
+                <button
+                  type="button"
+                  onClick={() => openReportModal("fan_post", numericId)}
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-white/25 hover:text-amber-400 transition-colors focus:outline-none"
+                  aria-label="게시글 신고"
+                >
+                  <span className="material-symbols-outlined text-lg">flag</span>
+                  <span>신고하기</span>
+                </button>
+              )}
             </div>
           </div>
         </article>
@@ -1078,6 +1158,17 @@ function PostDetailContent({ id }) {
                                 <span className="material-symbols-outlined text-sm">delete</span>
                               </button>
                             )}
+                            {!isDeleted && myUserId && c.userId !== myUserId && !c.isArtist && (
+                              <button
+                                type="button"
+                                onClick={() => openReportModal("comment", c.id)}
+                                className="text-xs font-bold text-white/25 hover:text-amber-400 transition-colors inline-flex items-center gap-0.5"
+                                aria-label="댓글 신고"
+                              >
+                                <span className="material-symbols-outlined text-sm">flag</span>
+                                신고하기
+                              </button>
+                            )}
                           </div>
                           )}
                         </div>
@@ -1223,6 +1314,17 @@ function PostDetailContent({ id }) {
                                           <span className="material-symbols-outlined text-xs">delete</span>
                                         </button>
                                       )}
+                                      {myUserId && r.userId !== myUserId && !r.isArtist && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openReportModal("comment", r.id)}
+                                          className="text-[10px] font-bold text-white/25 hover:text-amber-400 transition-colors inline-flex items-center"
+                                          aria-label="답글 신고"
+                                        >
+                                          <span className="material-symbols-outlined text-xs">flag</span>
+                                          신고하기
+                                        </button>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -1282,6 +1384,79 @@ function PostDetailContent({ id }) {
           </div>
         </div>
       </aside>
+      )}
+
+      {/* 신고 모달 */}
+      {reportModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={closeReportModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-modal-title"
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#201a33] p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="report-modal-title" className="text-lg font-black text-white">
+              {reportTargetType === "fan_post" ? "게시글 신고" : "댓글 신고"}
+            </h3>
+            <p className="mt-2 text-sm text-white/70">
+              {reportTargetType === "fan_post"
+                ? "이 게시글을 신고하시겠습니까? 카테고리와 사유를 선택·입력해 주세요."
+                : "이 댓글을 신고하시겠습니까? 카테고리와 사유를 선택·입력해 주세요."}
+            </p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-xs font-bold text-white/60 uppercase tracking-wider">
+                신고 카테고리
+              </label>
+              <select
+                value={reportCategory}
+                onChange={(e) => setReportCategory(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-[#16102a] text-white border border-white/[0.08] text-sm focus:ring-2 focus:ring-violet-500/30 outline-none"
+              >
+                {REPORT_CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <label className="block text-xs font-bold text-white/60 uppercase tracking-wider mt-2">
+                신고 상세 사유 (선택)
+              </label>
+              <textarea
+                value={reportReasonDetail}
+                onChange={(e) => setReportReasonDetail(e.target.value)}
+                placeholder="구체적인 사유를 입력해 주세요."
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl bg-[#16102a] text-white border border-white/[0.08] text-sm placeholder:text-white/40 focus:ring-2 focus:ring-violet-500/30 outline-none resize-y"
+              />
+            </div>
+            {reportMessage && (
+              <p className={`mt-3 text-sm ${reportMessage.includes("실패") || reportMessage.includes("이미") ? "text-amber-400" : "text-emerald-400"}`}>
+                {reportMessage}
+              </p>
+            )}
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={closeReportModal}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-white/[0.08] text-white/80 hover:bg-white/[0.12] transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleReportSubmit}
+                disabled={reportSubmitting}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-amber-500/90 text-white hover:brightness-110 disabled:opacity-50 transition-colors"
+              >
+                {reportSubmitting ? "처리 중..." : "신고하기"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
