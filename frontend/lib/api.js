@@ -43,6 +43,16 @@ export function getToken() {
     return normalizeToken(raw);
 }
 
+/**
+ * axios 등에서 쓸 Authorization 헤더 객체.
+ * 브라우저 외에서는 {} 반환.
+ */
+export function getAuthHeaders() {
+    if (typeof window === "undefined") return {};
+    const token = getToken();
+    return token ? { Authorization: token } : {};
+}
+
 /** refreshToken 조회 (Bearer 제거한 값) */
 function getRefreshTokenRaw() {
     if (typeof window === "undefined") return "";

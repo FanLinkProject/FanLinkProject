@@ -9,7 +9,7 @@ import axios from "axios";
 import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
 import { list as listMusicVideos } from "@/lib/musicVideoApi";
 import { listByArtist as listReplays } from "@/lib/replayApi";
-import { request, apiGet, apiPost, BASE_URL } from "@/lib/api";
+import { request, apiGet, apiPost, BASE_URL, getAuthHeaders } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
@@ -17,6 +17,7 @@ import {
     getArtistNamesArray,
     formatDateShort
 } from "@/lib/concertUtils";
+import { toYouTubeWatchUrl } from "@/lib/youtubeUtils";
 
 // 컴포넌트
 import Surface from "@/components/ui/Surface";
@@ -26,27 +27,7 @@ import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
 // --- 상수 및 헬퍼 함수 ---
 const CANDY_COST = 500;
-
-/** embed URL(또는 short URL)을 YouTube watch URL로 변환. 새 탭에서 열 때 153 오류 방지 */
-function toYouTubeWatchUrl(url) {
-  if (!url || typeof url !== "string") return null;
-  const trimmed = url.trim();
-  const embedMatch = trimmed.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/i);
-  if (embedMatch) return `https://www.youtube.com/watch?v=${embedMatch[1]}`;
-  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/i);
-  if (shortMatch) return `https://www.youtube.com/watch?v=${shortMatch[1]}`;
-  if (/youtube\.com\/watch\?/i.test(trimmed)) return trimmed;
-  return null;
-}
 const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
-
-function getAuthHeaders() {
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-    return {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: token }),
-    };
-}
 
 function getCurrentUser() {
     if (typeof window === "undefined") return null;
