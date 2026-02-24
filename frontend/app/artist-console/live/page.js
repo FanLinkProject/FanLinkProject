@@ -10,7 +10,7 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 import { apiGet, getToken, normalizeToken, WS_CHAT_URL } from "@/lib/api";
-import { getCandidates, publish, createManualReplay, publishManualReplay, getReplay, ReplayAccessType } from "@/lib/replayApi";
+import { publish, createManualReplay, publishManualReplay, getReplay, ReplayAccessType } from "@/lib/replayApi";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
@@ -136,9 +136,6 @@ export default function ArtistLivePage() {
     });
 
     // --- replay publish (Replay API) ---
-    const [publishCandidates, setPublishCandidates] = useState([]);
-    const [loadingCandidates, setLoadingCandidates] = useState(false);
-
     const [publishForm, setPublishForm] = useState({
         liveSessionId: "",
         accessType: ReplayAccessType.FREE,
@@ -176,29 +173,6 @@ export default function ArtistLivePage() {
         : null;
     const { upload: uploadManualVideo } = useMediaUpload(manualVideoPresignItem ?? { category: MediaAssetCategory.REPLAY_VIDEO, scope: MediaAssetScope.RESTRICTED, artistId: artistId ?? undefined, replayIdOrTemp: "tmp_manual" });
 
-    useEffect(() => {
-        const numericArtistId = artistId != null ? Number(artistId) : NaN;
-        if (Number.isNaN(numericArtistId) || numericArtistId < 1) {
-            setPublishCandidates([]);
-            setLoadingCandidates(false);
-            return;
-        }
-
-        setLoadingCandidates(true);
-        setPublishError(null);
-
-        getCandidates(numericArtistId)
-            .then((res) => {
-                const arr = Array.isArray(res) ? res : [];
-                setPublishCandidates(arr);
-            })
-            .catch((e) => {
-                setPublishError(e?.data?.message || e?.message || "후보 목록 조회 실패");
-                setPublishCandidates([]);
-            })
-            .finally(() => setLoadingCandidates(false));
-    }, [artistId]);
-
     const handlePublish = async (e) => {
         e.preventDefault();
 
@@ -227,7 +201,6 @@ export default function ArtistLivePage() {
                 thumbnailPreviewUrl: null,
             });
 
-            // 발행 후 리스트도 같이 갱신 (선택)
             fetchLiveDataRef.current?.();
         } catch (e) {
             setPublishError(e?.data?.message || e?.message || "발행 실패");
@@ -424,7 +397,7 @@ export default function ArtistLivePage() {
                 )}
             </section>
 
-            {/* 다시보기 발행 가능 목록 */}
+            {/* 다시보기 발행 가능 목록 (자동녹화 포함) */}
             <section className="space-y-4">
                 <h2 className="text-sm font-black uppercase tracking-widest text-white/55 px-1">
                     다시보기 발행 가능 목록
@@ -456,12 +429,13 @@ export default function ArtistLivePage() {
                                 : isReady
                                     ? "bg-violet-500/80 text-white"
                                     : "bg-white/10 text-white/80";
+                            const isSelected = String(publishForm.liveSessionId) === String(session.id);
 
                             return (
                                 <Surface
                                     key={session.id}
                                     variant="card"
-                                    className="overflow-hidden"
+                                    className={`overflow-hidden transition-all ${isSelected ? "ring-2 ring-violet-500" : ""}`}
                                 >
                                     <div className="aspect-video relative overflow-hidden bg-white/5">
                                         <img
@@ -479,18 +453,23 @@ export default function ArtistLivePage() {
                                     </div>
 
                                     <div className="p-6">
-                                        <h4 className="font-bold text-white truncate mb-4">
+                                        <h4 className="font-bold text-white truncate mb-1">
                                             {session.title ?? "라이브 다시보기"}
                                         </h4>
+                                        <p className="text-[10px] text-white/50 mb-4">
+                                            세션 #{session.id} · {session.isPaid ? "유료" : "무료"}
+                                            {session.endedAt && ` · ${new Date(session.endedAt).toLocaleDateString("ko-KR")}`}
+                                        </p>
                                         <Button
                                             type="button"
-                                            variant="primary"
+                                            variant={isSelected ? "ghost" : "primary"}
                                             className="w-full py-3 text-[10px] uppercase tracking-widest"
-                                            onClick={() =>
-                                                alert("아래 ‘다시보기 발행’ 폼에서 발행해 주세요!")
-                                            }
+                                            onClick={() => {
+                                                setPublishForm((f) => ({ ...f, liveSessionId: String(session.id) }));
+                                                document.getElementById("replay-publish-section")?.scrollIntoView({ behavior: "smooth" });
+                                            }}
                                         >
-                                            다시보기 발행
+                                            {isSelected ? "선택됨" : "다시보기 발행"}
                                         </Button>
                                     </div>
                                 </Surface>
@@ -501,7 +480,7 @@ export default function ArtistLivePage() {
             </section>
 
             {/* 다시보기 발행 (Replay API) */}
-            <Surface variant="primary" className="p-8">
+            <Surface id="replay-publish-section" variant="primary" className="p-8">
                 <SectionTitle className="text-lg font-bold mb-1">다시보기 발행</SectionTitle>
                 <p className="text-sm text-white/55 mb-6">녹화 완료된 라이브 세션을 다시보기로 발행합니다.</p>
 
@@ -513,101 +492,83 @@ export default function ArtistLivePage() {
                     </p>
                 )}
 
-                <div className="flex flex-col lg:flex-row gap-8">
-                    <form onSubmit={handlePublish} className="flex-1 space-y-5 min-w-0">
-                        <label className="block">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55">제목</span>
-                            <input
-                                type="text"
-                                maxLength={200}
-                                value={publishForm.title}
-                                onChange={(e) => setPublishForm((f) => ({ ...f, title: e.target.value }))}
-                                placeholder="다시보기 제목을 입력하세요"
-                                className="mt-2 w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/30"
-                            />
-                        </label>
+                {!publishForm.liveSessionId && (
+                    <div className="py-8 text-center rounded-xl bg-white/[0.03] border border-white/[0.06] mb-6">
+                        <span className="material-symbols-outlined text-3xl text-white/20 mb-2 block">touch_app</span>
+                        <p className="text-white/40 text-sm">위 목록에서 발행할 세션을 선택해 주세요</p>
+                    </div>
+                )}
 
-                        <label className="flex items-center gap-3 cursor-pointer select-none w-fit">
-                            <div
-                                className={`relative w-11 h-6 rounded-full transition-colors ${publishForm.accessType === ReplayAccessType.PAID ? "bg-violet-500" : "bg-white/15"}`}
-                                onClick={() => setPublishForm((f) => ({ ...f, accessType: f.accessType === ReplayAccessType.PAID ? ReplayAccessType.FREE : ReplayAccessType.PAID }))}
-                            >
-                                <div className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${publishForm.accessType === ReplayAccessType.PAID ? "translate-x-[22px]" : "translate-x-0.5"}`} />
-                            </div>
-                            <span className="text-sm text-white/80 font-bold">
-                                {publishForm.accessType === ReplayAccessType.PAID ? "유료 (멤버십 전용)" : "무료 (전체 공개)"}
-                            </span>
-                        </label>
+                {publishForm.liveSessionId && (
+                    <div className="mb-6 flex items-center gap-3 p-4 rounded-xl bg-violet-500/10 border border-violet-500/30">
+                        <span className="material-symbols-outlined text-violet-400">videocam</span>
+                        <p className="text-violet-300 text-sm font-bold">세션 #{publishForm.liveSessionId} 선택됨</p>
+                        <button
+                            type="button"
+                            onClick={() => setPublishForm((f) => ({ ...f, liveSessionId: "" }))}
+                            className="ml-auto text-white/40 hover:text-white/70 text-xs"
+                        >
+                            선택 해제
+                        </button>
+                    </div>
+                )}
 
-                        <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55">썸네일 (선택)</span>
-                            <input type="file" accept="image/*" className="hidden" id="replay-thumbnail-input"
-                                onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file || !file.type.startsWith("image/") || !uploadThumbnail) return;
-                                    const result = await uploadThumbnail(file);
-                                    if (result?.mediaAssetId && result?.url) {
-                                        setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: result.mediaAssetId, thumbnailPreviewUrl: result.url }));
-                                    }
-                                    e.target.value = "";
-                                }}
-                            />
-                            {publishForm.thumbnailPreviewUrl ? (
-                                <div className="mt-3 relative inline-block">
-                                    <img src={publishForm.thumbnailPreviewUrl} alt="썸네일" className="w-full max-w-xs rounded-xl border border-white/10 object-cover aspect-video" />
-                                    <button type="button" onClick={() => setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: null, thumbnailPreviewUrl: null }))} className="absolute top-2 right-2 size-7 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">×</button>
-                                </div>
-                            ) : (
-                                <button type="button" onClick={() => document.getElementById("replay-thumbnail-input")?.click()}
-                                    className="mt-3 w-full py-5 rounded-xl border-2 border-dashed border-white/15 text-white/50 hover:border-violet-500/40 hover:text-violet-300/70 text-sm font-bold transition-colors flex items-center justify-center gap-2">
-                                    <span className="material-symbols-outlined text-lg">add_photo_alternate</span>
-                                    이미지 선택
-                                </button>
-                            )}
+                <form onSubmit={handlePublish} className="space-y-5 max-w-lg">
+                    <label className="block">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white/55">제목</span>
+                        <input
+                            type="text"
+                            maxLength={200}
+                            value={publishForm.title}
+                            onChange={(e) => setPublishForm((f) => ({ ...f, title: e.target.value }))}
+                            placeholder="다시보기 제목을 입력하세요"
+                            className="mt-2 w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/30"
+                        />
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer select-none w-fit">
+                        <div
+                            className={`relative w-11 h-6 rounded-full transition-colors ${publishForm.accessType === ReplayAccessType.PAID ? "bg-violet-500" : "bg-white/15"}`}
+                            onClick={() => setPublishForm((f) => ({ ...f, accessType: f.accessType === ReplayAccessType.PAID ? ReplayAccessType.FREE : ReplayAccessType.PAID }))}
+                        >
+                            <div className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${publishForm.accessType === ReplayAccessType.PAID ? "translate-x-[22px]" : "translate-x-0.5"}`} />
                         </div>
+                        <span className="text-sm text-white/80 font-bold">
+                            {publishForm.accessType === ReplayAccessType.PAID ? "유료 (멤버십 전용)" : "무료 (전체 공개)"}
+                        </span>
+                    </label>
 
-                        <Button type="submit" variant="primary" className="w-full py-4" disabled={publishing || !publishForm.liveSessionId}>
-                            {publishing ? "발행 중..." : "발행"}
-                        </Button>
-                    </form>
-
-                    <div className="lg:w-72 shrink-0">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-white/55 block mb-3">라이브 세션 선택</span>
-                        {loadingCandidates ? (
-                            <p className="text-white/40 text-xs py-8 text-center">로딩 중...</p>
-                        ) : publishCandidates.length === 0 ? (
-                            <div className="py-8 text-center rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                <p className="text-white/40 text-xs">발행 가능한 세션이 없습니다</p>
+                    <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white/55">썸네일 (선택)</span>
+                        <input type="file" accept="image/*" className="hidden" id="replay-thumbnail-input"
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !file.type.startsWith("image/") || !uploadThumbnail) return;
+                                const result = await uploadThumbnail(file);
+                                if (result?.mediaAssetId && result?.url) {
+                                    setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: result.mediaAssetId, thumbnailPreviewUrl: result.url }));
+                                }
+                                e.target.value = "";
+                            }}
+                        />
+                        {publishForm.thumbnailPreviewUrl ? (
+                            <div className="mt-3 relative inline-block">
+                                <img src={publishForm.thumbnailPreviewUrl} alt="썸네일" className="w-full max-w-xs rounded-xl border border-white/10 object-cover aspect-video" />
+                                <button type="button" onClick={() => setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: null, thumbnailPreviewUrl: null }))} className="absolute top-2 right-2 size-7 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">&times;</button>
                             </div>
                         ) : (
-                            <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin" }}>
-                                {publishCandidates.map((c) => {
-                                    const selected = String(publishForm.liveSessionId) === String(c.liveSessionId);
-                                    return (
-                                        <button
-                                            key={c.liveSessionId}
-                                            type="button"
-                                            onClick={() => setPublishForm((f) => ({ ...f, liveSessionId: String(c.liveSessionId) }))}
-                                            className={`w-full text-left p-4 rounded-xl border transition-all ${
-                                                selected
-                                                    ? "border-violet-500 bg-violet-500/10"
-                                                    : "border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]"
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className="text-white font-bold text-sm">세션 #{c.liveSessionId}</span>
-                                                {selected && <span className="material-symbols-outlined text-violet-400 text-lg fill-icon">check_circle</span>}
-                                            </div>
-                                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${c.isPaid ? "bg-violet-500/25 text-violet-300" : "bg-white/10 text-white/60"}`}>
-                                                {c.isPaid ? "유료" : "무료"}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <button type="button" onClick={() => document.getElementById("replay-thumbnail-input")?.click()}
+                                className="mt-3 w-full py-5 rounded-xl border-2 border-dashed border-white/15 text-white/50 hover:border-violet-500/40 hover:text-violet-300/70 text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                                <span className="material-symbols-outlined text-lg">add_photo_alternate</span>
+                                이미지 선택
+                            </button>
                         )}
                     </div>
-                </div>
+
+                    <Button type="submit" variant="primary" className="w-full py-4" disabled={publishing || !publishForm.liveSessionId}>
+                        {publishing ? "발행 중..." : "발행"}
+                    </Button>
+                </form>
             </Surface>
 
             {/* 다시보기 수동 업로드 */}
@@ -659,7 +620,7 @@ export default function ArtistLivePage() {
                             {publishForm.thumbnailPreviewUrl ? (
                                 <div className="mt-3 relative inline-block">
                                     <img src={publishForm.thumbnailPreviewUrl} alt="썸네일" className="w-full max-w-xs rounded-xl border border-white/10 object-cover aspect-video" />
-                                    <button type="button" onClick={() => setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: null, thumbnailPreviewUrl: null }))} className="absolute top-2 right-2 size-7 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">×</button>
+                                    <button type="button" onClick={() => setPublishForm((f) => ({ ...f, thumbnailMediaAssetId: null, thumbnailPreviewUrl: null }))} className="absolute top-2 right-2 size-7 rounded-full bg-black/70 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors">&times;</button>
                                 </div>
                             ) : (
                                 <button type="button" onClick={() => document.getElementById("manual-thumbnail-input")?.click()}
