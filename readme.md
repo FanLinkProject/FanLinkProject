@@ -143,7 +143,103 @@ FanLink는 팬과 아티스트의 상호작용을 콘텐츠 소비에서 비즈�
 
 ## 시스템 아키텍처
 
-![FanLink Architecture](docs/images/architecture.png)
+```mermaid
+flowchart LR
+  %% Clients
+  subgraph Clients[Clients]
+    W["Web (Next.js)"]
+  end
+
+  %% Edge/Hosting
+  subgraph Edge[Edge / Hosting]
+    V["Vercel (Frontend)"]
+  end
+
+  %% Backend
+  subgraph App[Application Layer]
+    B["Spring Boot API (EC2 / Docker)"]
+    WS["WebSocket(STOMP) Endpoint"]
+    SSE[SSE Notifications]
+    SCHED["Batch/Scheduler (Settlement)"]
+  end
+
+  %% Data
+  subgraph Data[Data Layer]
+    M[(MySQL 8.0)]
+    R[(Redis 7)]
+    K[(Kafka)]
+  end
+
+  %% Media
+  subgraph Media[Media / Streaming]
+    S3[(S3)]
+    IVS[AWS IVS]
+    MC[AWS MediaConvert]
+    SQS[(SQS)]
+    RP[Replay Service/API]
+  end
+
+  %% Flows
+  W --> V --> B
+  W <--> WS
+  W --> SSE
+
+  B <--> M
+  B <--> R
+  WS <--> K
+  B <--> K
+
+  %% Live
+  B -->|Playback Token / URL| IVS
+  W -->|Watch Live| IVS
+
+  %% Upload & Replay
+  W -->|"Upload (Presigned URL)"| S3
+  S3 -->|Trigger/Events| SQS
+  SQS -->|Polling Listener| B
+  B -->|Create Job| MC
+  MC -->|Output| S3
+  RP <-->|Replay Metadata/Serve| B
+  W -->|Watch Replay| RP
+```
+
+### 실시간 채팅 메시지 흐름 (DM/Live)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Fan as Fan Client (Next.js)
+  participant WS as WS(STOMP) Gateway (Spring)
+  participant K as Kafka
+  participant S as Chat Service (Spring)
+  participant DB as MySQL
+  participant R as Redis
+
+  Fan->>WS: CONNECT + Auth(JWT)
+  WS->>R: Validate token / session (optional)
+  Fan->>WS: SEND /chat/send (DM or Live)
+  WS->>S: Deliver message payload
+  S->>DB: Persist message (history)
+  S->>K: Publish event (room/live topic)
+  K-->>WS: Consume broadcast event
+  WS-->>Fan: MESSAGE (broadcast to subscribers)
+```
+
+### 리플레이 인코딩 파이프라인
+
+```mermaid
+flowchart TB
+  U["Uploader (Artist/Admin)"] -->|Presigned Upload| S3[(S3 Raw Media)]
+  S3 -->|Event| SQS[(SQS)]
+  SQS --> L["Polling Listener (Spring)"]
+  L -->|Create Encoding Job| MC[AWS MediaConvert]
+  MC -->|Write Outputs| S3O[(S3 Encoded Outputs)]
+  L -->|Update metadata| DB[(MySQL)]
+  C["Client (Fan)"] -->|Request replay list| API[Spring API]
+  API --> DB
+  C -->|Stream replay| CDN["Replay Delivery (S3/IVS/Origin)"]
+  CDN --> C
+```
 
 아키텍처 요약:
 
