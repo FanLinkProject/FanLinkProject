@@ -78,15 +78,6 @@ export default function FanNavBar({ showSidebarToggle, sidebarOpen, onSidebarTog
           홈
         </Link>
         <Link
-          href="/market"
-          className={`inline-flex items-center leading-none h-8 text-[15px] font-bold transition-colors ${
-            pathname?.startsWith("/market")
-              ? "text-violet-300"
-              : "text-white/80 hover:text-violet-300"
-          }`}>
-          마켓
-        </Link>
-        <Link
           href="/concerts"
           className={`inline-flex items-center leading-none h-8 text-[15px] font-bold transition-colors ${
             pathname?.startsWith("/concerts")

@@ -87,6 +87,115 @@ export function formatConcertDday(concert) {
   return d === 0 ? "D-Day" : `D-${d}`;
 }
 
+/**
+ * startDateTime 기준 D-Day 라벨 (날짜만, 로컬 기준).
+ * 오늘: "D-DAY", 미래: "D-N", 과거: "D+N"
+ * @param {string|Date} startDateTimeISO - ISO 문자열 또는 Date
+ * @returns {string}
+ */
+export function getDDayLabel(startDateTimeISO) {
+  if (startDateTimeISO == null) return "";
+  const start = typeof startDateTimeISO === "object" ? startDateTimeISO : new Date(startDateTimeISO);
+  if (Number.isNaN(start.getTime())) return "";
+  const now = new Date();
+  const a = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const b = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const diff = Math.ceil((b - a) / (1000 * 60 * 60 * 24));
+  if (diff === 0) return "D-DAY";
+  if (diff > 0) return `D-${diff}`;
+  return `D+${Math.abs(diff)}`;
+}
+
+/** 공연 상태 키 (우선순위 높은 순) */
+export const CONCERT_STATUS_KEYS = {
+  LIVE: "LIVE",           // 공연중
+  ENDED: "ENDED",         // 공연종료
+  SALE: "SALE",           // 예매중
+  PRESALE: "PRESALE",     // 선예매중
+  SALE_UPCOMING: "SALE_UPCOMING", // 예매예정
+  UPCOMING: "UPCOMING",   // 예정
+};
+
+/**
+ * 공연 상태 계산 (now 기준). 우선순위: 공연중 > 공연종료 > 예매중 > 선예매중 > 예매예정 > 예정
+ * @param {object} concert - startDateTime, endDateTime, presaleStartDateTime, presaleEndDateTime, saleStartDateTime, saleEndDateTime
+ * @param {Date} [now] - 기준 시각 (기본값: 현재)
+ * @returns {{ key: string, label: string, priority: number }}
+ */
+export function getConcertStatus(concert, now = new Date()) {
+  const toDate = (v) => (v == null ? null : new Date(v));
+  const start = toDate(concert?.startDateTime ?? concert?.startDate);
+  const end = toDate(concert?.endDateTime ?? concert?.endDate);
+  const presaleStart = toDate(concert?.presaleStartDateTime);
+  const presaleEnd = toDate(concert?.presaleEndDateTime);
+  const saleStart = toDate(concert?.saleStartDateTime);
+  const saleEnd = toDate(concert?.saleEndDateTime);
+  const t = now.getTime();
+
+  const inRange = (from, to) => from != null && to != null && t >= from.getTime() && t <= to.getTime();
+  const before = (date) => date != null && t < date.getTime();
+  const after = (date) => date != null && t > date.getTime();
+
+  // 1) 공연중: start <= now <= end (end 없으면 공연중 생략)
+  if (start != null && end != null && t >= start.getTime() && t <= end.getTime()) {
+    return { key: CONCERT_STATUS_KEYS.LIVE, label: "공연중", priority: 6 };
+  }
+
+  // 2) 공연종료: now > endDateTime (없으면 startDateTime 지나면 종료)
+  const effectiveEnd = end ?? start;
+  if (effectiveEnd != null && t > effectiveEnd.getTime()) {
+    return { key: CONCERT_STATUS_KEYS.ENDED, label: "공연종료", priority: 5 };
+  }
+
+  // 3) 예매중
+  if (inRange(saleStart, saleEnd)) {
+    return { key: CONCERT_STATUS_KEYS.SALE, label: "예매중", priority: 4 };
+  }
+
+  // 4) 선예매중
+  if (inRange(presaleStart, presaleEnd)) {
+    return { key: CONCERT_STATUS_KEYS.PRESALE, label: "선예매중", priority: 3 };
+  }
+
+  // 5) 예매예정: now < saleStart (saleStart 존재 시)
+  if (saleStart != null && before(saleStart)) {
+    return { key: CONCERT_STATUS_KEYS.SALE_UPCOMING, label: "예매예정", priority: 2 };
+  }
+
+  // 6) 예정: now < startDateTime
+  if (start != null && before(start)) {
+    return { key: CONCERT_STATUS_KEYS.UPCOMING, label: "예정", priority: 1 };
+  }
+
+  return { key: "UNKNOWN", label: "예정", priority: 0 };
+}
+
+/**
+ * 상태 배지용 라벨: "상태 · 공연 D-n" 형태. 공연 종료면 D-Day 없음.
+ * 예: "예매중 · 공연 D-6", "예매 마감 · 공연 D-6", "공연종료", "예정 · 공연 D-12"
+ * @param {object} concert
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export function getConcertStatusBadgeLabel(concert, now = new Date()) {
+  const status = getConcertStatus(concert, now);
+  if (status.key === CONCERT_STATUS_KEYS.ENDED) return "공연종료";
+  if (status.key === CONCERT_STATUS_KEYS.LIVE) return "공연중";
+
+  const d = getDaysUntilConcertStart(concert);
+  const suffix = d == null ? "" : d === 0 ? " · 공연 D-DAY" : ` · 공연 D-${d}`;
+
+  if (status.key === CONCERT_STATUS_KEYS.SALE) return "예매중" + suffix;
+  if (status.key === CONCERT_STATUS_KEYS.PRESALE) return "선예매중" + suffix;
+  if (status.key === CONCERT_STATUS_KEYS.SALE_UPCOMING) return "예매예정" + suffix;
+  if (status.key === CONCERT_STATUS_KEYS.UPCOMING) {
+    const ticketStatus = getTicketStatus(concert);
+    const base = ticketStatus === "CLOSED" ? "예매 마감" : "예정";
+    return base + suffix;
+  }
+  return "예정" + suffix;
+}
+
 /** 공연이 끝났는지 (endDateTime < now) */
 export function isConcertEnded(concert) {
   const endStr = concert?.endDateTime ?? concert?.endDate;

@@ -62,14 +62,16 @@ public class ArtistController {
     }
 
     /**
-     * 공연관리 목록: 그룹/그룹 소속이면 그룹 아티스트 공연 전체, 아니면 본인 공연만
+     * 공연관리 목록: 그룹/그룹 소속이면 그룹 아티스트 공연 전체, 아니면 본인 공연만.
+     * includeEnded=true면 다가오는 공연 + 종료된 공연 모두 반환.
      */
     @GetMapping("/concerts")
     public ResponseEntity<List<ConcertListItemResponse>> getMyConcerts(
-            @AuthenticationPrincipal PrincipalDetails principalDetails
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @RequestParam(required = false, defaultValue = "false") Boolean includeEnded
     ) {
         List<Long> artistIds = artistService.getArtistIdsForConcertListing(principalDetails.getUser());
-        List<ConcertListItemResponse> list = concertService.getUpcomingConcertsForArtistIds(artistIds);
+        List<ConcertListItemResponse> list = concertService.getConcertsForArtistIds(artistIds, includeEnded);
         return ResponseEntity.ok(list);
     }
 
