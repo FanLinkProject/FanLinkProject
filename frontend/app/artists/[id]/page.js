@@ -69,13 +69,13 @@ function formatTimestamp(instant) {
     } catch { return "방금 전"; }
 }
 
-function transformArtistPost(p, groupAvatar = "") {
+function transformArtistPost(p) {
     const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
         authorName: p.writerNickname || "",
         authorMemberName: null,
-        authorAvatar: p.writerProfileImageUrl || groupAvatar,
+        authorAvatar: p.writerProfileImageUrl || getDefaultAvatarUrl(p.writerNickname || "?"),
         content: p.content || "",
         image: attachments[0]?.url || null,
         attachmentCount: attachments.length,
@@ -330,8 +330,7 @@ function ArtistDetailPageInner({ paramsId }) {
         request("/api/artist-posts/artist-only", { query: { groupId, limit: POSTS_LIMIT } })
             .then(async (data) => {
                 const raw = Array.isArray(data) ? data : (data?.content ?? data?.posts ?? []);
-                const groupAvatar = artist?.avatar || "";
-                const transformed = raw.map((p) => transformArtistPost(p, groupAvatar));
+                const transformed = raw.map((p) => transformArtistPost(p));
                 setArtistPosts(transformed);
                 setArtistPostsHasNext(raw.length === POSTS_LIMIT);
                 if (transformed.length > 0) setArtistPostsLastId(transformed[transformed.length - 1].id);
@@ -339,7 +338,7 @@ function ArtistDetailPageInner({ paramsId }) {
             })
             .catch(() => setArtistPosts([]))
             .finally(() => setArtistPostsLoading(false));
-    }, [activeTab, groupId, isRealGroup, artist?.avatar]);
+    }, [activeTab, groupId, isRealGroup]);
 
     // [B] FAN 탭: 팬 포스트 조회
     useEffect(() => {
@@ -368,8 +367,7 @@ function ArtistDetailPageInner({ paramsId }) {
                 query: { groupId, lastPostId: artistPostsLastId, limit: POSTS_LIMIT },
             });
             const raw = Array.isArray(data) ? data : (data?.content ?? data?.posts ?? []);
-            const groupAvatar = artist?.avatar || "";
-            const newPosts = raw.map((p) => transformArtistPost(p, groupAvatar));
+            const newPosts = raw.map((p) => transformArtistPost(p));
             setArtistPosts((prev) => [...prev, ...newPosts]);
             setArtistPostsHasNext(raw.length === POSTS_LIMIT);
             if (newPosts.length > 0) setArtistPostsLastId(newPosts[newPosts.length - 1].id);
