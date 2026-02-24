@@ -258,7 +258,7 @@ export default function NewConcertPage() {
   return (
     <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-8">
       <header className="flex items-center gap-4">
-        <Button variant="ghost" href="/artist-console/concerts" className="size-10 rounded-full">
+        <Button variant="ghost" onClick={() => router.back()} className="size-10 rounded-full">
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
         <div>
@@ -613,7 +613,7 @@ export default function NewConcertPage() {
         </Surface>
 
         <div className="flex gap-3 justify-end">
-          <Button variant="ghost" href="/artist-console/concerts" disabled={loading}>
+          <Button variant="ghost" onClick={() => router.back()} disabled={loading}>
             취소
           </Button>
           <Button type="submit" variant="primary" className="px-8 py-3" disabled={loading}>

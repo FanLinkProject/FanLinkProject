@@ -93,11 +93,7 @@ export default function SelectArtistsPage() {
   };
 
   const handleBack = () => {
-    const returnPath = getReturnPath();
-    try {
-      sessionStorage.removeItem("concertSelectArtistsReturn");
-    } catch (_) {}
-    router.push(returnPath);
+    router.back();
   };
 
   return (
