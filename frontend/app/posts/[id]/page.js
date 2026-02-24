@@ -152,6 +152,7 @@ function PostDetailContent({ id }) {
         : Promise.resolve([]),
     ])
       .then(([postData, countRes, checkRes]) => {
+        const attachments = Array.isArray(postData.attachments) ? postData.attachments : [];
         setPost({
           id: postData.id,
           writerId: postData.writerId ?? null,
@@ -159,10 +160,9 @@ function PostDetailContent({ id }) {
           authorAvatar: postData.writerProfileImageUrl || "",
           authorGradeName: postData.writerGradeName || null,
           content: postData.content || "",
-          image: postData.attachments?.[0]?.url || null,
+          attachments,
           timestamp: formatTimestamp(postData.createdAt),
           postType: type,
-          // 서버가 content를 null로 반환 = 멤버십 전용 + 접근 권한 없음
           isLocked: !!(postData.isMembershipOnly && postData.content === null),
           isMembershipOnly: !!postData.isMembershipOnly,
           isNotice: !!postData.isNotice,
@@ -707,11 +707,6 @@ function PostDetailContent({ id }) {
               멤버십
             </span>
           )}
-          {post.image && (
-            <div className="w-full aspect-video overflow-hidden">
-              <img src={post.image} className="w-full h-full object-cover" alt="" />
-            </div>
-          )}
           <div className="p-10">
             <div className="flex items-center gap-4 mb-8">
               <img
@@ -742,11 +737,44 @@ function PostDetailContent({ id }) {
                 <p className="text-white/40 text-sm">멤버십에 가입하면 모든 콘텐츠를 즐길 수 있습니다</p>
               </div>
             ) : (
-            <div className="prose max-w-none">
-                <p className="text-white/85 text-xl leading-relaxed font-light whitespace-pre-wrap">
-                  {post.content}
-                </p>
-            </div>
+              <>
+                <div className="prose max-w-none">
+                  <p className="text-white/85 text-xl leading-relaxed font-light whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+                {post.attachments?.length > 0 && (
+                  <div className={`mt-6 gap-3 ${
+                    post.attachments.length === 1
+                      ? "flex"
+                      : "grid grid-cols-2"
+                  }`}>
+                    {post.attachments.map((att, idx) => {
+                      const isVideo = att.contentType?.startsWith("video/") ||
+                        att.category === "POST_VIDEO";
+                      return isVideo ? (
+                        <div key={att.mediaAssetId || idx} className="rounded-2xl overflow-hidden bg-black border border-white/[0.06]">
+                          <video
+                            src={att.url}
+                            controls
+                            preload="metadata"
+                            className="w-full max-h-80 object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div key={att.mediaAssetId || idx} className="rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
+                          <img
+                            src={att.url}
+                            alt={`첨부 ${idx + 1}`}
+                            className="w-full max-h-80 object-contain cursor-pointer hover:scale-[1.02] transition-transform"
+                            onClick={() => window.open(att.url, "_blank")}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.06]">
               <button

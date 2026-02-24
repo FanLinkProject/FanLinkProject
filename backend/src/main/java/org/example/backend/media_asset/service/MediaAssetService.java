@@ -2,7 +2,6 @@ package org.example.backend.media_asset.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.backend.global.security.details.PrincipalDetails;
-import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.config.MediaProperties;
 import org.example.backend.media_asset.dto.request.CompleteRequest;
 import org.example.backend.media_asset.dto.request.PresignItemRequest;
@@ -25,7 +24,6 @@ import org.example.backend.replay.service.MediaConvertJobService;
 import org.example.backend.replay.entity.ReplayStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
 import org.example.backend.user.service.ArtistPermissionService;
@@ -49,13 +47,13 @@ public class MediaAssetService {
     private final MediaOwnershipValidator mediaOwnershipValidator;
     private final S3MediaClient s3MediaClient;
     private final MediaProperties mediaProperties;
-    private final AwsProperties awsProperties;
     private final Clock mediaClock;
     private final VideoMetadataExtractor videoMetadataExtractor;
     private final ReplayRepository replayRepository;
     private final MediaConvertJobService mediaConvertJobService;
     private final ArtistPermissionService artistPermissionService;
     private final UserRepository userRepository;
+    private final CdnUrlResolver cdnUrlResolver;
 
     // 업로드용 presigned URL을 배치 발급하고 INITIATED 상태를 저장한다.
     @Transactional
@@ -265,7 +263,7 @@ public class MediaAssetService {
 
     /**
      * 아티스트 커버 이미지용 MediaAsset의 공개 CDN URL을 반환한다.
-     * ARTIST_COVER_IMAGE 카테고리 및 아티스트 관리 권한 검증 후 URL을 생성한다.
+     * ARTIST_COVER_IMAGE 카테고리, 상태, 소유권 검증 후 URL을 생성한다.
      */
     @Transactional(readOnly = true)
     public String getPublicUrlForArtistCover(Long mediaAssetId, Long artistId) {
@@ -276,6 +274,11 @@ public class MediaAssetService {
         }
         if (mediaAsset.getStatus() != MediaAssetStatus.READY) {
             throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "업로드가 완료된 커버 이미지만 사용할 수 있습니다.");
+        }
+        if (!artistPermissionService.canManagePage(artistId, mediaAsset.getOwnerUserId(),
+                userRepository.findById(mediaAsset.getOwnerUserId()).map(u -> u.getRole()).orElse(null), true)) {
+            throw new MediaAssetException(MediaAssetErrorCode.MEDIA_ASSET_ACCESS_DENIED,
+                    "커버 이미지는 해당 아티스트 페이지 관리 계정만 설정할 수 있습니다.");
         }
         return buildCdnUrl(mediaAsset.getObjectKey());
     }
@@ -430,13 +433,12 @@ public class MediaAssetService {
         }
     }
 
-    // CloudFront 도메인과 objectKey로 CDN URL을 생성한다.
     private String buildCdnUrl(String objectKey) {
-        String domain = awsProperties.getCloudfront().getDomain();
-        if (domain == null || domain.isBlank()) {
+        String url = cdnUrlResolver.resolve(objectKey);
+        if (url == null) {
             throw new MediaAssetException(MediaAssetErrorCode.INVALID_MEDIA_ASSET_STATUS, "CloudFront 도메인이 필요합니다.");
         }
-        return "https://" + domain + "/" + objectKey;
+        return url;
     }
 
     // Content-Type 비교를 위해 소문자/공백 제거 정규화를 수행한다.

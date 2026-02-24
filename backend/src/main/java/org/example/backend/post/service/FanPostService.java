@@ -1,11 +1,11 @@
 package org.example.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.media_asset.service.CdnUrlResolver;
 import org.example.backend.post.dto.request.FanPostRequest;
 import org.example.backend.post.dto.response.FanPostResponse;
 import org.example.backend.post.dto.response.PostMediaAssetResponse;
@@ -44,17 +44,13 @@ public class FanPostService {
     private final UserRepository userRepository;
     private final PostMediaAssetRepository postMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
-    private final AwsProperties awsProperties;
+    private final CdnUrlResolver cdnUrlResolver;
     private final FanProfileService fanProfileService;
     private final FanProfileRepository fanProfileRepository;
     private final CommentService commentService;
 
     private String getCdnBaseUrl() {
-        String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
-        if (domain == null || domain.isBlank()) {
-            return null;
-        }
-        return domain.startsWith("http") ? domain : "https://" + domain;
+        return cdnUrlResolver.getBaseUrl();
     }
 
     private List<MediaAsset> validateAndFetchMediaAssets(Long userId, List<Long> mediaAssetIds) {
