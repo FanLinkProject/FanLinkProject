@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { apiGet, apiPatch, apiPost, getToken, normalizeToken, WS_CHAT_URL } from "@/lib/api";
+import { createPlaybackToken } from "@/lib/ivsApi";
+import IvsPlayer from "@/components/ivs/IvsPlayer";
 
 const SEND_DEST = "/pub/live/send";
 const SUB_PREFIX = "/sub/live/";
@@ -51,6 +53,8 @@ export default function ArtistLiveProgressPage({ params }) {
   const [endError, setEndError] = useState("");
   const [myUserId, setMyUserId] = useState(null);
   const [myNickname, setMyNickname] = useState("");
+  const [ivsToken, setIvsToken] = useState(null);
+  const [ivsError, setIvsError] = useState(null);
   const chatEndRef = useRef(null);
   const stompRef = useRef(null);
 
@@ -178,6 +182,21 @@ export default function ArtistLiveProgressPage({ params }) {
     };
   }, []);
 
+  // IVS Playback Token (LIVE일 때) + 만료 전 갱신
+  useEffect(() => {
+    if (!numericId || !session || session.status !== "LIVE") return;
+    setIvsError(null);
+    setIvsToken(null);
+    const fetchToken = () =>
+      createPlaybackToken(numericId, 300)
+        .then((res) => setIvsToken(res))
+        .catch((e) => setIvsError(e?.data?.message || e?.message || "IVS 토큰 발급 실패"));
+    fetchToken();
+    const refreshMs = 240 * 1000;
+    const timer = setInterval(fetchToken, refreshMs);
+    return () => clearInterval(timer);
+  }, [numericId, session?.status]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
@@ -260,19 +279,29 @@ export default function ArtistLiveProgressPage({ params }) {
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* TODO: IVS 실제 스트림 송출 제어 연동 필요 */}
-        {/* 현재는 LiveSession 상태 관리만 구현됨 */}
-        {/* 실제 방송 송출은 OBS + IVS RTMP 설정 필요 */}
         <section className="group relative w-full shrink-0 aspect-video bg-black flex items-center justify-center">
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
-            <span className="material-symbols-outlined text-5xl text-white/30">videocam_off</span>
-            <p className="text-sm text-amber-200/90 font-medium">
-              ⚠ 현재 영상 송출 기능은 연동 예정입니다.
-            </p>
-            <p className="text-xs text-white/60">
-              실제 스트리밍은 IVS RTMP 설정이 필요합니다.
-            </p>
-          </div>
+          {isLive && ivsToken?.playbackUrl && ivsToken?.token ? (
+            <IvsPlayer
+              playbackUrl={ivsToken.playbackUrl}
+              token={ivsToken.token}
+              className="aspect-video w-full"
+            />
+          ) : isLive && ivsError ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+              <span className="material-symbols-outlined text-5xl text-white/30">videocam_off</span>
+              <p className="text-sm text-amber-200/90 font-medium">{ivsError}</p>
+            </div>
+          ) : isLive ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+              <span className="material-symbols-outlined text-5xl text-white/30">videocam_off</span>
+              <p className="text-sm text-white/60">IVS 재생 준비 중...</p>
+            </div>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+              <span className="material-symbols-outlined text-5xl text-white/30">videocam_off</span>
+              <p className="text-xs text-white/60">라이브가 종료되었습니다.</p>
+            </div>
+          )}
 
           <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
             <Link

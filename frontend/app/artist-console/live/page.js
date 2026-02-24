@@ -343,7 +343,12 @@ export default function ArtistLivePage() {
 
                     <Link
                         href="/artist-console/live/create"
-                        className="px-6 py-3 bg-red-500/90 text-white rounded-full font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all"
+                        className={`px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all ${
+                            liveSessions.length > 0
+                                ? "bg-white/10 text-white/40 cursor-not-allowed pointer-events-none"
+                                : "bg-red-500/90 text-white hover:brightness-110"
+                        }`}
+                        aria-disabled={liveSessions.length > 0}
                     >
                         라이브 시작하기
                     </Link>
@@ -406,10 +411,10 @@ export default function ArtistLivePage() {
 
                                     <div className="flex gap-2">
                                         <Link
-                                            href={`/live/${live.id}`}
+                                            href={`/artist-console/live/${live.id}`}
                                             className="flex-1 py-3 bg-[#201a33] border border-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-colors text-center"
                                         >
-                                            시청하기
+                                            라이브로 이동
                                         </Link>
                                     </div>
                                 </div>
