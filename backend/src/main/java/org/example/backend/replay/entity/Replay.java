@@ -48,6 +48,9 @@ public class Replay {
     @Column(name = "status", nullable = false, length = 20)
     private ReplayStatus status;
 
+    @Column(name = "title", length = 200)
+    private String title;
+
     @Column(name = "recording_s3_bucket", length = 255)
     private String recordingS3Bucket;
 
@@ -80,7 +83,6 @@ public class Replay {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    // Replay 엔티티를 생성한다.
     public Replay(Long artistId,
                   Long liveSessionId,
                   ReplayAccessType accessType,
@@ -88,6 +90,17 @@ public class Replay {
                   String recordingS3Bucket,
                   String recordingS3Prefix,
                   Instant publishedAt) {
+        this(artistId, liveSessionId, accessType, status, recordingS3Bucket, recordingS3Prefix, publishedAt, null);
+    }
+
+    public Replay(Long artistId,
+                  Long liveSessionId,
+                  ReplayAccessType accessType,
+                  ReplayStatus status,
+                  String recordingS3Bucket,
+                  String recordingS3Prefix,
+                  Instant publishedAt,
+                  String title) {
         this.artistId = artistId;
         this.liveSessionId = liveSessionId;
         this.accessType = accessType;
@@ -95,6 +108,7 @@ public class Replay {
         this.recordingS3Bucket = recordingS3Bucket;
         this.recordingS3Prefix = recordingS3Prefix;
         this.publishedAt = publishedAt;
+        this.title = title;
     }
 
     // Replay 상태를 변경한다.
@@ -133,7 +147,10 @@ public class Replay {
         this.rejectReason = rejectReason;
     }
 
-    /** 수동 업로드 발행: 상태를 PUBLISHED로 하고 발행 시각을 기록한다. */
+    public void updateTitle(String title) {
+        this.title = title;
+    }
+
     public void markPublished(Instant at) {
         this.status = ReplayStatus.PUBLISHED;
         this.publishedAt = at;

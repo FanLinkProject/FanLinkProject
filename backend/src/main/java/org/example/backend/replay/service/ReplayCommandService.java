@@ -89,8 +89,12 @@ public class ReplayCommandService {
                     ReplayStatus.PUBLISHED,
                     session.recordingS3Bucket(),
                     session.recordingS3Prefix(),
-                    now
+                    now,
+                    request.title()
             );
+        }
+        if (request.title() != null && !request.title().isBlank()) {
+            replay.updateTitle(request.title().trim());
         }
         replayRepository.save(replay);
 
@@ -181,7 +185,8 @@ public class ReplayCommandService {
                 ReplayStatus.UPLOADING,
                 null,
                 null,
-                null
+                null,
+                request.title() != null ? request.title().trim() : null
         );
         replayRepository.save(replay);
         return new ReplayCreateManualResponse(
