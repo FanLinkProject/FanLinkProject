@@ -5,24 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import { getProductsByArtist } from "@/lib/productApi";
+import { getProductImageUrl, formatPrice } from "@/lib/productUtils";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
-
-function getProductImageUrl(product) {
-  const rep = product.attachments?.find(
-    (a) => a.mediaAssetId === product.representativeMediaAssetId
-  );
-  if (rep?.url) return rep.url;
-  return product.attachments?.[0]?.url || null;
-}
-
-function formatPrice(product) {
-  if (product.paymentMethod === "CANDY_ONLY" && product.candyPrice > 0) {
-    return `${product.candyPrice?.toLocaleString()} 캔디`;
-  }
-  return `${product.price?.toLocaleString()}원`;
-}
 
 function ProductCard({ product, artist }) {
   const imgUrl = getProductImageUrl(product);

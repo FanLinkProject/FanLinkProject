@@ -127,6 +127,7 @@ function PostDetailContent({ id }) {
         image: p.image || null,
         timestamp: p.timestamp,
         postType: p.type,
+        isMembershipOnly: p.isMembershipOnly ?? false,
       });
       setLikeCount(p.likes || 0);
       if (!groupId) {
@@ -152,17 +153,19 @@ function PostDetailContent({ id }) {
         : Promise.resolve([]),
     ])
       .then(([postData, countRes, checkRes]) => {
+        const attachments = Array.isArray(postData.attachments) ? postData.attachments : [];
         setPost({
           id: postData.id,
           writerId: postData.writerId ?? null,
           authorName: postData.writerNickname || "",
           authorAvatar: postData.writerProfileImageUrl || "",
+          authorGradeName: postData.writerGradeName || null,
           content: postData.content || "",
-          image: postData.attachments?.[0]?.url || null,
+          attachments,
           timestamp: formatTimestamp(postData.createdAt),
           postType: type,
-          // 서버가 content를 null로 반환 = 멤버십 전용 + 접근 권한 없음
           isLocked: !!(postData.isMembershipOnly && postData.content === null),
+          isMembershipOnly: !!postData.isMembershipOnly,
           isNotice: !!postData.isNotice,
         });
         const countVal = countRes?.[numericId] ?? countRes?.[String(numericId)] ?? 0;
@@ -714,11 +717,11 @@ function PostDetailContent({ id }) {
           {backLabel}
         </Link>
 
-        <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden">
-          {post.image && (
-            <div className="w-full aspect-video overflow-hidden">
-              <img src={post.image} className="w-full h-full object-cover" alt="" />
-            </div>
+        <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden relative">
+          {post.isMembershipOnly && (
+            <span className="absolute top-6 right-6 z-10 px-3 py-1.5 rounded-lg bg-violet-500/25 text-violet-300 text-xs font-black uppercase tracking-widest border border-violet-400/30">
+              멤버십
+            </span>
           )}
           <div className="p-10">
             <div className="flex items-center gap-4 mb-8">
@@ -728,7 +731,15 @@ function PostDetailContent({ id }) {
                 alt=""
               />
               <div>
-                <h4 className="text-lg font-extrabold text-white">{post.authorName}</h4>
+                <h4 className="text-lg font-extrabold text-white flex items-center gap-1.5 flex-wrap">
+                  {post.authorGradeName && (
+                    <span className="text-amber-300/90 text-sm font-bold shrink-0">[{post.authorGradeName}]</span>
+                  )}
+                  {post.authorName}
+                  {post.postType === "ARTIST" && (
+                    <span className="material-symbols-outlined text-violet-300 text-lg fill-icon shrink-0" aria-hidden>verified</span>
+                  )}
+                </h4>
                 <p className="text-xs text-white/55 font-semibold uppercase tracking-wider">
                   {post.timestamp}
                   {post.postType === "ARTIST" && " • 공식 업데이트"}
@@ -742,11 +753,44 @@ function PostDetailContent({ id }) {
                 <p className="text-white/40 text-sm">멤버십에 가입하면 모든 콘텐츠를 즐길 수 있습니다</p>
               </div>
             ) : (
-            <div className="prose max-w-none">
-                <p className="text-white/85 text-xl leading-relaxed font-light whitespace-pre-wrap">
-                  {post.content}
-                </p>
-            </div>
+              <>
+                <div className="prose max-w-none">
+                  <p className="text-white/85 text-xl leading-relaxed font-light whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+                {post.attachments?.length > 0 && (
+                  <div className={`mt-6 gap-3 ${
+                    post.attachments.length === 1
+                      ? "flex"
+                      : "grid grid-cols-2"
+                  }`}>
+                    {post.attachments.map((att, idx) => {
+                      const isVideo = att.contentType?.startsWith("video/") ||
+                        att.category === "POST_VIDEO";
+                      return isVideo ? (
+                        <div key={att.mediaAssetId || idx} className="rounded-2xl overflow-hidden bg-black border border-white/[0.06]">
+                          <video
+                            src={att.url}
+                            controls
+                            preload="metadata"
+                            className="w-full max-h-80 object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div key={att.mediaAssetId || idx} className="rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
+                          <img
+                            src={att.url}
+                            alt={`첨부 ${idx + 1}`}
+                            className="w-full max-h-80 object-contain cursor-pointer hover:scale-[1.02] transition-transform"
+                            onClick={() => window.open(att.url, "_blank")}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.06]">
               <button
@@ -814,7 +858,10 @@ function PostDetailContent({ id }) {
                           alt=""
                         />
                         <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            {!isDeleted && c.writerGradeName && (
+                              <span className="text-amber-300/90 text-xs font-bold shrink-0">[{c.writerGradeName}]</span>
+                            )}
                             <span className={`text-sm font-bold ${isDeleted ? "text-white/35" : "text-white"}`}>
                               {isDeleted ? "알 수 없음" : (c.nickname || "익명")}
                             </span>
@@ -991,7 +1038,10 @@ function PostDetailContent({ id }) {
                                   alt=""
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
+                                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                    {!rDeleted && r.writerGradeName && (
+                                      <span className="text-amber-300/90 text-[11px] font-bold shrink-0">[{r.writerGradeName}]</span>
+                                    )}
                                     <span className={`text-xs font-bold ${rDeleted ? "text-white/35" : "text-white"}`}>
                                       {rDeleted ? "알 수 없음" : (r.nickname || "익명")}
                                     </span>

@@ -42,6 +42,7 @@ export default function PostFeed({
           onComment={post.isNotice ? undefined : onComment}
           showCommentButton={!post.isNotice}
           isLocked={isLockedMap[post.id] ?? false}
+          isMembershipOnly={post.isMembershipOnly ?? false}
           onDelete={onDelete && canDeleteSet?.has(post.id) ? onDelete : undefined}
           onEdit={onEdit && canEditSet?.has(post.id) ? onEdit : undefined}
         />

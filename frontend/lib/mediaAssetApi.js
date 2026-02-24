@@ -24,6 +24,11 @@ export const MediaAssetCategory = {
 
 export const MediaAssetScope = { PUBLIC: "PUBLIC", RESTRICTED: "RESTRICTED" };
 
+/** 게시물 첨부 최대 개수 */
+export const MAX_POST_ATTACHMENTS = 5;
+/** presign 시 영상 최대 길이(초) 요청값 */
+export const POST_VIDEO_DURATION_SECONDS = 600;
+
 export const MediaAssetStatus = {
   INITIATED: "INITIATED",
   READY: "READY",
@@ -77,14 +82,13 @@ export function complete(items) {
  * @returns {Promise<{ mediaAssetId: number; objectKey: string; status: string; url: string | null; errorCode?: string }>}
  */
 export async function uploadFile(file, presignItem) {
+  const rawExt = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/gi, "") || "bin";
+  const contentType = (file.type && file.type.trim()) || (file.name.match(/\.(png|jpe?g|gif|webp)$/i) ? "image/png" : "application/octet-stream");
   const item = {
     ...presignItem,
-    contentType: file.type,
+    contentType,
     sizeBytes: file.size,
-    ext:
-      (file.name.split(".").pop() || "bin")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/gi, "") || "bin",
+    ext: rawExt,
   };
   if (
     file.type.startsWith("video/") &&
@@ -92,20 +96,61 @@ export async function uploadFile(file, presignItem) {
   ) {
     item.durationSecondsRequested = presignItem.durationSecondsRequested;
   }
-  const { items: presignResults } = await presign([item]);
+  let presignResults;
+  try {
+    const res = await presign([item]);
+    presignResults = res.items;
+  } catch (e) {
+    const msg = e?.data?.message || e?.message || "presign 실패";
+    throw new Error(`Presign: ${msg}`);
+  }
+  if (!presignResults?.[0]) throw new Error("Presign 응답이 비어 있습니다.");
   const { objectKey, uploadUrl, requiredHeaders } = presignResults[0];
 
-  const putRes = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: requiredHeaders || { "Content-Type": file.type },
-    body: file,
-  });
-  if (!putRes.ok) {
-    throw new Error(`Upload failed: ${putRes.status}`);
+  // requiredHeaders에서 서명된 헤더를 구성 (Content-Type 포함)
+  const putHeaders = {};
+  if (requiredHeaders && typeof requiredHeaders === "object") {
+    for (const [k, v] of Object.entries(requiredHeaders)) {
+      if (k.toLowerCase() !== "host") {
+        putHeaders[k] = v;
+      }
+    }
+  }
+  if (!putHeaders["Content-Type"] && !putHeaders["content-type"]) {
+    putHeaders["Content-Type"] = contentType;
   }
 
-  const { items: completeResults } = await complete([{ objectKey }]);
-  const result = completeResults[0];
+  // File 객체를 Blob으로 변환하여 브라우저가 자동으로 Content-Type을 추가하는 것을 방지
+  const blob = new Blob([file], { type: putHeaders["Content-Type"] || contentType });
+
+  let putRes = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: putHeaders,
+    body: blob,
+  });
+  // 403 재시도: Content-Type 없이 순수 바이너리로 전송
+  if (putRes.status === 403) {
+    const rawBlob = new Blob([file]);
+    putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      body: rawBlob,
+    });
+  }
+  if (!putRes.ok) {
+    const text = await putRes.text().catch(() => "");
+    throw new Error(`S3 업로드 실패 (${putRes.status})${text ? `: ${text.slice(0, 80)}` : ""}`);
+  }
+
+  let completeResults;
+  try {
+    const res = await complete([{ objectKey }]);
+    completeResults = res.items;
+  } catch (e) {
+    const msg = e?.data?.message || e?.message || "complete 실패";
+    throw new Error(`Complete: ${msg}`);
+  }
+  const result = completeResults?.[0];
+  if (!result) throw new Error("Complete 응답이 비어 있습니다.");
   return {
     mediaAssetId: result.mediaAssetId,
     objectKey: result.objectKey,

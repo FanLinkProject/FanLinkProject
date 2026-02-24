@@ -27,7 +27,11 @@ public class S3MediaClient {
     private final S3Presigner s3Presigner;
     private final AwsProperties awsProperties;
 
-    // S3에 대한 presigned PUT URL과 필수 헤더를 생성한다.
+    /**
+     * S3에 대한 presigned PUT URL을 생성한다.
+     * Content-Type을 PutObjectRequest에 포함시켜 서명(SignedHeaders)에 넣는다.
+     * 클라이언트는 반드시 requiredHeaders의 Content-Type을 PUT 요청 헤더에 동일하게 설정해야 한다.
+     */
     public PresignedUpload presignPut(String objectKey, String contentType, Duration duration) {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(awsProperties.getS3().getBucketName())
@@ -42,7 +46,14 @@ public class S3MediaClient {
 
         PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presignRequest);
         URL url = presigned.url();
-        return new PresignedUpload(url.toString(), Map.of("Content-Type", contentType));
+        Map<String, String> headers = new java.util.LinkedHashMap<>();
+        headers.put("Content-Type", contentType);
+        presigned.signedHeaders().forEach((k, v) -> {
+            if (!k.equalsIgnoreCase("host") && !k.equalsIgnoreCase("content-type")) {
+                headers.put(k, v.stream().findFirst().orElse(""));
+            }
+        });
+        return new PresignedUpload(url.toString(), headers);
     }
 
     // S3 HEAD로 객체 메타데이터를 조회한다. 없으면 null 반환.

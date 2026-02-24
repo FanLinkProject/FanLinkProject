@@ -2,15 +2,19 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { request } from "@/lib/api";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
-import { useMediaUpload } from "@/lib/useMediaUpload";
-import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
+import { usePostAttachments } from "@/lib/usePostAttachments";
+import { MAX_POST_ATTACHMENTS } from "@/lib/mediaAssetApi";
+import { list as listMusicVideos, create as createMusicVideo, remove as removeMusicVideo, getSafeEmbedUrl } from "@/lib/musicVideoApi";
+import { uploadFile, MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
+import ProfileImageModal from "@/components/common/ProfileImageModal";
+import DraggableAttachmentGrid from "@/components/common/DraggableAttachmentGrid";
 
 function getCurrentUser() {
     if (typeof window === "undefined") return null;
@@ -60,13 +64,15 @@ function formatTimestamp(instant) {
 }
 
 function transformArtistPost(p, groupAvatar = "") {
+    const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
         authorName: p.writerNickname || "",
         authorMemberName: null,
         authorAvatar: p.writerProfileImageUrl || groupAvatar,
         content: p.content || "",
-        image: p.attachments?.[0]?.url || null,
+        image: attachments[0]?.url || null,
+        attachmentCount: attachments.length,
         timestamp: formatTimestamp(p.createdAt),
         isMembershipOnly: p.isMembershipOnly ?? false,
         isNotice: !!p.isNotice,
@@ -75,14 +81,17 @@ function transformArtistPost(p, groupAvatar = "") {
 }
 
 function transformFanPost(p) {
+    const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
         writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
+        authorGradeName: p.writerGradeName ?? null,
         authorAvatar: p.writerProfileImageUrl || "",
         content: p.content || "",
-        image: p.attachments?.[0]?.url || null,
+        image: attachments[0]?.url || null,
+        attachmentCount: attachments.length,
         timestamp: formatTimestamp(p.createdAt),
         type: "FAN",
     };
@@ -92,7 +101,10 @@ const POSTS_LIMIT = 10;
 
 export default function ArtistConsolePage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState("POSTS");
+    const searchParams = useSearchParams();
+    const VALID_TABS = ["POSTS", "FAN_POSTS", "LIVE", "CONCERTS", "MV"];
+    const tabParam = searchParams.get("tab");
+    const [activeTab, setActiveTab] = useState(tabParam && VALID_TABS.includes(tabParam) ? tabParam : "POSTS");
 
     // 현재 사용자 프로필
     const [currentUser, setCurrentUser] = useState(null);
@@ -101,7 +113,10 @@ export default function ArtistConsolePage() {
     const [myProfile, setMyProfile] = useState(null);
     const [groupProfile, setGroupProfile] = useState(null); // 그룹 계정 프로필 (ARTIST 멤버인 경우 그룹 계정 정보)
     const [totalFollowers, setTotalFollowers] = useState(null);
-    const [profileBio, setProfileBio] = useState(null); // 소개글 (마이페이지 프로필)
+    const [profileBio, setProfileBio] = useState(null);
+    const [coverImageUrl, setCoverImageUrl] = useState(null);
+    const [coverImageLoading, setCoverImageLoading] = useState(false);
+    const coverFileRef = useRef(null);
 
     // 아티스트 포스트 state
     const [artistPosts, setArtistPosts] = useState([]);
@@ -118,19 +133,25 @@ export default function ArtistConsolePage() {
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostIsMembershipOnly, setNewPostIsMembershipOnly] = useState(false);
     const [newPostIsNotice, setNewPostIsNotice] = useState(false);
-    const [newPostMediaAssetIds, setNewPostMediaAssetIds] = useState([]);
-    const [newPostAttachmentPreviews, setNewPostAttachmentPreviews] = useState([]);
     const [createPostLoading, setCreatePostLoading] = useState(false);
     const newPostFileInputRef = useRef(null);
 
-    const newPostPresignItem = {
-        category: MediaAssetCategory.POST_IMAGE,
-        scope: MediaAssetScope.PUBLIC,
-        artistId: groupId ?? undefined,
+    const {
+        mediaAssetIds: newPostMediaAssetIds,
+        attachmentPreviews: newPostAttachmentPreviews,
+        addAttachment: addNewPostAttachment,
+        removeAttachment: removeNewPostAttachment,
+        setRepresentative: setNewPostRepresentative,
+        reorderAttachments: reorderNewPostAttachments,
+        resetAttachments: resetNewPostAttachments,
+        canAddAttachment: canAddNewPostAttachment,
+        uploading: newPostUploading,
+        uploadError: newPostUploadError,
+        representativeMediaAssetId: newPostRepresentativeId,
+    } = usePostAttachments({
+        postGroupId: groupId,
         postIdOrTemp: "tmp_new",
-        attachmentCountInPost: newPostMediaAssetIds.length + 1,
-    };
-    const { upload: uploadNewPostImage } = useMediaUpload(newPostPresignItem);
+    });
 
     // 팬 포스트 state
     const [fanPosts, setFanPosts] = useState([]);
@@ -147,6 +168,23 @@ export default function ArtistConsolePage() {
     const fanPostsBottomRef = useRef(null);
 
     const [endedLives, setEndedLives] = useState([]);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
+
+    // MV 탭
+    const [mvList, setMvList] = useState([]);
+    const [mvLoading, setMvLoading] = useState(false);
+    const [mvError, setMvError] = useState(null);
+    const [mvShowForm, setMvShowForm] = useState(false);
+    const [mvForm, setMvForm] = useState({ url: "", title: "", description: "" });
+    const [mvSubmitting, setMvSubmitting] = useState(false);
+    const [mvSelectedVideo, setMvSelectedVideo] = useState(null);
+    const [mvSearchQuery, setMvSearchQuery] = useState("");
+    const [mvComments, setMvComments] = useState([]);
+    const [mvCommentsLoading, setMvCommentsLoading] = useState(false);
+    const [mvNewComment, setMvNewComment] = useState("");
+    const [mvCommentSubmitting, setMvCommentSubmitting] = useState(false);
+
+    const mvSearchTimerRef = useRef(null);
 
     // 프로필 조회 → myId, groupId
     useEffect(() => {
@@ -194,6 +232,137 @@ export default function ArtistConsolePage() {
             .catch(() => setEndedLives([]));
     }, [groupId]);
 
+    // Concerts 탭 활성화 시 공연 목록 로드 (그룹/소속 아티스트면 그룹 공연 전체, 아니면 본인 공연만)
+    useEffect(() => {
+        if (activeTab !== "CONCERTS") return;
+        setConcertsLoading(true);
+        request("/api/artist/concerts")
+            .then((data) => setConcertsList(Array.isArray(data) ? data : []))
+            .catch(() => setConcertsList([]))
+            .finally(() => setConcertsLoading(false));
+    }, [activeTab]);
+
+    // MV 목록 로드 (검색어 포함)
+    const loadMvList = useCallback((keyword) => {
+        if (!groupId) return;
+        setMvLoading(true);
+        setMvError(null);
+        listMusicVideos(groupId, keyword)
+            .then(setMvList)
+            .catch((e) => { setMvError(e?.data?.message || e.message || "목록 조회 실패"); setMvList([]); })
+            .finally(() => setMvLoading(false));
+    }, [groupId]);
+
+    useEffect(() => {
+        if (activeTab === "MV") loadMvList(mvSearchQuery);
+    }, [activeTab, groupId]);
+
+    // 검색어 변경 시 디바운스 서버 검색
+    useEffect(() => {
+        if (activeTab !== "MV" || !groupId) return;
+        clearTimeout(mvSearchTimerRef.current);
+        mvSearchTimerRef.current = setTimeout(() => {
+            loadMvList(mvSearchQuery);
+        }, 300);
+        return () => clearTimeout(mvSearchTimerRef.current);
+    }, [mvSearchQuery]);
+
+    const loadMvComments = useCallback((videoId) => {
+        if (!videoId) return;
+        setMvCommentsLoading(true);
+        request(`/api/comments?targetType=MEDIA&targetId=${videoId}&size=50`)
+            .then((data) => setMvComments(data?.content || []))
+            .catch(() => setMvComments([]))
+            .finally(() => setMvCommentsLoading(false));
+    }, []);
+
+    useEffect(() => {
+        if (mvSelectedVideo?.id) loadMvComments(mvSelectedVideo.id);
+        else setMvComments([]);
+    }, [mvSelectedVideo?.id]);
+
+    const handleMvSubmit = async (e) => {
+        e.preventDefault();
+        if (!mvForm.url.trim() || !mvForm.title.trim() || !mvForm.description.trim()) return;
+        setMvSubmitting(true);
+        setMvError(null);
+        try {
+            await createMusicVideo(groupId, mvForm);
+            setMvForm({ url: "", title: "", description: "" });
+            setMvShowForm(false);
+            loadMvList(mvSearchQuery);
+        } catch (err) {
+            setMvError(err?.data?.message || err.message || "등록 실패");
+        } finally {
+            setMvSubmitting(false);
+        }
+    };
+
+    const handleMvDelete = async (id) => {
+        if (!confirm("이 뮤직비디오를 삭제할까요?")) return;
+        setMvError(null);
+        try {
+            await removeMusicVideo(groupId, id);
+            if (mvSelectedVideo?.id === id) setMvSelectedVideo(null);
+            loadMvList(mvSearchQuery);
+        } catch (err) {
+            setMvError(err?.data?.message || err.message || "삭제 실패");
+        }
+    };
+
+    const handleMvCommentSubmit = async () => {
+        if (!mvNewComment.trim() || !mvSelectedVideo?.id || mvCommentSubmitting) return;
+        setMvCommentSubmitting(true);
+        try {
+            await request("/api/comments", {
+                method: "POST",
+                body: { targetId: mvSelectedVideo.id, targetType: "MEDIA", content: mvNewComment.trim() },
+            });
+            setMvNewComment("");
+            loadMvComments(mvSelectedVideo.id);
+        } catch (err) {
+            console.error("댓글 작성 실패", err);
+        } finally {
+            setMvCommentSubmitting(false);
+        }
+    };
+
+    const handleMvCommentDelete = async (commentId) => {
+        try {
+            await request(`/api/comments/${commentId}`, { method: "DELETE" });
+            loadMvComments(mvSelectedVideo.id);
+        } catch (err) {
+            console.error("댓글 삭제 실패", err);
+        }
+    };
+
+    // 커버 이미지 업로드
+    const handleCoverImageUpload = useCallback(async (e) => {
+        const file = e.target.files?.[0];
+        if (!file || !groupId) return;
+        if (!file.type.startsWith("image/")) return;
+        setCoverImageLoading(true);
+        try {
+            const result = await uploadFile(file, {
+                category: MediaAssetCategory.ARTIST_COVER_IMAGE,
+                scope: MediaAssetScope.PUBLIC,
+                artistId: groupId,
+            });
+            if (result?.mediaAssetId && result.status === "READY") {
+                await request("/api/artist/profile", {
+                    method: "PATCH",
+                    body: { bannerImageMediaAssetId: result.mediaAssetId },
+                });
+                setCoverImageUrl(result.publicUrl || URL.createObjectURL(file));
+            }
+        } catch (err) {
+            console.error("커버 이미지 업로드 실패", err);
+        } finally {
+            setCoverImageLoading(false);
+            if (coverFileRef.current) coverFileRef.current.value = "";
+        }
+    }, [groupId]);
+
     // 팔로워 수 (아티스트 마이페이지 API에서 조회)
     useEffect(() => {
         if (!myId) return;
@@ -203,6 +372,7 @@ export default function ArtistConsolePage() {
                 setTotalFollowers(n != null ? Number(n) : null);
                 const bio = data?.profile?.bio;
                 setProfileBio(bio != null && String(bio).trim() !== "" ? String(bio).trim() : null);
+                if (data?.profile?.bannerImageUrl) setCoverImageUrl(data.profile.bannerImageUrl);
             })
             .catch(() => {
                 setTotalFollowers(null);
@@ -394,25 +564,15 @@ export default function ArtistConsolePage() {
         setNewPostContent("");
         setNewPostIsMembershipOnly(false);
         setNewPostIsNotice(false);
-        setNewPostMediaAssetIds([]);
-        setNewPostAttachmentPreviews([]);
+        resetNewPostAttachments();
         setShowCreateModal(false);
     };
 
-    const handleNewPostImageChange = async (e) => {
+    const handleNewPostFileChange = async (e) => {
         const file = e?.target?.files?.[0];
-        if (!file || !file.type.startsWith("image/") || !uploadNewPostImage) return;
-        const result = await uploadNewPostImage(file);
-        if (result?.mediaAssetId && result?.url) {
-            setNewPostMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
-            setNewPostAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url }]);
-        }
+        if (!file) return;
+        await addNewPostAttachment(file);
         e.target.value = "";
-    };
-
-    const removeNewPostImage = (mediaAssetId) => {
-        setNewPostMediaAssetIds((prev) => prev.filter((id) => id !== mediaAssetId));
-        setNewPostAttachmentPreviews((prev) => prev.filter((p) => p.mediaAssetId !== mediaAssetId));
     };
 
     // 아티스트 포스트 생성
@@ -428,7 +588,8 @@ export default function ArtistConsolePage() {
                     content: newPostContent.trim(),
                     isMembershipOnly: newPostIsMembershipOnly,
                     isNotice: newPostIsNotice,
-                    mediaAssetIds: newPostMediaAssetIds,
+                    mediaAssetIds: newPostMediaAssetIds.length > 0 ? newPostMediaAssetIds : null,
+                    representativeMediaAssetId: newPostRepresentativeId,
                 },
             });
             const groupAvatar = myProfile?.profileImageUrl || "";
@@ -494,13 +655,46 @@ export default function ArtistConsolePage() {
             {/* 헤더 프로필 카드 */}
             <Surface
                 variant="primary"
-                className="p-10 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden"
+                className="relative overflow-hidden"
             >
-                <img
-                    src={displayAvatar || getDefaultAvatarUrl(displayName)}
-                    className="size-32 rounded-2xl border-2 border-white/[0.08] shrink-0 object-cover"
-                    alt=""
-                />
+                {/* 커버 이미지 영역 */}
+                <div className="relative h-48 bg-gradient-to-br from-violet-900/40 to-indigo-900/30">
+                    {coverImageUrl && (
+                        <img src={coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0d0b15] via-[#0d0b15]/60 to-transparent" />
+                    <input
+                        ref={coverFileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleCoverImageUpload}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => coverFileRef.current?.click()}
+                        disabled={coverImageLoading}
+                        className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 text-white/70 text-xs font-bold hover:bg-black/70 hover:text-white transition-all disabled:opacity-50"
+                    >
+                        <span className="material-symbols-outlined text-sm mr-1 align-middle">photo_camera</span>
+                        {coverImageLoading ? "업로드 중..." : coverImageUrl ? "커버 변경" : "커버 추가"}
+                    </button>
+                </div>
+                <div className="p-10 pt-0 -mt-16 relative flex flex-col md:flex-row items-center gap-8">
+                <div className="relative group shrink-0">
+                    <img
+                        src={displayAvatar || getDefaultAvatarUrl(displayName)}
+                        className="size-32 rounded-2xl border-4 border-[#0d0b15] object-cover shadow-xl"
+                        alt=""
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowProfileImageModal(true)}
+                        className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                    >
+                        사진 변경
+                    </button>
+                </div>
                 <div className="flex-1 text-center md:text-left min-w-0">
                     <SectionTitle className="text-3xl font-black">
                         {displayName} Studio
@@ -531,6 +725,7 @@ export default function ArtistConsolePage() {
                         팔로워 {Number(totalFollowers).toLocaleString("ko-KR")}명
                     </p>
                 )}
+                </div>
             </Surface>
 
             {/* 탭 + 새 글 작성 (가로 정렬) */}
@@ -540,31 +735,21 @@ export default function ArtistConsolePage() {
                         { id: "POSTS", label: "My Posts" },
                         { id: "FAN_POSTS", label: "Fan Posts" },
                         { id: "LIVE", label: "Live History" },
-                        { id: "MV", label: "MV", href: "/artist-console/music-videos" },
-                    ].map((tab) =>
-                        tab.href ? (
-                            <Link
-                                key={tab.id}
-                                href={tab.href}
-                                className="px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-white/55 hover:text-white/80"
-                            >
-                                {tab.label}
-                            </Link>
-                        ) : (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                                    activeTab === tab.id
-                                        ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
-                                        : "text-white/55 hover:text-white/80"
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        )
-                    )}
+                        { id: "MV", label: "MV" },
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                activeTab === tab.id
+                                    ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
+                                    : "text-white/55 hover:text-white/80"
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
                 {activeTab === "POSTS" && (
                     <Button
@@ -574,6 +759,16 @@ export default function ArtistConsolePage() {
                     >
                         <span className="material-symbols-outlined text-lg mr-1.5 align-middle">edit_note</span>
                         새 글 작성
+                    </Button>
+                )}
+                {activeTab === "MV" && (
+                    <Button
+                        variant="primary"
+                        className="text-xs uppercase tracking-widest px-6 py-3 shrink-0"
+                        onClick={() => setMvShowForm((v) => !v)}
+                    >
+                        <span className="material-symbols-outlined text-lg mr-1.5 align-middle">video_call</span>
+                        {mvShowForm ? "취소" : "영상 등록"}
                     </Button>
                 )}
             </div>
@@ -701,6 +896,227 @@ export default function ArtistConsolePage() {
                         )}
                     </div>
                 )}
+
+                {/* MV 탭 */}
+                {activeTab === "MV" && (
+                    <div className="space-y-6">
+                        {mvError && <p className="text-red-400 text-sm">{mvError}</p>}
+
+                        {mvShowForm && (
+                            <Surface variant="primary" className="p-6">
+                                <h3 className="font-bold text-white mb-4">새 뮤직비디오 등록</h3>
+                                <form onSubmit={handleMvSubmit} className="space-y-3 max-w-lg">
+                                    <label className="block">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-white/55">YouTube URL</span>
+                                        <input
+                                            type="url"
+                                            value={mvForm.url}
+                                            onChange={(e) => setMvForm((f) => ({ ...f, url: e.target.value }))}
+                                            placeholder="https://www.youtube.com/watch?v=..."
+                                            className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-white/55">제목 (150자)</span>
+                                        <input
+                                            type="text"
+                                            maxLength={150}
+                                            value={mvForm.title}
+                                            onChange={(e) => setMvForm((f) => ({ ...f, title: e.target.value }))}
+                                            className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
+                                            required
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-white/55">설명 (2000자)</span>
+                                        <textarea
+                                            maxLength={2000}
+                                            value={mvForm.description}
+                                            onChange={(e) => setMvForm((f) => ({ ...f, description: e.target.value }))}
+                                            className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white min-h-[80px]"
+                                            required
+                                        />
+                                    </label>
+                                    <Button type="submit" variant="primary" disabled={mvSubmitting}>
+                                        {mvSubmitting ? "등록 중..." : "등록"}
+                                    </Button>
+                                </form>
+                            </Surface>
+                        )}
+
+                        {/* 인라인 플레이어 + 댓글 */}
+                        {mvSelectedVideo && (
+                            <Surface variant="primary" className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-white truncate flex-1 mr-4">{mvSelectedVideo.title}</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMvSelectedVideo(null)}
+                                        className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors shrink-0"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">close</span>
+                                    </button>
+                                </div>
+                                <div className="aspect-video rounded-xl overflow-hidden bg-black">
+                                    <iframe
+                                        src={getSafeEmbedUrl(mvSelectedVideo.embedUrl)}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                        title={mvSelectedVideo.title}
+                                        referrerPolicy="strict-origin-when-cross-origin"
+                                    />
+                                </div>
+                                {mvSelectedVideo.description && (
+                                    <p className="text-white/60 text-sm mt-4 whitespace-pre-wrap line-clamp-4">{mvSelectedVideo.description}</p>
+                                )}
+
+                                {/* 댓글 섹션 */}
+                                <div className="mt-6 border-t border-white/[0.06] pt-6">
+                                    <h4 className="text-sm font-bold text-white/80 mb-4">
+                                        댓글 {mvComments.length > 0 && `(${mvComments.length})`}
+                                    </h4>
+                                    <div className="flex gap-3 mb-4">
+                                        <input
+                                            type="text"
+                                            value={mvNewComment}
+                                            onChange={(e) => setMvNewComment(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }}
+                                            placeholder="댓글을 입력하세요..."
+                                            className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30"
+                                        />
+                                        <Button
+                                            variant="primary"
+                                            className="px-4 py-2 text-xs shrink-0"
+                                            onClick={handleMvCommentSubmit}
+                                            disabled={mvCommentSubmitting || !mvNewComment.trim()}
+                                        >
+                                            {mvCommentSubmitting ? "..." : "작성"}
+                                        </Button>
+                                    </div>
+                                    {mvCommentsLoading ? (
+                                        <p className="text-white/40 text-sm">댓글 로딩 중...</p>
+                                    ) : mvComments.length === 0 ? (
+                                        <p className="text-white/40 text-sm">아직 댓글이 없습니다.</p>
+                                    ) : (
+                                        <div className="space-y-3 max-h-80 overflow-y-auto">
+                                            {mvComments.map((c) => (
+                                                <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03]">
+                                                    <img
+                                                        src={c.profileImageUrl || getDefaultAvatarUrl(c.nickname || "?")}
+                                                        alt=""
+                                                        className="size-8 rounded-full object-cover shrink-0 border border-white/[0.08]"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <span className="text-xs font-bold text-white/80 truncate">{c.nickname || "알 수 없음"}</span>
+                                                            {c.isArtist && (
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-bold">아티스트</span>
+                                                            )}
+                                                            {c.writerGradeName && !c.isArtist && (
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/60 font-bold">{c.writerGradeName}</span>
+                                                            )}
+                                                            <span className="text-[10px] text-white/30">
+                                                                {c.createdAt ? new Date(c.createdAt).toLocaleDateString("ko-KR") : ""}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-white/70 break-words">{c.content}</p>
+                                                    </div>
+                                                    {c.userId === myId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMvCommentDelete(c.id)}
+                                                            className="text-white/30 hover:text-red-400 transition-colors shrink-0"
+                                                            title="삭제"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </Surface>
+                        )}
+
+                        {/* MV 목록 */}
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-white">등록된 뮤직비디오</h3>
+                                {mvList.length > 0 && (
+                                    <div className="relative">
+                                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
+                                        <input
+                                            type="text"
+                                            value={mvSearchQuery}
+                                            onChange={(e) => setMvSearchQuery(e.target.value)}
+                                            placeholder="제목 또는 설명 검색"
+                                            className="pl-9 pr-4 py-2 rounded-xl bg-[#16102a] border border-white/[0.08] text-white text-sm w-64 placeholder:text-white/30"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            {mvLoading ? (
+                                <Surface variant="primary" className="py-12 text-center">
+                                    <p className="text-white/55">로딩 중...</p>
+                                </Surface>
+                            ) : mvList.length === 0 ? (
+                                <Surface variant="primary" className="p-12 text-center">
+                                    <p className="text-white/55 font-medium">등록된 영상이 없습니다.</p>
+                                </Surface>
+                            ) : mvList.length === 0 && mvSearchQuery.trim() ? (
+                                <Surface variant="primary" className="p-12 text-center">
+                                    <p className="text-white/55">검색 결과가 없습니다.</p>
+                                </Surface>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    {mvList.map((v) => (
+                                        <Surface
+                                            key={v.id}
+                                            variant="card"
+                                            className={`overflow-hidden group transition-all ${mvSelectedVideo?.id === v.id ? "ring-2 ring-violet-500" : ""}`}
+                                        >
+                                            <button type="button" onClick={() => setMvSelectedVideo(v)} className="w-full text-left">
+                                                <div className="aspect-video relative overflow-hidden">
+                                                    {v.thumbnailUrl ? (
+                                                        <img
+                                                            src={v.thumbnailUrl}
+                                                            alt=""
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-white/5 flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                                                        <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                            <div className="p-4 flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="font-bold text-white truncate">{v.title}</h4>
+                                                    <p className="text-sm text-white/50 truncate mt-0.5">{v.description}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="size-8 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0"
+                                                    onClick={(e) => { e.stopPropagation(); handleMvDelete(v.id); }}
+                                                    title="삭제"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                                </button>
+                                            </div>
+                                        </Surface>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* 새 글 작성 모달 */}
@@ -792,34 +1208,65 @@ export default function ArtistConsolePage() {
                             </label>
                         )}
 
-                        {/* 사진 첨부 */}
+                        {/* 첨부파일 */}
                         <div className="mt-5">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
-                                사진 첨부
-                            </span>
-                            <input ref={newPostFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleNewPostImageChange} />
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-sm text-white/40">attach_file</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-white/55">
+                                    첨부파일
+                                </span>
+                                <span className="text-[10px] font-bold text-white/40">
+                                    {newPostMediaAssetIds.length}/{MAX_POST_ATTACHMENTS}
+                                </span>
+                                {newPostAttachmentPreviews.length > 1 && (
+                                    <span className="text-[9px] text-violet-400/70 ml-auto">
+                                        클릭하여 대표 이미지 선택
+                                    </span>
+                                )}
+                            </div>
+                            <input ref={newPostFileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleNewPostFileChange} />
+                            {newPostUploadError && (
+                                <p className="text-red-400 text-xs mb-2">{newPostUploadError}</p>
+                            )}
                             {newPostAttachmentPreviews.length > 0 ? (
                                 <div className="space-y-3">
-                                    {newPostAttachmentPreviews.map((p) => (
-                                        <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                                            <img src={p.url} alt="미리보기" className="w-full max-h-48 object-contain bg-black/20" />
-                                            <button type="button" onClick={() => removeNewPostImage(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-                                                <span className="material-symbols-outlined text-lg">close</span>
-                                            </button>
+                                    <p className="text-[10px] text-white/30 font-medium">
+                                        클릭하여 대표 설정 · 드래그하여 순서 변경
+                                    </p>
+                                    <DraggableAttachmentGrid
+                                        attachments={newPostAttachmentPreviews}
+                                        representativeId={newPostRepresentativeId}
+                                        onSetRepresentative={setNewPostRepresentative}
+                                        onReorder={reorderNewPostAttachments}
+                                        onRemove={removeNewPostAttachment}
+                                    />
+                                    {canAddNewPostAttachment && !newPostUploading && (
+                                        <button
+                                            type="button"
+                                            onClick={() => newPostFileInputRef.current?.click()}
+                                            className="w-full py-3 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/40 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">add</span>
+                                            <span className="text-[10px] font-bold">파일 추가</span>
+                                        </button>
+                                    )}
+                                    {newPostUploading && (
+                                        <div className="flex items-center gap-2 py-2">
+                                            <div className="size-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                                            <span className="text-violet-300 text-xs font-medium">업로드 중...</span>
                                         </div>
-                                    ))}
-                                    <button type="button" onClick={() => newPostFileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">
-                                        + 추가
-                                    </button>
+                                    )}
                                 </div>
                             ) : (
                                 <button
                                     type="button"
                                     onClick={() => newPostFileInputRef.current?.click()}
-                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
+                                    disabled={newPostUploading}
+                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50"
                                 >
                                     <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
-                                    <span className="text-xs font-bold">클릭하여 사진 추가</span>
+                                    <span className="text-xs font-bold">{newPostUploading ? "업로드 중..." : "사진 또는 동영상 추가"}</span>
+                                    <span className="text-[10px] text-white/30">이미지·영상 최대 {MAX_POST_ATTACHMENTS}개</span>
                                 </button>
                             )}
                         </div>
@@ -837,7 +1284,7 @@ export default function ArtistConsolePage() {
                                 variant="primary"
                                 className="flex-1 py-4 text-sm uppercase tracking-widest"
                                 onClick={handleCreatePost}
-                                disabled={createPostLoading || !newPostContent.trim()}
+                                disabled={createPostLoading || newPostUploading || !newPostContent.trim()}
                             >
                                 {createPostLoading ? "게시 중..." : "게시하기"}
                             </Button>
@@ -845,6 +1292,19 @@ export default function ArtistConsolePage() {
                     </Surface>
                 </div>
             )}
+
+            <ProfileImageModal
+                isOpen={showProfileImageModal}
+                onClose={() => setShowProfileImageModal(false)}
+                currentImageUrl={displayAvatar}
+                mode="artist"
+                onSuccess={(newUrl) => {
+                    setMyProfile((prev) => prev ? { ...prev, profileImageUrl: newUrl } : prev);
+                    if (groupId === myId) {
+                        setGroupProfile((prev) => prev ? { ...prev, profileImageUrl: newUrl } : prev);
+                    }
+                }}
+            />
         </div>
     );
 }

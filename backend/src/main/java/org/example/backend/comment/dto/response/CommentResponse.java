@@ -13,6 +13,7 @@ public record CommentResponse(
         String profileImageUrl,
         String role,            // USER, ARTIST, GROUP, ADMIN
         boolean isArtist,       // 아티스트 댓글 강조용
+        String writerGradeName, // 해당 그룹 기준 팬 마일스톤 칭호 (댓글 작성자)
         String content,
         Boolean status,
         Instant createdAt,
@@ -34,7 +35,7 @@ public record CommentResponse(
      * - 삭제된 댓글은 "삭제된 댓글입니다." 문구로 대체
      * - hasArtistReply: 서비스에서 일괄 조회한 Set에 포함 여부로 판별
      */
-    public static CommentResponse of(Comment entity, User user, boolean hasArtistReply) {
+    public static CommentResponse of(Comment entity, User user, boolean hasArtistReply, String writerGradeName) {
         String displayContent = Boolean.TRUE.equals(entity.getStatus()) ? "삭제된 댓글입니다." : entity.getContent();
 
         return new CommentResponse(
@@ -44,6 +45,7 @@ public record CommentResponse(
                 user != null ? user.getProfileImageUrl() : null,
                 user != null ? user.getRole().name() : null,
                 checkArtist(user),
+                writerGradeName,
                 displayContent,
                 entity.getStatus(),
                 entity.getCreatedAt(),
@@ -57,7 +59,7 @@ public record CommentResponse(
      * 대댓글 전용 팩토리 메서드
      * - 대댓글에는 자식이 없으므로 replyCount = 0, hasArtistReply = false 고정
      */
-    public static CommentResponse ofReply(Comment entity, User user) {
+    public static CommentResponse ofReply(Comment entity, User user, String writerGradeName) {
         return new CommentResponse(
                 entity.getId(),
                 entity.getUserId(),
@@ -65,6 +67,7 @@ public record CommentResponse(
                 user != null ? user.getProfileImageUrl() : null,
                 user != null ? user.getRole().name() : null,
                 checkArtist(user),
+                writerGradeName,
                 entity.getContent(),
                 entity.getStatus(),
                 entity.getCreatedAt(),

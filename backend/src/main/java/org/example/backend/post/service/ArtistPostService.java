@@ -1,11 +1,11 @@
 package org.example.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.media_asset.service.CdnUrlResolver;
 import org.example.backend.post.dto.request.ArtistPostRequest;
 import org.example.backend.post.dto.response.ArtistPostResponse;
 import org.example.backend.post.dto.response.PostMediaAssetResponse;
@@ -19,9 +19,10 @@ import org.example.backend.comment.service.CommentService;
 import org.example.backend.notification.dto.request.NotificationSendRequest;
 import org.example.backend.notification.entity.NotificationType;
 import org.example.backend.notification.service.NotificationService;
+import org.example.backend.order.enums.OrderStatus;
+import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.post.repository.ArtistPostRepository;
 import org.example.backend.post.repository.PostMediaAssetRepository;
-import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.GroupMemberRepository;
@@ -35,11 +36,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -52,19 +54,15 @@ public class ArtistPostService {
     private final UserRepository userRepository;
     private final PostMediaAssetRepository postMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
-    private final AwsProperties awsProperties;
-    private final SubscriptionRepository subscriptionRepository;
+    private final CdnUrlResolver cdnUrlResolver;
+    private final OrderRepository orderRepository;
     private final ArtistPermissionService artistPermissionService;
     private final GroupMemberRepository groupMemberRepository;
     private final CommentService commentService;
     private final NotificationService notificationService;
 
     private String getCdnBaseUrl() {
-        String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
-        if (domain == null || domain.isBlank()) {
-            return null;
-        }
-        return domain.startsWith("http") ? domain : "https://" + domain;
+        return cdnUrlResolver.getBaseUrl();
     }
 
     private List<MediaAsset> validateAndFetchMediaAssets(Long userId, List<Long> mediaAssetIds) {
@@ -391,8 +389,13 @@ public class ArtistPostService {
             }
             return false;
         }
+        // USER: 멤버십 상품 일회 구매(12개월 내) 시에만 접근 가능
         Long artistId = post.getGroup() != null ? post.getGroup().getId() : post.getUser().getId();
-        return subscriptionRepository.existsActiveSubscriptionForArtist(userId, artistId, Instant.now());
+        return orderRepository.existsPaidMembershipOrder(
+                userId,
+                artistId,
+                OrderStatus.COMPLETED,
+                Instant.now().atZone(ZoneId.systemDefault()).minusMonths(12).toInstant());
     }
 
     /** 서비스 공지 등록 시 전체 유저에게 알림 발송 (작성자 제외) */

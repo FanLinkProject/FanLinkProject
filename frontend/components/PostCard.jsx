@@ -14,11 +14,13 @@ export default function PostCard({
   onComment,
   showCommentButton = true,
   isLocked = false,
+  isMembershipOnly = false,
   onDelete,
   onEdit,
   className = "",
 }) {
   const displayName = post.authorMemberName ?? post.authorName ?? "";
+  const gradeName = post.authorGradeName ?? null;
   const likes = likeCount ?? post.likes ?? 0;
   const comments = commentCount ?? post.comments ?? 0;
   const likeNum = typeof likes === "string" ? likes : String(likes);
@@ -50,12 +52,20 @@ export default function PostCard({
   };
 
   const cardContent = (
-    <Surface variant="card" className={"overflow-hidden p-8 " + (className || "")}>
+    <Surface variant="card" className={"overflow-hidden p-8 relative " + (className || "")}>
+      {isMembershipOnly && (
+        <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-violet-500/25 text-violet-300 text-[10px] font-black uppercase tracking-widest border border-violet-400/30">
+          멤버십
+        </span>
+      )}
       {/* 작성자 헤더 — 잠금 여부 관계없이 항상 표시 */}
       <div className="flex items-center gap-4 mb-6">
         <img src={post.authorAvatar} className="size-12 rounded-full border border-white/[0.08] shrink-0" alt="" />
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-white flex items-center gap-1.5 leading-none">
+            {gradeName && (
+              <span className="text-amber-300/90 text-sm font-bold shrink-0">[{gradeName}]</span>
+            )}
             {displayName}
             {showVerified && (
               <span className="material-symbols-outlined text-violet-300 text-lg fill-icon shrink-0" aria-hidden>verified</span>
@@ -63,11 +73,6 @@ export default function PostCard({
           </h4>
           <p className="text-[10px] text-white/55 font-bold uppercase tracking-widest mt-1">{post.timestamp}</p>
         </div>
-        {isLocked && (
-          <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[9px] font-black uppercase tracking-widest shrink-0">
-            멤버십 전용
-          </span>
-        )}
         {onEdit && (
           <button
             type="button"
@@ -101,7 +106,14 @@ export default function PostCard({
         <>
           <p className="text-white/80 text-lg leading-relaxed mb-6 font-normal whitespace-pre-wrap">{post.content}</p>
           {post.image && (
-            <img src={post.image} className="rounded-2xl w-full border border-white/[0.06] object-cover max-h-80" alt="" />
+            <div className="relative">
+              <img src={post.image} className="rounded-2xl w-full border border-white/[0.06] object-cover max-h-80" alt="" />
+              {post.attachmentCount > 1 && (
+                <span className="absolute top-3 right-3 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-sm text-white text-xs font-bold">
+                  +{post.attachmentCount - 1}
+                </span>
+              )}
+            </div>
           )}
           <div className="flex items-center gap-6 mt-6 pt-6 border-t border-white/[0.06]">
             <button

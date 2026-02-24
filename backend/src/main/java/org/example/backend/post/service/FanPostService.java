@@ -1,11 +1,11 @@
 package org.example.backend.post.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.media_asset.service.CdnUrlResolver;
 import org.example.backend.post.dto.request.FanPostRequest;
 import org.example.backend.post.dto.response.FanPostResponse;
 import org.example.backend.post.dto.response.PostMediaAssetResponse;
@@ -44,17 +44,13 @@ public class FanPostService {
     private final UserRepository userRepository;
     private final PostMediaAssetRepository postMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
-    private final AwsProperties awsProperties;
+    private final CdnUrlResolver cdnUrlResolver;
     private final FanProfileService fanProfileService;
     private final FanProfileRepository fanProfileRepository;
     private final CommentService commentService;
 
     private String getCdnBaseUrl() {
-        String domain = awsProperties.getCloudfront() != null ? awsProperties.getCloudfront().getDomain() : null;
-        if (domain == null || domain.isBlank()) {
-            return null;
-        }
-        return domain.startsWith("http") ? domain : "https://" + domain;
+        return cdnUrlResolver.getBaseUrl();
     }
 
     private List<MediaAsset> validateAndFetchMediaAssets(Long userId, List<Long> mediaAssetIds) {
@@ -87,6 +83,16 @@ public class FanPostService {
         return postMediaAssets.stream()
                 .map(pma -> PostMediaAssetResponse.from(pma.getMediaAsset(), cdnBaseUrl))
                 .collect(Collectors.toList());
+    }
+
+    /** 해당 그룹 기준 팬의 마일스톤 칭호명 반환 (없으면 null) */
+    private String getWriterGradeName(Long fanUserId, Long groupId) {
+        if (fanUserId == null || groupId == null) return null;
+        return fanProfileRepository.findByFan_IdAndGroup_Id(fanUserId, groupId)
+                .map(FanProfile::getGrade)
+                .filter(g -> g != null && g.getMilestone() != null)
+                .map(g -> g.getMilestone().getName())
+                .orElse(null);
     }
 
     @Transactional
@@ -127,7 +133,8 @@ public class FanPostService {
         }
 
         List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, savedPost.getId());
-        return FanPostResponse.from(savedPost, buildAttachmentResponses(attachments));
+        String gradeName = group != null ? getWriterGradeName(userId, group.getId()) : null;
+        return FanPostResponse.from(savedPost, buildAttachmentResponses(attachments), gradeName);
     }
 
     public FanPostResponse getPost(Long id) {
@@ -139,13 +146,18 @@ public class FanPostService {
         }
 
         List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, fanPost.getId());
-        return FanPostResponse.from(fanPost, buildAttachmentResponses(attachments));
+        String gradeName = fanPost.getGroup() != null ? getWriterGradeName(fanPost.getUser().getId(), fanPost.getGroup().getId()) : null;
+        return FanPostResponse.from(fanPost, buildAttachmentResponses(attachments), gradeName);
     }
 
     public List<FanPostResponse> getPosts(Long groupId, Long lastPostId, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
         return fanPostRepository.findPosts(groupId, lastPostId, pageable).stream()
-                .map(FanPostResponse::from)
+                .map(post -> {
+                    List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, post.getId());
+                    String gradeName = post.getGroup() != null ? getWriterGradeName(post.getUser().getId(), post.getGroup().getId()) : null;
+                    return FanPostResponse.from(post, buildAttachmentResponses(attachments), gradeName);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -171,7 +183,8 @@ public class FanPostService {
         }
 
         List<PostMediaAsset> attachments = postMediaAssetRepository.findAllByPostTypeAndPostIdOrderById(PostMediaAssetType.FAN, postId);
-        return FanPostResponse.from(fanPost, buildAttachmentResponses(attachments));
+        String gradeName = fanPost.getGroup() != null ? getWriterGradeName(fanPost.getUser().getId(), fanPost.getGroup().getId()) : null;
+        return FanPostResponse.from(fanPost, buildAttachmentResponses(attachments), gradeName);
     }
 
     @Transactional

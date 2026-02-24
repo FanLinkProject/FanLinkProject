@@ -7,9 +7,10 @@ import axios from "axios";
 
 // 데이터 및 유틸리티
 import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
-import { list as listMusicVideos } from "@/lib/musicVideoApi";
+import { list as listMusicVideos, getSafeEmbedUrl } from "@/lib/musicVideoApi";
+import { getDefaultAvatarUrl } from "@/lib/avatar";
 import { listByArtist as listReplays } from "@/lib/replayApi";
-import { request, apiGet, apiPost, BASE_URL } from "@/lib/api";
+import { request, apiGet, apiPost, BASE_URL, getAuthHeaders } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
@@ -20,36 +21,19 @@ import {
     getConcertStatusBadgeLabel,
     CONCERT_STATUS_KEYS
 } from "@/lib/concertUtils";
+import { usePostAttachments } from "@/lib/usePostAttachments";
+import { MAX_POST_ATTACHMENTS } from "@/lib/mediaAssetApi";
 
 // 컴포넌트
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
+import DraggableAttachmentGrid from "@/components/common/DraggableAttachmentGrid";
 import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
 // --- 상수 및 헬퍼 함수 ---
 const CANDY_COST = 500;
-
-/** embed URL(또는 short URL)을 YouTube watch URL로 변환. 새 탭에서 열 때 153 오류 방지 */
-function toYouTubeWatchUrl(url) {
-  if (!url || typeof url !== "string") return null;
-  const trimmed = url.trim();
-  const embedMatch = trimmed.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/i);
-  if (embedMatch) return `https://www.youtube.com/watch?v=${embedMatch[1]}`;
-  const shortMatch = trimmed.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/i);
-  if (shortMatch) return `https://www.youtube.com/watch?v=${shortMatch[1]}`;
-  if (/youtube\.com\/watch\?/i.test(trimmed)) return trimmed;
-  return null;
-}
 const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
-
-function getAuthHeaders() {
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-    return {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: token }),
-    };
-}
 
 function getCurrentUser() {
     if (typeof window === "undefined") return null;
@@ -83,13 +67,15 @@ function formatTimestamp(instant) {
 }
 
 function transformArtistPost(p, groupAvatar = "") {
+    const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
         authorName: p.writerNickname || "",
         authorMemberName: null,
         authorAvatar: p.writerProfileImageUrl || groupAvatar,
         content: p.content || "",
-        image: p.attachments?.[0]?.url || null,
+        image: attachments[0]?.url || null,
+        attachmentCount: attachments.length,
         timestamp: formatTimestamp(p.createdAt),
         isMembershipOnly: p.isMembershipOnly ?? false,
         isLockedByServer: !!(p.isMembershipOnly && p.content === null),
@@ -99,14 +85,17 @@ function transformArtistPost(p, groupAvatar = "") {
 }
 
 function transformFanPost(p) {
+    const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
         writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
+        authorGradeName: p.writerGradeName ?? null,
         authorAvatar: p.writerProfileImageUrl || "",
         content: p.content || "",
-        image: p.attachments?.[0]?.url || null,
+        image: attachments[0]?.url || null,
+        attachmentCount: attachments.length,
         timestamp: formatTimestamp(p.createdAt),
         type: "FAN",
     };
@@ -172,9 +161,32 @@ function ArtistDetailPageInner({ paramsId }) {
     const fanPostFileInputRef = useRef(null);
     const artistPostsBottomRef = useRef(null);
     const fanPostsBottomRef = useRef(null);
+    const [selectedMV, setSelectedMV] = useState(null);
+    const [mvSearchQuery, setMvSearchQuery] = useState("");
+    const [mvComments, setMvComments] = useState([]);
+    const [mvCommentsLoading, setMvCommentsLoading] = useState(false);
+    const [mvNewComment, setMvNewComment] = useState("");
+    const [mvCommentSubmitting, setMvCommentSubmitting] = useState(false);
     const groupId = Number(paramsId);
     const postGroupId = groupId;
     const isRealGroup = !isNaN(groupId);
+
+    const {
+        mediaAssetIds: fanPostMediaAssetIds,
+        attachmentPreviews: fanPostAttachmentPreviews,
+        addAttachment: addFanPostAttachment,
+        removeAttachment: removeFanPostAttachment,
+        setRepresentative: setFanPostRepresentative,
+        reorderAttachments: reorderFanPostAttachments,
+        resetAttachments: resetFanPostAttachments,
+        canAddAttachment: canAddFanPostAttachment,
+        uploading: fanPostUploading,
+        uploadError: fanPostUploadError,
+        representativeMediaAssetId: fanPostRepresentativeId,
+    } = usePostAttachments({
+        postGroupId: groupId,
+        postIdOrTemp: "tmp_fan_new",
+    });
 
     // 1. 아티스트 기본 정보 및 대시보드 로드
     useEffect(() => {
@@ -410,15 +422,70 @@ function ArtistDetailPageInner({ paramsId }) {
             .finally(() => setVodLoading(false));
     }, [activeTab, artist?.backendId]);
 
-    // 6. MV 탭 활성화 시 로드
-    useEffect(() => {
-        if (activeTab !== "MV" || !artist) return;
+    // 6. MV 탭 활성화 시 로드 (검색어 포함)
+    const mvSearchTimerRef = useRef(null);
+    const loadMusicVideos = useCallback((keyword) => {
+        if (!artist) return;
         setMusicVideosLoading(true);
-        listMusicVideos(artist.backendId || artist.id)
+        listMusicVideos(artist.backendId || artist.id, keyword)
             .then(res => setMusicVideos(Array.isArray(res) ? res : []))
             .catch(() => setMusicVideos([]))
             .finally(() => setMusicVideosLoading(false));
+    }, [artist]);
+
+    useEffect(() => {
+        if (activeTab === "MV") loadMusicVideos(mvSearchQuery);
     }, [activeTab, artist]);
+
+    useEffect(() => {
+        if (activeTab !== "MV" || !artist) return;
+        clearTimeout(mvSearchTimerRef.current);
+        mvSearchTimerRef.current = setTimeout(() => {
+            loadMusicVideos(mvSearchQuery);
+        }, 300);
+        return () => clearTimeout(mvSearchTimerRef.current);
+    }, [mvSearchQuery]);
+
+    // MV 댓글 로드
+    const loadMvComments = useCallback((videoId) => {
+        if (!videoId) return;
+        setMvCommentsLoading(true);
+        request(`/api/comments?targetType=MEDIA&targetId=${videoId}&size=50`)
+            .then((data) => setMvComments(data?.content || []))
+            .catch(() => setMvComments([]))
+            .finally(() => setMvCommentsLoading(false));
+    }, []);
+
+    useEffect(() => {
+        if (selectedMV?.id) loadMvComments(selectedMV.id);
+        else setMvComments([]);
+    }, [selectedMV?.id]);
+
+    const handleMvCommentSubmit = async () => {
+        if (!mvNewComment.trim() || !selectedMV?.id || mvCommentSubmitting) return;
+        setMvCommentSubmitting(true);
+        try {
+            await request("/api/comments", {
+                method: "POST",
+                body: { targetId: selectedMV.id, targetType: "MEDIA", content: mvNewComment.trim() },
+            });
+            setMvNewComment("");
+            loadMvComments(selectedMV.id);
+        } catch (err) {
+            console.error("댓글 작성 실패", err);
+        } finally {
+            setMvCommentSubmitting(false);
+        }
+    };
+
+    const handleMvCommentDelete = async (commentId) => {
+        try {
+            await request(`/api/comments/${commentId}`, { method: "DELETE" });
+            loadMvComments(selectedMV.id);
+        } catch (err) {
+            console.error("댓글 삭제 실패", err);
+        }
+    };
 
     // --- 핸들러 함수들 ---
 
@@ -524,19 +591,32 @@ function ArtistDetailPageInner({ paramsId }) {
 
     const closeFanPostModal = () => {
         setNewPostContent("");
+        resetFanPostAttachments();
         setShowCreateModal(false);
     };
 
+    const handleFanPostFileChange = async (e) => {
+        const file = e?.target?.files?.[0];
+        if (!file) return;
+        await addFanPostAttachment(file);
+        e.target.value = "";
+    };
+
     const handleCreatePost = async () => {
-        if (!newPostContent.trim()) return;
-        if (createPostLoading) return;
+        if (!newPostContent.trim() || createPostLoading || fanPostUploading) return;
 
         if (isRealGroup && groupId) {
             setCreatePostLoading(true);
             try {
                 const created = await request("/api/fan-posts", {
                     method: "POST",
-                    body: { groupId, title: "", content: newPostContent.trim(), mediaAssetIds: null },
+                    body: {
+                        groupId,
+                        title: "",
+                        content: newPostContent.trim(),
+                        mediaAssetIds: fanPostMediaAssetIds.length > 0 ? fanPostMediaAssetIds : null,
+                        representativeMediaAssetId: fanPostRepresentativeId,
+                    },
                 });
                 const newPost = transformFanPost(created);
                 setFanPosts((prev) => [newPost, ...prev]);
@@ -613,15 +693,17 @@ function ArtistDetailPageInner({ paramsId }) {
                         </div>
                     </div>
                     <div className="pb-1 flex items-center gap-3">
-                        {artist.isSubscribed ? (
+                        {artist.isFollowing ? (
                             <>
-                                <Button variant="ghost" className="px-8" disabled>구독 중</Button>
+                                {artist.isSubscribed ? (
+                                    <Button variant="ghost" className="px-8" disabled>구독 중</Button>
+                                ) : (
+                                    <Button variant="ghost" className="px-8" disabled>팔로우중</Button>
+                                )}
                                 <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
                                     {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
                                 </Button>
                             </>
-                        ) : artist.isFollowing ? (
-                            <Button variant="ghost" className="px-8" disabled>팔로우중</Button>
                         ) : (
                             <Button
                                 variant="primary"
@@ -988,24 +1070,143 @@ function ArtistDetailPageInner({ paramsId }) {
                     )}
 
                     {activeTab === "MV" && (
-                        musicVideosLoading ? (
-                            <p className="text-white/40">로딩 중...</p>
-                        ) : musicVideos.length > 0 ? (
-                            <div className="grid grid-cols-2 gap-6">
-                                {musicVideos.map(mv => (
-                                    <Surface key={mv.id} className="p-4 group cursor-pointer">
-                                        <a href={toYouTubeWatchUrl(mv.embedUrl) || mv.embedUrl} target="_blank" rel="noreferrer">
-                                            <div className="aspect-video rounded-xl overflow-hidden mb-4">
-                                                <img src={mv.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
+                        <div className="space-y-6">
+                            {musicVideos.length > 0 && (
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
+                                    <input
+                                        type="text"
+                                        value={mvSearchQuery}
+                                        onChange={(e) => setMvSearchQuery(e.target.value)}
+                                        placeholder="MV 제목 검색"
+                                        className="pl-9 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm w-full sm:w-72 placeholder:text-white/30"
+                                    />
+                                </div>
+                            )}
+
+                            {selectedMV && (
+                                <Surface variant="primary" className="p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-white truncate flex-1 mr-4">{selectedMV.title}</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedMV(null)}
+                                            className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors shrink-0"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">close</span>
+                                        </button>
+                                    </div>
+                                    <div className="aspect-video rounded-xl overflow-hidden bg-black">
+                                        <iframe
+                                            src={getSafeEmbedUrl(selectedMV.embedUrl)}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            className="w-full h-full"
+                                            title={selectedMV.title}
+                                            referrerPolicy="strict-origin-when-cross-origin"
+                                        />
+                                    </div>
+                                    {selectedMV.description && (
+                                        <p className="text-white/60 text-sm mt-4 whitespace-pre-wrap">{selectedMV.description}</p>
+                                    )}
+
+                                    {/* 댓글 섹션 */}
+                                    <div className="mt-6 border-t border-white/[0.06] pt-6">
+                                        <h4 className="text-sm font-bold text-white/80 mb-4">
+                                            댓글 {mvComments.length > 0 && `(${mvComments.length})`}
+                                        </h4>
+                                        {currentUser && (
+                                            <div className="flex gap-3 mb-4">
+                                                <input
+                                                    type="text"
+                                                    value={mvNewComment}
+                                                    onChange={(e) => setMvNewComment(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }}
+                                                    placeholder="댓글을 입력하세요..."
+                                                    className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-500 transition-colors disabled:opacity-50 shrink-0"
+                                                    onClick={handleMvCommentSubmit}
+                                                    disabled={mvCommentSubmitting || !mvNewComment.trim()}
+                                                >
+                                                    {mvCommentSubmitting ? "..." : "작성"}
+                                                </button>
                                             </div>
-                                            <h4 className="font-bold text-white truncate">{mv.title}</h4>
-                                        </a>
-                                    </Surface>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">MV가 없습니다.</p>
-                        )
+                                        )}
+                                        {mvCommentsLoading ? (
+                                            <p className="text-white/40 text-sm">댓글 로딩 중...</p>
+                                        ) : mvComments.length === 0 ? (
+                                            <p className="text-white/40 text-sm">아직 댓글이 없습니다.</p>
+                                        ) : (
+                                            <div className="space-y-3 max-h-80 overflow-y-auto">
+                                                {mvComments.map((c) => (
+                                                    <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03]">
+                                                        <img
+                                                            src={c.profileImageUrl || getDefaultAvatarUrl(c.nickname || "?")}
+                                                            alt=""
+                                                            className="size-8 rounded-full object-cover shrink-0 border border-white/[0.08]"
+                                                        />
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <span className="text-xs font-bold text-white/80 truncate">{c.nickname || "알 수 없음"}</span>
+                                                                {c.isArtist && (
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-bold">아티스트</span>
+                                                                )}
+                                                                {c.writerGradeName && !c.isArtist && (
+                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/60 font-bold">{c.writerGradeName}</span>
+                                                                )}
+                                                                <span className="text-[10px] text-white/30">
+                                                                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString("ko-KR") : ""}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm text-white/70 break-words">{c.content}</p>
+                                                        </div>
+                                                        {currentUser && c.userId === currentUser.id && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleMvCommentDelete(c.id)}
+                                                                className="text-white/30 hover:text-red-400 transition-colors shrink-0"
+                                                                title="삭제"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </Surface>
+                            )}
+
+                            {musicVideosLoading ? (
+                                <p className="text-white/40">로딩 중...</p>
+                            ) : musicVideos.length === 0 && !mvSearchQuery.trim() ? (
+                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">MV가 없습니다.</p>
+                            ) : musicVideos.length === 0 ? (
+                                <p className="text-white/30 py-12 text-center bg-white/5 rounded-2xl">검색 결과가 없습니다.</p>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-6">
+                                    {musicVideos.map(mv => (
+                                        <Surface key={mv.id} className={`overflow-hidden group cursor-pointer transition-all ${selectedMV?.id === mv.id ? "ring-2 ring-violet-500" : ""}`}>
+                                            <button type="button" onClick={() => setSelectedMV(mv)} className="w-full text-left">
+                                                <div className="aspect-video relative overflow-hidden">
+                                                    <img src={mv.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="" />
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                                                        <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4">
+                                                    <h4 className="font-bold text-white truncate">{mv.title}</h4>
+                                                </div>
+                                            </button>
+                                        </Surface>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     )}
 
                 </div>
@@ -1062,19 +1263,65 @@ function ArtistDetailPageInner({ paramsId }) {
                             value={newPostContent}
                             onChange={(e) => setNewPostContent(e.target.value)}
                         />
-                        {/* 첨부파일 버튼 */}
+                        {/* 첨부파일 */}
                         <div className="mt-4">
-                            <button
-                                type="button"
-                                onClick={() => fanPostFileInputRef.current?.click()}
-                                className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
-                                <span className="text-xs font-bold">사진 첨부</span>
-                            </button>
-                            <input ref={fanPostFileInputRef} type="file" accept="image/*" className="hidden" />
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-sm text-white/40">attach_file</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-white/55">첨부파일</span>
+                                <span className="text-[10px] font-bold text-white/40">{fanPostMediaAssetIds.length}/{MAX_POST_ATTACHMENTS}</span>
+                                {fanPostAttachmentPreviews.length > 1 && (
+                                    <span className="text-[9px] text-violet-400/70 ml-auto">클릭하여 대표 이미지 선택</span>
+                                )}
+                            </div>
+                            <input ref={fanPostFileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFanPostFileChange} />
+                            {fanPostUploadError && (
+                                <p className="text-red-400 text-xs mb-2">{fanPostUploadError}</p>
+                            )}
+                            {fanPostAttachmentPreviews.length > 0 ? (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] text-white/30 font-medium">
+                                        클릭하여 대표 설정 · 드래그하여 순서 변경
+                                    </p>
+                                    <DraggableAttachmentGrid
+                                        attachments={fanPostAttachmentPreviews}
+                                        representativeId={fanPostRepresentativeId}
+                                        onSetRepresentative={setFanPostRepresentative}
+                                        onReorder={reorderFanPostAttachments}
+                                        onRemove={removeFanPostAttachment}
+                                    />
+                                    {canAddFanPostAttachment && !fanPostUploading && (
+                                        <button
+                                            type="button"
+                                            onClick={() => fanPostFileInputRef.current?.click()}
+                                            className="w-full py-3 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/40 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">add</span>
+                                            <span className="text-[10px] font-bold">파일 추가</span>
+                                        </button>
+                                    )}
+                                    {fanPostUploading && (
+                                        <div className="flex items-center gap-2 py-2">
+                                            <div className="size-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                                            <span className="text-violet-300 text-xs font-medium">업로드 중...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => fanPostFileInputRef.current?.click()}
+                                    disabled={fanPostUploading}
+                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50"
+                                >
+                                    <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                                    <span className="text-xs font-bold">{fanPostUploading ? "업로드 중..." : "사진 또는 동영상 추가"}</span>
+                                    <span className="text-[10px] text-white/30">이미지·영상 최대 {MAX_POST_ATTACHMENTS}개</span>
+                                </button>
+                            )}
                         </div>
-                        <Button variant="primary" className="w-full mt-6 py-4" onClick={handleCreatePost}>게시하기</Button>
+                        <Button variant="primary" className="w-full mt-6 py-4" onClick={handleCreatePost} disabled={createPostLoading || fanPostUploading || !newPostContent.trim()}>
+                            {createPostLoading ? "게시 중..." : "게시하기"}
+                        </Button>
                     </Surface>
                 </div>
             )}
