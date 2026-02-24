@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -33,10 +34,11 @@ public class ArtistMusicVideoController {
                 .body(response);
     }
 
-    // MV 목록 조회 요청을 처리한다.
+    // MV 목록 조회 요청을 처리한다. q 파라미터로 제목/설명 검색 가능.
     @GetMapping
-    public ResponseEntity<List<MusicVideoResponse>> list(@PathVariable Long artistId) {
-        return ResponseEntity.ok(artistMusicVideoService.list(artistId));
+    public ResponseEntity<List<MusicVideoResponse>> list(@PathVariable Long artistId,
+                                                         @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(artistMusicVideoService.list(artistId, q));
     }
 
     // MV 상세 조회 요청을 처리한다.

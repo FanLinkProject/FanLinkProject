@@ -1,12 +1,12 @@
 package org.example.backend.product.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetCategory;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.gateway.FanPageGateway;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.media_asset.service.CdnUrlResolver;
 import org.example.backend.product.dto.request.ProductRequestDto;
 import org.example.backend.product.dto.response.ProductDetailResponse;
 import org.example.backend.product.dto.response.ProductMediaAssetResponse;
@@ -39,7 +39,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final ProductMediaAssetRepository productMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
-    private final AwsProperties awsProperties;
+    private final CdnUrlResolver cdnUrlResolver;
     private final FanPageGateway fanPageGateway;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -153,7 +153,7 @@ public class ProductService {
 
         Product savedProduct = productRepository.save(product);
 
-        List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(request.mediaAssetIds());
+        List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(userId, request.mediaAssetIds());
         for (MediaAsset asset : mediaAssets) {
             productMediaAssetRepository.save(new ProductMediaAsset(savedProduct, asset));
         }
@@ -161,7 +161,7 @@ public class ProductService {
         return toDetailResponse(savedProduct);
     }
 
-    private List<MediaAsset> validateAndFetchMediaAssets(List<Long> mediaAssetIds) {
+    private List<MediaAsset> validateAndFetchMediaAssets(Long ownerUserId, List<Long> mediaAssetIds) {
         if (CollectionUtils.isEmpty(mediaAssetIds)) {
             return Collections.emptyList();
         }
@@ -169,6 +169,9 @@ public class ProductService {
         for (Long id : mediaAssetIds) {
             MediaAsset asset = mediaAssetRepository.findById(id)
                     .orElseThrow(() -> new ProductException(ProductErrorCode.MEDIA_ASSET_NOT_FOUND));
+            if (!asset.getOwnerUserId().equals(ownerUserId)) {
+                throw new ProductException(ProductErrorCode.MEDIA_ASSET_NOT_FOUND);
+            }
             if (asset.getStatus() != MediaAssetStatus.READY) {
                 throw new ProductException(ProductErrorCode.MEDIA_ASSET_NOT_READY);
             }
@@ -217,7 +220,7 @@ public class ProductService {
 
         if (request.mediaAssetIds() != null) {
             productMediaAssetRepository.deleteAllByProduct_Id(id);
-            List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(request.mediaAssetIds());
+            List<MediaAsset> mediaAssets = validateAndFetchMediaAssets(userId, request.mediaAssetIds());
             for (MediaAsset asset : mediaAssets) {
                 productMediaAssetRepository.save(new ProductMediaAsset(product, asset));
             }
@@ -384,14 +387,6 @@ public class ProductService {
     }
 
     private String resolveCdnBaseUrl() {
-        String domain = awsProperties.getCloudfront().getDomain();
-        if (domain == null || domain.isBlank()) {
-            return null;
-        }
-        String normalized = domain.trim();
-        if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
-            return normalized;
-        }
-        return "https://" + normalized;
+        return cdnUrlResolver.getBaseUrl();
     }
 }

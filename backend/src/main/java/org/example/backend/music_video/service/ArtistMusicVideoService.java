@@ -58,13 +58,13 @@ public class ArtistMusicVideoService {
         return toResponse(saved);
     }
 
-    // 아티스트 MV 목록을 최신순으로 조회한다.
-    public List<MusicVideoResponse> list(Long artistId) {
+    // 아티스트 MV 목록을 최신순으로 조회한다. keyword가 주어지면 제목/설명 검색.
+    public List<MusicVideoResponse> list(Long artistId, String keyword) {
         validateArtistExists(artistId);
-        return artistMusicVideoRepository.findAllByArtistIdOrderByCreatedAtDesc(artistId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        List<ArtistMusicVideo> videos = (keyword != null && !keyword.isBlank())
+                ? artistMusicVideoRepository.searchByArtistIdAndKeyword(artistId, keyword.trim())
+                : artistMusicVideoRepository.findAllByArtistIdOrderByCreatedAtDesc(artistId);
+        return videos.stream().map(this::toResponse).toList();
     }
 
     // MV 상세 조회를 처리한다.
