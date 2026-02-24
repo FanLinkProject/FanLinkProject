@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MOCK_POSTS, MOCK_ARTISTS } from "@/lib/mockData";
 import { request } from "@/lib/api";
@@ -690,32 +689,17 @@ function PostDetailContent({ id }) {
 
   if (!post) return null;
 
-  const backHref = fromNotices
-    ? "/notices"
-    : fromArtistConsole
-    ? "/home"
-    : backArtistId
-    ? `/artists/${backArtistId}${type === "FAN" ? "?tab=FAN" : ""}`
-    : "/";
-
-  const backLabel = fromNotices
-    ? "전체 공지사항으로 돌아가기"
-    : fromArtistConsole
-    ? "아티스트 홈으로 돌아가기"
-    : type === "FAN"
-    ? "팬 페이지로 돌아가기"
-    : "아티스트 페이지로 돌아가기";
-
   return (
     <div className="max-w-6xl mx-auto p-8 flex flex-col lg:flex-row gap-8 min-h-full">
       <div className="flex-1 space-y-6">
-        <Link
-          href={backHref}
+        <button
+          type="button"
+          onClick={() => router.back()}
           className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          {backLabel}
-        </Link>
+          뒤로가기
+        </button>
 
         <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden relative">
           {post.isMembershipOnly && (

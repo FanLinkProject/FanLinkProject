@@ -1030,7 +1030,6 @@ function ArtistDetailPageInner({ paramsId }) {
                 <aside className="hidden lg:col-span-4 lg:flex flex-col gap-8">
                     <Surface variant="primary" className="p-8 border border-violet-500/20">
                         <span className="text-violet-300 text-[10px] font-black tracking-widest uppercase">Membership</span>
-                        <h3 className="text-2xl font-bold text-white mt-3">공식 멤버십 가입</h3>
                         <p className="text-white/60 text-sm mt-4 leading-relaxed">
                             {artist.name}의 미공개 포스트와 라이브 스트리밍 혜택을 누리세요.
                         </p>

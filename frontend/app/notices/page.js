@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 
@@ -25,6 +26,7 @@ function formatTimestamp(instant) {
 
 /** 플랫폼 전체 공지사항 (서비스 공지) */
 export default function NoticesPage() {
+  const router = useRouter();
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasNext, setHasNext] = useState(false);
@@ -80,13 +82,14 @@ export default function NoticesPage() {
 
   return (
     <div className="min-h-full max-w-3xl mx-auto px-8 py-8">
-      <Link
-        href="/home"
+      <button
+        type="button"
+        onClick={() => router.back()}
         className="inline-flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-colors mb-6"
       >
         <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-        홈으로
-      </Link>
+        뒤로가기
+      </button>
 
       <h1 className="text-2xl font-bold text-white mb-2">전체 공지사항</h1>
       <p className="text-sm text-white/55 mb-8">플랫폼 공식 공지입니다.</p>

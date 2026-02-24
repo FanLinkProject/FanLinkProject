@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import Surface from "@/components/ui/Surface";
 
@@ -26,6 +26,7 @@ function formatTimestamp(instant) {
 
 export default function ArtistNoticesPage() {
     const params = useParams();
+    const router = useRouter();
     const id = params?.id;
     const groupId = Number(id);
     const isRealGroup = !isNaN(groupId) && groupId > 0;
@@ -96,13 +97,14 @@ export default function ArtistNoticesPage() {
 
     return (
         <div className="min-h-full max-w-3xl mx-auto px-8 py-8">
-            <Link
-                href={`/artists/${id}`}
+            <button
+                type="button"
+                onClick={() => router.back()}
                 className="inline-flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-colors mb-6"
             >
                 <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-                {artistName ? `${artistName} 페이지로` : "아티스트 페이지로"} 돌아가기
-            </Link>
+                뒤로가기
+            </button>
 
             <h1 className="text-2xl font-bold text-white mb-2">전체 공지사항</h1>
             {artistName && (

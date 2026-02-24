@@ -63,6 +63,7 @@ function formatTimestamp(instant) {
 function transformArtistPost(p, groupAvatar = "") {
     return {
         id: p.id,
+        writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
         authorAvatar: p.writerProfileImageUrl || groupAvatar,
@@ -455,6 +456,22 @@ export default function ArtistConsolePage() {
         }
     };
 
+    // 아티스트 포스트 수정
+    const handleEditArtistPost = (postId) => {
+        router.push(`/artist-console/posts/${postId}/edit`);
+    };
+
+    // 아티스트 포스트 삭제
+    const handleDeleteArtistPost = async (postId) => {
+        if (!window.confirm("게시글을 삭제하시겠습니까?")) return;
+        try {
+            await request(`/api/artist-posts/${postId}`, { method: "DELETE" });
+            setArtistPosts((prev) => prev.filter((p) => p.id !== postId));
+        } catch (err) {
+            console.error("아티스트 포스트 삭제 실패", err);
+        }
+    };
+
     // 아티스트 포스트 좋아요 토글
     const handleArtistPostLike = (postId) => {
         if (!currentUser) { router.push("/login"); return; }
@@ -564,6 +581,7 @@ export default function ArtistConsolePage() {
                         { id: "LIVE", label: "Live History" },
                         { id: "CONCERTS", label: "Concerts" },
                         { id: "MV", label: "MV", href: "/artist-console/music-videos" },
+                        { id: "MARKET", label: "마켓", href: "/market" },
                     ].map((tab) =>
                         tab.href ? (
                             <Link
@@ -629,6 +647,10 @@ export default function ArtistConsolePage() {
                                             `/posts/${postId}?type=ARTIST&groupId=${groupId}&from=artist-console`
                                         )
                                     }
+                                    onEdit={handleEditArtistPost}
+                                    onDelete={handleDeleteArtistPost}
+                                    canEditSet={myId ? new Set(artistPosts.filter((p) => p.writerId === myId).map((p) => p.id)) : undefined}
+                                    canDeleteSet={myId ? new Set(artistPosts.filter((p) => p.writerId === myId).map((p) => p.id)) : undefined}
                                 />
                                 {/* 무한스크롤 sentinel */}
                                 <div ref={artistPostsBottomRef} className="py-1">

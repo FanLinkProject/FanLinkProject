@@ -40,7 +40,8 @@ function getLayoutVariant(pathname, role) {
     pathname === "/home" ||
     pathname === "/mypage" ||
     pathname === "/notifications" ||
-    pathname.startsWith("/posts")
+    pathname.startsWith("/posts") ||
+    pathname.startsWith("/market")
   ) {
     if (role === "ROLE_ADMIN") return "admin";
     if (role === "ROLE_GROUP") return "group";
