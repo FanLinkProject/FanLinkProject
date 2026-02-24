@@ -23,6 +23,8 @@ public class ConcertCreateRequest {
     private Long posterMediaAssetId;
     private Integer presaleTicketCount;
     private Integer saleTicketCount;
+    private Long presaleTicketPrice;   // 선예매 티켓 가격 (원)
+    private Long saleTicketPrice;      // 일반 예매 티켓 가격 (원)
     private Instant presaleStartDateTime;
     private Instant presaleEndDateTime;
     private Instant saleStartDateTime;

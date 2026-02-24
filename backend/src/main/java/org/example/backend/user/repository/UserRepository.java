@@ -155,4 +155,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 관리자: 아티스트/그룹 검색 (닉네임)
     @Query("SELECT u FROM User u WHERE u.role IN :roles AND u.deletedAt IS NULL AND LOWER(u.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')) ORDER BY u.createdAt DESC")
     Page<User> findForAdminArtistSearch(@Param("roles") java.util.List<UserRole> roles, @Param("keyword") String keyword, Pageable pageable);
+
+    /** 공지 알림 발송용: 탈퇴하지 않은 전체 유저 ID */
+    @Query(value = "SELECT id FROM users WHERE deleted_at IS NULL", nativeQuery = true)
+    java.util.List<Long> findAllUserIdsByDeletedAtIsNull();
 }

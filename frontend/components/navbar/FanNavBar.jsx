@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
+import NoticeButton from "@/components/NoticeButton";
+import { useNotifications } from "@/app/providers/NotificationProvider";
 
 import { BASE_URL } from "@/lib/api";
 function getAuthHeaders() {
@@ -19,6 +21,7 @@ export default function FanNavBar({ showSidebarToggle, sidebarOpen, onSidebarTog
   const pathname = usePathname();
   const [profile, setProfile] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { unreadCount = 0 } = useNotifications() ?? {};
 
   useEffect(() => {
     setIsLoggedIn(!!getAuthHeaders().Authorization);
@@ -94,14 +97,18 @@ export default function FanNavBar({ showSidebarToggle, sidebarOpen, onSidebarTog
         </Link>
       </nav>
 
-      {isLoggedIn && (
-        <div className="flex items-center gap-6 shrink-0">
+      <div className="flex items-center gap-6 shrink-0">
+        <NoticeButton />
+        {isLoggedIn && (
+          <>
           <Link
             href="/notifications"
             className="p-2 text-white/80 hover:bg-white/10 rounded-full transition-colors relative"
             aria-label="알림">
             <span className="material-symbols-outlined">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-violet-400 rounded-full border-2 border-[#0b0618]" />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-violet-400 rounded-full border-2 border-[#0b0618]" />
+            )}
           </Link>
 
           <Link
@@ -114,8 +121,9 @@ export default function FanNavBar({ showSidebarToggle, sidebarOpen, onSidebarTog
               className="size-9 rounded-full border border-white/20 group-hover:border-violet-400/50 transition-colors shadow-lg object-cover"
             />
           </Link>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </header>
   );
 }

@@ -21,6 +21,12 @@ import org.example.backend.media_asset.config.AwsProperties;
 import org.example.backend.media_asset.entity.MediaAsset;
 import org.example.backend.media_asset.entity.MediaAssetStatus;
 import org.example.backend.media_asset.repository.MediaAssetRepository;
+import org.example.backend.product.dto.request.ProductRequestDto;
+import org.example.backend.product.entity.Product;
+import org.example.backend.product.enums.ProductPaymentMethod;
+import org.example.backend.product.enums.ProductType;
+import org.example.backend.product.repository.ProductRepository;
+import org.example.backend.product.service.ProductService;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
@@ -47,22 +53,30 @@ public class ConcertService {
     private final ConcertMediaAssetRepository concertMediaAssetRepository;
     private final MediaAssetRepository mediaAssetRepository;
     private final UserRepository userRepository;
+    private final ProductService productService;
+    private final ProductRepository productRepository;
     private final AwsProperties awsProperties;
 
     /**
      * 공연 생성
      */
     public ConcertResponse createConcert(Long creatorId, ConcertCreateRequest request) {
-        // 아티스트 권한 확인
+        // 아티스트/그룹 권한 확인
         User creator = userRepository.findById(creatorId)
                 .orElseThrow(() -> new ConcertException(ConcertErrorCode.NOT_ARTIST_USER));
-        if (creator.getRole() != UserRole.ARTIST) {
+        if (creator.getRole() != UserRole.ARTIST && creator.getRole() != UserRole.GROUP) {
             throw new ConcertException(ConcertErrorCode.NOT_ARTIST_USER);
         }
 
         // 날짜 검증
         validateDateRange(request.getStartDateTime(), request.getEndDateTime());
         validateSalePeriod(request);
+
+        // 선예매 입력 시 해당 아티스트(또는 그룹)의 멤버십 상품 필요
+        int presaleCount = request.getPresaleTicketCount() != null ? request.getPresaleTicketCount() : 0;
+        if (presaleCount > 0 && !productRepository.existsByArtistIdAndIsMembershipTrue(creatorId)) {
+            throw new ConcertException(ConcertErrorCode.NO_MEMBERSHIP_PRODUCT);
+        }
 
         // 위치 조회
         Location location = null;
@@ -97,12 +111,18 @@ public class ConcertService {
             concertMediaAssetRepository.save(cma);
         }
 
-        // 아티스트 추가 (artistIds가 없으면 생성자 본인을 추가)
+        // 아티스트 추가: 개인 아티스트는 미선택 시 본인 자동 추가, 그룹 계정은 참여 아티스트 필수
         List<Long> artistIds = request.getArtistIds();
         if (artistIds == null || artistIds.isEmpty()) {
+            if (creator.getRole() == UserRole.GROUP) {
+                throw new ConcertException(ConcertErrorCode.EMPTY_ARTIST_LIST);
+            }
             artistIds = List.of(creatorId);
         }
         addArtistsToConcert(savedConcert, artistIds);
+
+        // 티켓 상품 자동 생성 (선예매/일반 2종). productArtistId = 콘서트 등록자(그룹 계정이면 그룹 ID, 개인 아티스트면 개인 ID)
+        createTicketProductsForConcert(savedConcert, creatorId, creator.getRole(), request);
 
         return buildConcertResponse(savedConcert);
     }
@@ -211,6 +231,12 @@ public class ConcertService {
         validateDateRange(request.getStartDateTime(), request.getEndDateTime());
         validateSalePeriod(request);
 
+        // 선예매 입력 시 해당 아티스트(또는 그룹)의 멤버십 상품 필요 (수정 요청자 = 공연 소유자로 간주)
+        int presaleCount = request.getPresaleTicketCount() != null ? request.getPresaleTicketCount() : (concert.getPresaleTicketCount() != null ? concert.getPresaleTicketCount() : 0);
+        if (presaleCount > 0 && !productRepository.existsByArtistIdAndIsMembershipTrue(userId)) {
+            throw new ConcertException(ConcertErrorCode.NO_MEMBERSHIP_PRODUCT);
+        }
+
         // 위치 업데이트
         if (request.getLocationId() != null) {
             Location location = locationRepository.findById(request.getLocationId())
@@ -250,6 +276,9 @@ public class ConcertService {
         if (request.getArtistIds() != null) {
             updateArtists(concert, request.getArtistIds());
         }
+
+        // 티켓 상품 가격 업데이트 (선예매/일반)
+        updateTicketProductPrices(concert.getId(), request.getPresaleTicketPrice(), request.getSaleTicketPrice());
 
         return buildConcertResponse(concert);
     }
@@ -297,7 +326,47 @@ public class ConcertService {
                     })
                     .orElse(null);
         }
-        return ConcertResponse.from(concert, posterImageUrl, mediaAssetResponses);
+        Long presaleTicketPrice = null;
+        Long saleTicketPrice = null;
+        List<Product> ticketProducts = productRepository.findByConcertId(concert.getId());
+        for (Product p : ticketProducts) {
+            if (Boolean.TRUE.equals(p.getIsMembershipOnly())) {
+                presaleTicketPrice = p.getPrice();
+            } else {
+                saleTicketPrice = p.getPrice();
+            }
+        }
+        return ConcertResponse.from(concert, posterImageUrl, mediaAssetResponses, presaleTicketPrice, saleTicketPrice);
+    }
+
+    /**
+     * 해당 공연의 티켓 상품(선예매/일반) 가격만 업데이트
+     */
+    private void updateTicketProductPrices(Long concertId, Long presaleTicketPrice, Long saleTicketPrice) {
+        if (presaleTicketPrice == null && saleTicketPrice == null) {
+            return;
+        }
+        List<Product> ticketProducts = productRepository.findByConcertId(concertId);
+        for (Product p : ticketProducts) {
+            Long newPrice = Boolean.TRUE.equals(p.getIsMembershipOnly()) ? presaleTicketPrice : saleTicketPrice;
+            if (newPrice == null || newPrice < 0) {
+                continue;
+            }
+            p.update(
+                    p.getName(),
+                    newPrice,
+                    p.getCandyPrice() != null ? p.getCandyPrice() : 0L,
+                    p.getType(),
+                    p.getPaymentMethod(),
+                    p.getIsSubscription(),
+                    p.getQuantity(),
+                    p.getIsMembershipOnly(),
+                    p.getIsExclusive(),
+                    p.getIsMembership(),
+                    p.getRepresentativeMediaAssetId(),
+                    p.getConcertId()
+            );
+        }
     }
 
     /**
@@ -314,6 +383,61 @@ public class ConcertService {
         }
 
         concertRepository.delete(concert);
+    }
+
+    /**
+     * 공연 생성 시 티켓 상품 자동 생성 (선예매/일반 2종).
+     * productArtistId: 그룹 계정으로 등록 시 그룹 ID, 그룹에 속하지 않은 개인 아티스트로 등록 시 개인 아티스트 ID (= creatorId)
+     */
+    private void createTicketProductsForConcert(Concert concert, Long creatorId, UserRole creatorRole, ConcertCreateRequest request) {
+        Long productArtistId = creatorId;
+
+        String title = concert.getTitle() != null ? concert.getTitle() : "공연";
+        int presaleCount = concert.getPresaleTicketCount() != null ? concert.getPresaleTicketCount() : 0;
+        int saleCount = concert.getSaleTicketCount() != null ? concert.getSaleTicketCount() : 0;
+        Long presalePrice = (request != null && request.getPresaleTicketPrice() != null && request.getPresaleTicketPrice() >= 0)
+                ? request.getPresaleTicketPrice() : 0L;
+        Long salePrice = (request != null && request.getSaleTicketPrice() != null && request.getSaleTicketPrice() >= 0)
+                ? request.getSaleTicketPrice() : 0L;
+
+        if (presaleCount > 0) {
+            ProductRequestDto presaleRequest = new ProductRequestDto(
+                    productArtistId,
+                    title + " 선예매 티켓",
+                    presalePrice,
+                    0L,
+                    ProductType.CASH,
+                    ProductPaymentMethod.CASH_ONLY,
+                    false,
+                    (long) presaleCount,
+                    true,
+                    true,
+                    false,
+                    concert.getId(),
+                    null,
+                    null
+            );
+            productService.createProduct(creatorId, creatorRole, presaleRequest);
+        }
+        if (saleCount > 0) {
+            ProductRequestDto saleRequest = new ProductRequestDto(
+                    productArtistId,
+                    title + " 일반 예매 티켓",
+                    salePrice,
+                    0L,
+                    ProductType.CASH,
+                    ProductPaymentMethod.CASH_ONLY,
+                    false,
+                    (long) saleCount,
+                    false,
+                    true,
+                    false,
+                    concert.getId(),
+                    null,
+                    null
+            );
+            productService.createProduct(creatorId, creatorRole, saleRequest);
+        }
     }
 
     /**

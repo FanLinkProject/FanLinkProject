@@ -4,5 +4,6 @@ public enum NotificationType {
     LIVE_STARTED,
     ARTIST_MESSAGE,
     FAN_MESSAGE,
-    DELIVERY_ISSUE
+    DELIVERY_ISSUE,
+    SERVICE_NOTICE
 }

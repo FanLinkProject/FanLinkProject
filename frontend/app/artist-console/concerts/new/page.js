@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 import Surface from "@/components/ui/Surface";
@@ -51,6 +51,7 @@ export default function NewConcertPage() {
   const [posterMediaAssetId, setPosterMediaAssetId] = useState(null);
   const [posterPreviewUrl, setPosterPreviewUrl] = useState(null);
   const [selectedArtists, setSelectedArtists] = useState([]);
+  const [creatorDisplayName, setCreatorDisplayName] = useState("");
   const posterFileInputRef = useRef(null);
 
   const effectiveArtistId = selectedArtists[0]?.id ?? userId;
@@ -86,6 +87,8 @@ export default function NewConcertPage() {
           if (draft.posterPreviewUrl != null) setPosterPreviewUrl(draft.posterPreviewUrl);
           if (draft.presaleTicketCount != null) setPresaleTicketCount(String(draft.presaleTicketCount));
           if (draft.saleTicketCount != null) setSaleTicketCount(String(draft.saleTicketCount));
+          if (draft.presaleTicketPrice != null) setPresaleTicketPrice(String(draft.presaleTicketPrice));
+          if (draft.saleTicketPrice != null) setSaleTicketPrice(String(draft.saleTicketPrice));
           if (draft.presaleStartDateTime != null) setPresaleStartDateTime(String(draft.presaleStartDateTime));
           if (draft.presaleEndDateTime != null) setPresaleEndDateTime(String(draft.presaleEndDateTime));
           if (draft.saleStartDateTime != null) setSaleStartDateTime(String(draft.saleStartDateTime));
@@ -110,8 +113,33 @@ export default function NewConcertPage() {
     } catch (_) {}
   }, []);
 
+  // 새 공연 등록 화면 진입 시: 프로필 조회 후 개인 아티스트면 참여 아티스트에 본인 미리 선택 (그룹 계정은 비워 둠)
+  // userId 의존 제거 → 마운트 시 바로 프로필 호출해 본인 세팅 보장
+  useEffect(() => {
+    apiGet("/api/user/profile")
+      .then((profile) => {
+        if (!profile?.id) return;
+        if (userId == null) setUserId(profile.id);
+        const isGroupAccount = profile.groupId != null && Number(profile.groupId) === Number(profile.id);
+        setCreatorDisplayName(
+          isGroupAccount
+            ? (profile.name || profile.nickname || "그룹")
+            : (profile.nickname || profile.name || "아티스트")
+        );
+        if (isGroupAccount) return;
+        setSelectedArtists((prev) => {
+          const hasSelf = prev.some((a) => Number(a.id) === Number(profile.id));
+          if (hasSelf) return prev;
+          return [{ id: profile.id, nickname: profile.nickname ?? "", profileImageUrl: profile.profileImageUrl ?? null }, ...prev];
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   const [presaleTicketCount, setPresaleTicketCount] = useState("");
   const [saleTicketCount, setSaleTicketCount] = useState("");
+  const [presaleTicketPrice, setPresaleTicketPrice] = useState("");
+  const [saleTicketPrice, setSaleTicketPrice] = useState("");
   const [presaleStartDateTime, setPresaleStartDateTime] = useState("");
   const [presaleEndDateTime, setPresaleEndDateTime] = useState("");
   const [saleStartDateTime, setSaleStartDateTime] = useState("");
@@ -128,9 +156,14 @@ export default function NewConcertPage() {
     return Number.isNaN(n) ? null : n;
   };
 
+  const [presaleTicketPriceError, setPresaleTicketPriceError] = useState("");
+  const [saleTicketPriceError, setSaleTicketPriceError] = useState("");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setPresaleTicketPriceError("");
+    setSaleTicketPriceError("");
     if (!title.trim()) {
       setError("공연 제목을 입력해주세요.");
       return;
@@ -145,6 +178,22 @@ export default function NewConcertPage() {
     }
     if (!selectedPlaceFromPicker?.placeName?.trim()) {
       setError("장소를 검색하여 선택해주세요.");
+      return;
+    }
+    if (!selectedArtists?.length) {
+      setError("참여 아티스트를 1명 이상 선택해 주세요.");
+      return;
+    }
+    const presaleCount = toNum(presaleTicketCount) ?? 0;
+    const saleCount = toNum(saleTicketCount) ?? 0;
+    const presalePrice = toNum(presaleTicketPrice);
+    const salePrice = toNum(saleTicketPrice);
+    if (presaleCount > 0 && (presalePrice == null || presalePrice <= 0)) {
+      setPresaleTicketPriceError("선예매 수량이 있으면 선예매 티켓 가격을 입력해주세요.");
+      return;
+    }
+    if (saleCount > 0 && (salePrice == null || salePrice <= 0)) {
+      setSaleTicketPriceError("일반 예매 수량이 있으면 일반 예매 티켓 가격을 입력해주세요.");
       return;
     }
 
@@ -172,11 +221,9 @@ export default function NewConcertPage() {
         posterMediaAssetId != null && Number.isInteger(posterMediaAssetId) && posterMediaAssetId > 0
           ? posterMediaAssetId
           : null;
-      const rawIds = [
-        ...(userId != null && Number.isInteger(Number(userId)) ? [Number(userId)] : []),
-        ...selectedArtists.map((a) => Number(a.id)),
-      ].filter((id) => id > 0 && Number.isInteger(id));
-      const artistIds = rawIds.length > 0 ? [...new Set(rawIds)] : undefined;
+      const artistIds = [
+        ...new Set(selectedArtists.map((a) => Number(a.id)).filter((id) => id > 0 && Number.isInteger(id))),
+      ];
 
       await apiPost("/api/concerts", {
         title: title.trim(),
@@ -189,6 +236,8 @@ export default function NewConcertPage() {
         posterMediaAssetId: posterId != null && posterId > 0 ? posterId : null,
         presaleTicketCount: toNum(presaleTicketCount) ?? 0,
         saleTicketCount: toNum(saleTicketCount) ?? 0,
+        presaleTicketPrice: toNum(presaleTicketPrice) != null ? toNum(presaleTicketPrice) : null,
+        saleTicketPrice: toNum(saleTicketPrice) != null ? toNum(saleTicketPrice) : null,
         presaleStartDateTime: toInstant(presaleStartDateTime),
         presaleEndDateTime: toInstant(presaleEndDateTime),
         saleStartDateTime: toInstant(saleStartDateTime),
@@ -291,6 +340,8 @@ export default function NewConcertPage() {
                       posterPreviewUrl: posterPreviewUrl ?? undefined,
                       presaleTicketCount,
                       saleTicketCount,
+                      presaleTicketPrice,
+                      saleTicketPrice,
                       presaleStartDateTime,
                       presaleEndDateTime,
                       saleStartDateTime,
@@ -450,7 +501,17 @@ export default function NewConcertPage() {
         </Surface>
 
         <Surface variant="primary" className="p-8 space-y-6">
-          <h3 className="text-lg font-bold text-white mb-4">티켓 정보</h3>
+          <div className="flex flex-wrap items-baseline gap-2 mb-2">
+            <h3 className="text-lg font-bold text-white">티켓 정보</h3>
+            {creatorDisplayName && (
+              <p className="text-sm text-white/55">
+                티켓 상품은 &quot;{creatorDisplayName}&quot;의 마켓에 등록됩니다.
+              </p>
+            )}
+          </div>
+          <p className="text-[11px] text-amber-200/80 mb-4">
+            선예매를 사용하려면 해당 아티스트(또는 그룹)의 멤버십 상품을 먼저 등록해야 합니다. 멤버십 상품이 없으면 선예매 정보 입력 후에도 등록이 불가합니다.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">선예매 수량</span>
@@ -473,6 +534,40 @@ export default function NewConcertPage() {
                 min="0"
                 className="w-full bg-[#16102a] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
               />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">선예매 티켓 가격 (원)</span>
+              <input
+                type="number"
+                value={presaleTicketPrice}
+                onChange={(e) => {
+                  setPresaleTicketPrice(e.target.value);
+                  setPresaleTicketPriceError("");
+                }}
+                placeholder="0"
+                min="0"
+                className={`w-full bg-[#16102a] border rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20 ${presaleTicketPriceError ? "border-red-500/60" : "border-white/[0.08]"}`}
+              />
+              {presaleTicketPriceError && (
+                <p className="mt-1.5 text-sm text-red-400">{presaleTicketPriceError}</p>
+              )}
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">일반 예매 티켓 가격 (원)</span>
+              <input
+                type="number"
+                value={saleTicketPrice}
+                onChange={(e) => {
+                  setSaleTicketPrice(e.target.value);
+                  setSaleTicketPriceError("");
+                }}
+                placeholder="0"
+                min="0"
+                className={`w-full bg-[#16102a] border rounded-xl px-4 py-3 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20 ${saleTicketPriceError ? "border-red-500/60" : "border-white/[0.08]"}`}
+              />
+              {saleTicketPriceError && (
+                <p className="mt-1.5 text-sm text-red-400">{saleTicketPriceError}</p>
+              )}
             </label>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

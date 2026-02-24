@@ -1,8 +1,8 @@
 package org.example.backend.post.repository;
+import org.example.backend.user.enums.UserRole;
 
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.user.entity.User;
-import org.example.backend.user.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,28 +26,28 @@ public interface ArtistPostRepository extends JpaRepository<ArtistPost, Long> {
             "ORDER BY a.id DESC")
     List<ArtistPost> findPosts(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId, Pageable pageable);
 
-    // 공지사항(서비스 전체): 관리자(ROLE_ADMIN)가 올린 글만, 관리자는 group_id 없음 → a.group IS NULL
+    // 공지사항(서비스 전체): group 없고 isNotice=true인 글 (관리자 공지)
     @Query("SELECT a FROM ArtistPost a " +
             "JOIN FETCH a.user u " +
             "LEFT JOIN FETCH a.group g " +
             "WHERE a.status = false " +
             "AND a.group IS NULL " +
-            "AND u.role = :adminRole " +
+            "AND a.isNotice = true " +
             "AND (:lastPostId IS NULL OR a.id < :lastPostId) " +
             "ORDER BY a.id DESC")
-    List<ArtistPost> findNotices(@Param("lastPostId") Long lastPostId, @Param("adminRole") UserRole adminRole, Pageable pageable);
+    List<ArtistPost> findNotices(@Param("lastPostId") Long lastPostId, Pageable pageable);
 
-    // 공지사항(그룹 페이지): 해당 그룹 계정(ROLE_GROUP)이 올린 글만 조회
+    // 공지사항(그룹 페이지): 해당 페이지에 속한 글 중 isNotice=true
     @Query("SELECT a FROM ArtistPost a " +
             "JOIN FETCH a.user u " +
             "LEFT JOIN FETCH a.group g " +
             "WHERE a.status = false " +
-            "AND a.user.id = :groupId " +
-            "AND u.role = :groupRole " +
+            "AND ((a.group IS NOT NULL AND a.group.id = :groupId) OR a.user.id = :groupId) " +
+            "AND a.isNotice = true " +
             "AND (:lastPostId IS NULL OR a.id < :lastPostId) " +
             "ORDER BY a.id DESC")
     List<ArtistPost> findNoticesByGroupId(@Param("groupId") Long groupId, @Param("lastPostId") Long lastPostId,
-            @Param("groupRole") UserRole groupRole, Pageable pageable);
+            Pageable pageable);
 
     // 공지사항(개인 아티스트 페이지): 해당 아티스트가 공지로 지정한 글만 조회
     @Query("SELECT a FROM ArtistPost a " +

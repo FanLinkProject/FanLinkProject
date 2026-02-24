@@ -2,6 +2,8 @@ package org.example.backend.order.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.backend.concert.entity.Concert;
+import org.example.backend.concert.repository.ConcertRepository;
 import org.example.backend.delivery.entity.Delivery;
 import org.example.backend.order.dto.response.ArtistOrderDeliveryResponseDto;
 import org.example.backend.order.dto.request.OrderItemDto;
@@ -13,6 +15,7 @@ import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.product.entity.Product;
 import org.example.backend.product.repository.ProductRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,6 +31,8 @@ import org.example.backend.order.exception.OrderException;
 import org.example.backend.payment.service.PaymentService;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.user.service.ArtistPermissionService;
+import org.example.backend.user.repository.FollowRepository;
+import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.springframework.beans.factory.annotation.Value;
 
 @Slf4j
@@ -41,9 +46,12 @@ public class OrderService {
 
         private final OrderRepository orderRepository;
         private final ProductRepository productRepository;
+        private final ConcertRepository concertRepository;
+        private final SubscriptionRepository subscriptionRepository;
         private final UserRepository userRepository;
         private final PaymentService paymentService;
         private final ArtistPermissionService artistPermissionService;
+        private final FollowRepository followRepository;
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
@@ -67,6 +75,12 @@ public class OrderService {
                         // PESSIMISTIC_WRITE 락으로 동시 구매 시 재고 정합성 보장 (race condition 방지)
                         Product product = productRepository.findByIdForUpdate(itemDto.productId())
                                         .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
+
+                        // 아티스트 상품: 팔로우 필수
+                        validateFollowRequired(user, product);
+
+                        // 콘서트 티켓 상품: 기간·멤버십 검증
+                        validateConcertTicketOrder(user, product);
 
                         // 유료 팬 가입 상품 중복 구매 방지: 10개월 내 동일 아티스트 membership 상품 재구매 차단
                         if (Boolean.TRUE.equals(product.getIsMembership())) {
@@ -168,6 +182,9 @@ public class OrderService {
                 if (product.getPaymentMethod() != ProductPaymentMethod.CANDY_ONLY) {
                         throw new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND);
                 }
+
+                validateFollowRequired(user, product);
+
                 Long candyPrice = product.getCandyPrice() != null ? product.getCandyPrice() : 0L;
                 if (candyPrice <= 0) {
                         throw new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND);
@@ -224,6 +241,55 @@ public class OrderService {
                                 .filter(order -> canManageOrder(order, operatorUserId, operatorRole))
                                 .map(ArtistOrderDeliveryResponseDto::from)
                                 .toList();
+        }
+
+        /**
+         * 콘서트 티켓 상품 주문 시: 기간 검증, 선예매 시 멤버십 검증.
+         * 멤버십은 (1) 해당 아티스트에 대한 활성 구독(Subscription) 또는
+         * (2) 해당 아티스트 멤버십 상품의 완료된 주문(일회성 가입)으로 인정.
+         */
+        private void validateConcertTicketOrder(User user, Product product) {
+                if (product.getConcertId() == null) {
+                        return;
+                }
+                Concert concert = concertRepository.findById(product.getConcertId())
+                                .orElseThrow(() -> new OrderException(OrderErrorCode.PRODUCT_NOT_FOUND));
+
+                Instant now = Instant.now();
+                boolean isPresaleProduct = Boolean.TRUE.equals(product.getIsMembershipOnly());
+
+                if (isPresaleProduct) {
+                        Long artistId = product.getArtistId();
+                        boolean hasActiveSubscription = subscriptionRepository.existsActiveSubscriptionForArtist(user.getId(), artistId, now);
+                        boolean hasPaidMembershipOrder = orderRepository.existsPaidMembershipOrder(
+                                        user.getId(),
+                                        artistId,
+                                        OrderStatus.COMPLETED,
+                                        now.atZone(java.time.ZoneId.systemDefault()).minusMonths(10).toInstant());
+                        if (!hasActiveSubscription && !hasPaidMembershipOrder) {
+                                throw new OrderException(OrderErrorCode.PRESALE_MEMBERSHIP_REQUIRED);
+                        }
+                        if (!concert.isPresaleAvailable(now)) {
+                                throw new OrderException(OrderErrorCode.PRESALE_PERIOD_NOT_AVAILABLE);
+                        }
+                } else {
+                        if (!concert.isSaleAvailable(now)) {
+                                throw new OrderException(OrderErrorCode.SALE_PERIOD_NOT_AVAILABLE);
+                        }
+                }
+        }
+
+        private void validateFollowRequired(User user, Product product) {
+                if (product.getArtistId() == null) {
+                        return; // 플랫폼 상품(캔디 충전 등)은 팔로우 불필요
+                }
+                User artist = userRepository.findById(product.getArtistId()).orElse(null);
+                if (artist == null) {
+                        return;
+                }
+                if (!followRepository.existsByFollowerAndArtist(user, artist)) {
+                        throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                }
         }
 
         private void validateShippingRequest(OrderRequestDto request) {

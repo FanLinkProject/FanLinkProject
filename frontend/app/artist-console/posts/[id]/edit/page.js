@@ -14,12 +14,15 @@ function EditPostContent() {
   const id = typeof params?.id === "string" ? params.id : null;
   const numericId = Number(id);
 
+  const [isIndividualArtist, setIsIndividualArtist] = useState(false);
   const [content, setContent] = useState("");
   const [isMembershipOnly, setIsMembershipOnly] = useState(false);
   const [isNotice, setIsNotice] = useState(false);
-  const [isIndividualArtist, setIsIndividualArtist] = useState(false);
   const [mediaAssetIds, setMediaAssetIds] = useState([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState([]);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [initialImageUrl, setInitialImageUrl] = useState(null);
   const [writerNickname, setWriterNickname] = useState("");
   const [writerAvatar, setWriterAvatar] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,6 +54,7 @@ function EditPostContent() {
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
+  const [canSetNotice, setCanSetNotice] = useState(false);
   }, [numericId]);
 
   // 개인 아티스트 여부 (공지 토글 노출용)
