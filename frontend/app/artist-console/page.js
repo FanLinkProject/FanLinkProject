@@ -224,7 +224,7 @@ export default function ArtistConsolePage() {
             const result = await uploadFile(file, { category: MediaAssetCategory.ARTIST_COVER_IMAGE, scope: MediaAssetScope.PUBLIC, artistId: groupId });
             if (result?.mediaAssetId && result.status === "READY") {
                 await request("/api/artist/profile", { method: "PATCH", body: { bannerImageMediaAssetId: result.mediaAssetId } });
-                setCoverImageUrl(result.publicUrl || URL.createObjectURL(file));
+                setCoverImageUrl(result.url || URL.createObjectURL(file));
             }
         } catch (err) { console.error("커버 이미지 업로드 실패", err); }
         finally { setCoverImageLoading(false); if (coverFileRef.current) coverFileRef.current.value = ""; }
