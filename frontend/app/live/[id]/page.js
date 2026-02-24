@@ -138,6 +138,8 @@ export default function LiveSessionPage({ params }) {
     const chatInputRef = useRef(null);
     const commentEndRef = useRef(null);
     const stompRef = useRef(null);
+    /** 팬 라이브 종료 시 아티스트 홈(/artists/[artistId])으로 리다이렉트하기 위한 artistId */
+    const liveArtistIdRef = useRef(null);
 
     /** 채팅 입력창: 내용에 따라 높이 확장, max 이상이면 스크롤 */
     const MAX_CHAT_INPUT_HEIGHT = 96; // max-h-24
@@ -180,7 +182,8 @@ export default function LiveSessionPage({ params }) {
                             parsed.type === "SYSTEM" &&
                             parsed.event === "LIVE_ENDED"
                         ) {
-                            if (numericId != null) router.push(`/artist-console/live/${numericId}`);
+                            const artistId = liveArtistIdRef.current;
+                            if (artistId != null) router.push(`/artists/${artistId}`);
                             return;
                         }
                         setChat((prev) => [...prev, parsed]);
@@ -203,7 +206,8 @@ export default function LiveSessionPage({ params }) {
                     typeof body === "string" &&
                     (body.includes("LIVE_SESSION_NOT_LIVE") || body.includes("LIVE_ENDED"))
                 ) {
-                    if (numericId != null) router.push(`/artist-console/live/${numericId}`);
+                    const artistId = liveArtistIdRef.current;
+                    if (artistId != null) router.push(`/artists/${artistId}`);
                 }
                 setWsStatus("Disconnected");
             },
@@ -212,7 +216,11 @@ export default function LiveSessionPage({ params }) {
 
         stompRef.current = client;
         client.activate();
-    }, [numericId, router]);
+    }, [router]);
+
+    useEffect(() => {
+        liveArtistIdRef.current = live?.artistId ?? null;
+    }, [live]);
 
     const isMine = useCallback(
         (msg) => {
@@ -262,6 +270,7 @@ export default function LiveSessionPage({ params }) {
                     timeLabel: data.status === "LIVE" ? "LIVE NOW" : data.status,
                     viewerCount: data.viewerCount ?? null, // 있으면 표시 가능
                 });
+                liveArtistIdRef.current = data.artistId ?? null;
 
                 setAccessError("");
 
