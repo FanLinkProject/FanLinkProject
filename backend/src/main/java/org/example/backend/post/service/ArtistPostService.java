@@ -393,13 +393,13 @@ public class ArtistPostService {
             }
             return false;
         }
-        // USER: 멤버십 상품 일회 구매(10개월 내) 시에만 접근 가능
+        // USER: 멤버십 상품 일회 구매(12개월 내) 시에만 접근 가능
         Long artistId = post.getGroup() != null ? post.getGroup().getId() : post.getUser().getId();
         return orderRepository.existsPaidMembershipOrder(
                 userId,
                 artistId,
                 OrderStatus.COMPLETED,
-                Instant.now().atZone(ZoneId.systemDefault()).minusMonths(10).toInstant());
+                Instant.now().atZone(ZoneId.systemDefault()).minusMonths(12).toInstant());
     }
 
     /** 서비스 공지 등록 시 전체 유저에게 알림 발송 (작성자 제외) */

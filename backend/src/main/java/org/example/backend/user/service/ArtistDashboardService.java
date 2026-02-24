@@ -89,7 +89,7 @@ public class ArtistDashboardService {
         }
 
         // 5) 멤버십 정보 (팬 유저만 대상, 아티스트/관리자는 멤버십 가입 안 함)
-        // 멤버십 상품 일회 구매(10개월 내) 시에만 멤버십 인정
+        // 멤버십 상품 일회 구매(12개월 내) 시에만 멤버십 인정
         boolean canSubscribeMembership = viewer != null && viewer.getRole() == UserRole.USER;
         boolean hasActiveMembership = false;
         if (canSubscribeMembership) {
@@ -97,7 +97,7 @@ public class ArtistDashboardService {
                     viewer.getId(),
                     artistId,
                     OrderStatus.COMPLETED,
-                    java.time.Instant.now().atZone(ZoneId.systemDefault()).minusMonths(10).toInstant());
+                    java.time.Instant.now().atZone(ZoneId.systemDefault()).minusMonths(12).toInstant());
         }
 
         String membershipButtonText = null;
