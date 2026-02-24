@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 
-// 데이터 및 유틸리티
 import { MOCK_ARTISTS, MOCK_POSTS } from "@/lib/mockData";
 import { list as listMusicVideos, getSafeEmbedUrl } from "@/lib/musicVideoApi";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
@@ -14,8 +13,6 @@ import { request, apiGet, apiPost, BASE_URL, getAuthHeaders } from "@/lib/api";
 import {
     isUpcoming,
     concertIncludesArtist,
-    formatArtists,
-    getArtistNamesArray,
     formatDateShort,
     getConcertStatus,
     getConcertStatusBadgeLabel,
@@ -26,100 +23,40 @@ import { MAX_POST_ATTACHMENTS } from "@/lib/mediaAssetApi";
 import { getProfile } from "@/lib/userApi";
 import { getProduct } from "@/lib/productApi";
 import { createCandySubscription, checkDmSubscription } from "@/lib/subscriptionApi";
+import {
+    getCurrentUser,
+    formatTimestamp,
+    transformArtistPost,
+    transformFanPost,
+    POSTS_LIMIT,
+} from "@/lib/postUtils";
 
-// 컴포넌트
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
 import DraggableAttachmentGrid from "@/components/common/DraggableAttachmentGrid";
 import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
-// --- 상수 및 헬퍼 함수 ---
 const CANDY_COST = 500;
 const FAN_PROFILES_API = `${BASE_URL}/api/fan-profiles`;
-
-function getCurrentUser() {
-    if (typeof window === "undefined") return null;
-    const raw = localStorage.getItem("accessToken");
-    if (!raw) return null;
-    try {
-        const token = raw.replace(/^Bearer\s+/i, "").trim();
-        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-        return { email: payload.sub, role: (payload.role || "").replace("ROLE_", "") };
-    } catch { return null; }
-}
 
 function getConcertId(concert) {
     if (!concert) return null;
     return concert.id ?? concert.concertId ?? concert.concert_id ?? concert?.concert?.id ?? null;
 }
 
-function formatTimestamp(instant) {
-    if (!instant) return "방금 전";
-    try {
-        const date = new Date(instant);
-        const now = new Date();
-        const diffSec = Math.floor((now - date) / 1000);
-        if (diffSec < 60) return "방금 전";
-        const diffMin = Math.floor(diffSec / 60);
-        if (diffMin < 60) return `${diffMin}분 전`;
-        const diffHour = Math.floor(diffMin / 60);
-        if (diffHour < 24) return `${diffHour}시간 전`;
-        return date.toLocaleDateString("ko-KR");
-    } catch { return "방금 전"; }
-}
+const VALID_TABS = ["ARTIST", "FAN", "LIVE", "REPLAY", "CONCERT", "MV", "MARKET"];
 
-function transformArtistPost(p) {
-    const attachments = Array.isArray(p.attachments) ? p.attachments : [];
-    return {
-        id: p.id,
-        authorName: p.writerNickname || "",
-        authorMemberName: null,
-        authorAvatar: p.writerProfileImageUrl || getDefaultAvatarUrl(p.writerNickname || "?"),
-        content: p.content || "",
-        image: attachments[0]?.url || null,
-        attachmentCount: attachments.length,
-        timestamp: formatTimestamp(p.createdAt),
-        isMembershipOnly: p.isMembershipOnly ?? false,
-        isLockedByServer: !!(p.isMembershipOnly && p.content === null),
-        isNotice: !!p.isNotice,
-        type: "ARTIST",
-    };
-}
-
-function transformFanPost(p) {
-    const attachments = Array.isArray(p.attachments) ? p.attachments : [];
-    return {
-        id: p.id,
-        writerId: p.writerId ?? null,
-        authorName: p.writerNickname || "",
-        authorMemberName: null,
-        authorGradeName: p.writerGradeName ?? null,
-        authorAvatar: p.writerProfileImageUrl || "",
-        content: p.content || "",
-        image: attachments[0]?.url || null,
-        attachmentCount: attachments.length,
-        timestamp: formatTimestamp(p.createdAt),
-        type: "FAN",
-    };
-}
-
-const POSTS_LIMIT = 10;
-
-// --- 메인 컴포넌트 (Inner) ---
 function ArtistDetailPageInner({ paramsId }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const tabParam = searchParams.get("tab");
-    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "CONCERT", "MARKET", "MV"];
 
-    // 상태 관리
     const [artist, setArtist] = useState(null);
     const [activeTab, setActiveTab] = useState(tabParam && VALID_TABS.includes(tabParam) ? tabParam : "ARTIST");
     const [currentUser, setCurrentUser] = useState(null);
     const [fanProfiles, setFanProfiles] = useState([]);
 
-    // 포스트 데이터 및 페이징
     const [artistPosts, setArtistPosts] = useState([]);
     const [fanPosts, setFanPosts] = useState([]);
     const [artistNotices, setArtistNotices] = useState([]);
@@ -141,7 +78,6 @@ function ArtistDetailPageInner({ paramsId }) {
     const [myGroupId, setMyGroupId] = useState(null);
     const [createPostLoading, setCreatePostLoading] = useState(false);
 
-    // 참여 공연: 상단 섹션용(다가오는 것만), 공연 탭용(다가오는+종료된, 백엔드 includeEnded 지원 시)
     const [artistConcerts, setArtistConcerts] = useState([]);
     const [artistConcertsForTab, setArtistConcertsForTab] = useState([]);
     const [artistConcertsLoading, setArtistConcertsLoading] = useState(false);
@@ -153,7 +89,6 @@ function ArtistDetailPageInner({ paramsId }) {
     const [vodList, setVodList] = useState([]);
     const [vodLoading, setVodLoading] = useState(false);
 
-    // 모달 및 UI 상태
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newPostContent, setNewPostContent] = useState("");
     const [attendanceLoading, setAttendanceLoading] = useState(false);
@@ -165,9 +100,8 @@ function ArtistDetailPageInner({ paramsId }) {
     const [dmModalCandyBalance, setDmModalCandyBalance] = useState(null);
     const [dmModalLoading, setDmModalLoading] = useState(false);
     const [dmModalPaying, setDmModalPaying] = useState(false);
-    const [dmConnectCheckingId, setDmConnectCheckingId] = useState(null); // DM 연결 확인 중인 멤버 ID
+    const [dmConnectCheckingId, setDmConnectCheckingId] = useState(null);
     const [dmErrorModalOpen, setDmErrorModalOpen] = useState(false);
-    const [likedPostIds, setLikedPostIds] = useState(new Set());
 
     const fanPostFileInputRef = useRef(null);
     const artistPostsBottomRef = useRef(null);
@@ -194,12 +128,10 @@ function ArtistDetailPageInner({ paramsId }) {
         uploading: fanPostUploading,
         uploadError: fanPostUploadError,
         representativeMediaAssetId: fanPostRepresentativeId,
-    } = usePostAttachments({
-        postGroupId: groupId,
-        postIdOrTemp: "tmp_fan_new",
-    });
+    } = usePostAttachments({ postGroupId: groupId, postIdOrTemp: "tmp_fan_new" });
 
-    // 1. 아티스트 기본 정보 및 대시보드 로드
+    // --- Data loading ---
+
     useEffect(() => {
         if (isRealGroup) {
             request(`/api/user/artists/${groupId}/dashboard`)
@@ -207,7 +139,6 @@ function ArtistDetailPageInner({ paramsId }) {
                     const info = data?.artistInfo || {};
                     const follow = data?.followStatus || {};
                     const membership = data?.membershipInfo || {};
-                    // members는 응답 최상위에 있음 (그룹: 소속 멤버, 개인: 본인)
                     const rawMembers = data?.members ?? info?.members ?? [];
                     setArtist({
                         id: String(groupId),
@@ -224,7 +155,7 @@ function ArtistDetailPageInner({ paramsId }) {
                             avatar: m.profileImageUrl ?? m.avatar,
                             dmProductId: m.dmProductId,
                         })),
-                        backendId: groupId
+                        backendId: groupId,
                     });
                 })
                 .catch(() => {
@@ -237,7 +168,6 @@ function ArtistDetailPageInner({ paramsId }) {
         }
     }, [paramsId, groupId, isRealGroup]);
 
-    // 2. 참여 공연 정보 로드 (상단: 다가오는 공연만, 공연 탭: 다가오는+종료된. 백엔드가 includeEnded 지원 시 종료 공연 포함)
     useEffect(() => {
         if (!artist?.name) return;
         setArtistConcertsLoading(true);
@@ -248,46 +178,28 @@ function ArtistDetailPageInner({ paramsId }) {
                 setArtistConcerts(forArtist.filter(c => isUpcoming(c)));
                 setArtistConcertsForTab(forArtist);
             })
-            .catch(() => {
-                setArtistConcerts([]);
-                setArtistConcertsForTab([]);
-            })
+            .catch(() => { setArtistConcerts([]); setArtistConcertsForTab([]); })
             .finally(() => setArtistConcertsLoading(false));
     }, [artist?.name]);
 
-    // 3. 라이브 세션 로드
     useEffect(() => {
         if (!artist) return;
-        const fetchLive = async () => {
-            setLiveLoading(true);
-            try {
-                const data = await apiGet(`/api/live-sessions?artistId=${artist.backendId || artist.id}&status=LIVE`);
-                setLiveSessions(Array.isArray(data) ? data : []);
-            } catch (e) {
-                setLiveError("라이브 정보를 불러오지 못했습니다.");
-            } finally {
-                setLiveLoading(false);
-            }
-        };
-        fetchLive();
+        setLiveLoading(true);
+        apiGet(`/api/live-sessions?artistId=${artist.backendId || artist.id}&status=LIVE`)
+            .then((data) => setLiveSessions(Array.isArray(data) ? data : []))
+            .catch(() => setLiveError("라이브 정보를 불러오지 못했습니다."))
+            .finally(() => setLiveLoading(false));
     }, [artist]);
 
-    // 4. 팬 프로필 (출석용) + 내 userId 로드
     useEffect(() => {
         const user = getCurrentUser();
         setCurrentUser(user);
         if (!user) return;
         request("/api/user/profile")
-            .then((data) => {
-              setMyUserId(data?.id ?? null);
-              setMyGroupId(data?.groupId ?? null);
-            })
+            .then((data) => { setMyUserId(data?.id ?? null); setMyGroupId(data?.groupId ?? null); })
             .catch(() => {});
         axios.get(`${FAN_PROFILES_API}/me`, { headers: getAuthHeaders() })
-            .then(res => {
-                const list = Array.isArray(res.data) ? res.data : (res.data?.content ?? []);
-                setFanProfiles(list);
-            })
+            .then(res => { setFanProfiles(Array.isArray(res.data) ? res.data : (res.data?.content ?? [])); })
             .catch(() => {});
     }, []);
 
@@ -321,7 +233,6 @@ function ArtistDetailPageInner({ paramsId }) {
         setFanIsLikedMap((prev) => ({ ...prev, ...Object.fromEntries(transformed.map((p) => [p.id, likedSet.has(Number(p.id))])) }));
     }, []);
 
-    // [A] ARTIST 탭: 아티스트 포스트 조회
     useEffect(() => {
         if (activeTab !== "ARTIST" || !isRealGroup || !groupId) return;
         setArtistPostsLoading(true);
@@ -330,7 +241,7 @@ function ArtistDetailPageInner({ paramsId }) {
         request("/api/artist-posts/artist-only", { query: { groupId, limit: POSTS_LIMIT } })
             .then(async (data) => {
                 const raw = Array.isArray(data) ? data : (data?.content ?? data?.posts ?? []);
-                const transformed = raw.map((p) => transformArtistPost(p));
+                const transformed = raw.map(transformArtistPost);
                 setArtistPosts(transformed);
                 setArtistPostsHasNext(raw.length === POSTS_LIMIT);
                 if (transformed.length > 0) setArtistPostsLastId(transformed[transformed.length - 1].id);
@@ -340,7 +251,6 @@ function ArtistDetailPageInner({ paramsId }) {
             .finally(() => setArtistPostsLoading(false));
     }, [activeTab, groupId, isRealGroup]);
 
-    // [B] FAN 탭: 팬 포스트 조회
     useEffect(() => {
         if (activeTab !== "FAN" || !isRealGroup || !groupId || !artist?.isFollowing) return;
         setFanPostsLoading(true);
@@ -363,26 +273,22 @@ function ArtistDetailPageInner({ paramsId }) {
         if (!isRealGroup || artistPostsLoadingMore || !artistPostsHasNext || !artistPostsLastId) return;
         setArtistPostsLoadingMore(true);
         try {
-            const data = await request("/api/artist-posts/artist-only", {
-                query: { groupId, lastPostId: artistPostsLastId, limit: POSTS_LIMIT },
-            });
+            const data = await request("/api/artist-posts/artist-only", { query: { groupId, lastPostId: artistPostsLastId, limit: POSTS_LIMIT } });
             const raw = Array.isArray(data) ? data : (data?.content ?? data?.posts ?? []);
-            const newPosts = raw.map((p) => transformArtistPost(p));
+            const newPosts = raw.map(transformArtistPost);
             setArtistPosts((prev) => [...prev, ...newPosts]);
             setArtistPostsHasNext(raw.length === POSTS_LIMIT);
             if (newPosts.length > 0) setArtistPostsLastId(newPosts[newPosts.length - 1].id);
             await fetchArtistPostsMeta(newPosts);
         } catch {}
         setArtistPostsLoadingMore(false);
-    }, [isRealGroup, artistPostsLoadingMore, artistPostsHasNext, artistPostsLastId, groupId, artist, fetchArtistPostsMeta]);
+    }, [isRealGroup, artistPostsLoadingMore, artistPostsHasNext, artistPostsLastId, groupId, fetchArtistPostsMeta]);
 
     const loadMoreFanPosts = useCallback(async () => {
         if (!isRealGroup || fanPostsLoadingMore || !fanPostsHasNext || !fanPostsLastId) return;
         setFanPostsLoadingMore(true);
         try {
-            const data = await request("/api/fan-posts", {
-                query: { groupId, lastPostId: fanPostsLastId, limit: POSTS_LIMIT },
-            });
+            const data = await request("/api/fan-posts", { query: { groupId, lastPostId: fanPostsLastId, limit: POSTS_LIMIT } });
             const raw = Array.isArray(data) ? data : (data?.content ?? data?.posts ?? []);
             const newPosts = raw.map(transformFanPost);
             setFanPosts((prev) => [...prev, ...newPosts]);
@@ -397,10 +303,7 @@ function ArtistDetailPageInner({ paramsId }) {
         if (!artistPostsHasNext || artistPostsLoading) return;
         const el = artistPostsBottomRef.current;
         if (!el) return;
-        const observer = new IntersectionObserver(
-            ([entry]) => { if (entry?.isIntersecting) loadMoreArtistPosts(); },
-            { rootMargin: "100px" }
-        );
+        const observer = new IntersectionObserver(([entry]) => { if (entry?.isIntersecting) loadMoreArtistPosts(); }, { rootMargin: "100px" });
         observer.observe(el);
         return () => observer.disconnect();
     }, [artistPostsHasNext, artistPostsLastId, loadMoreArtistPosts, artistPostsLoading]);
@@ -409,28 +312,20 @@ function ArtistDetailPageInner({ paramsId }) {
         if (!fanPostsHasNext || fanPostsLoading) return;
         const el = fanPostsBottomRef.current;
         if (!el) return;
-        const observer = new IntersectionObserver(
-            ([entry]) => { if (entry?.isIntersecting) loadMoreFanPosts(); },
-            { rootMargin: "100px" }
-        );
+        const observer = new IntersectionObserver(([entry]) => { if (entry?.isIntersecting) loadMoreFanPosts(); }, { rootMargin: "100px" });
         observer.observe(el);
         return () => observer.disconnect();
     }, [fanPostsHasNext, fanPostsLastId, loadMoreFanPosts, fanPostsLoading]);
 
-    // 4-1. 공지사항 (탭 아래 섹션용, 최근 3건)
     useEffect(() => {
         if (!isRealGroup || !groupId) return;
         request("/api/artist-posts/notices", { query: { groupId, limit: 3 } })
-            .then((data) => {
-                const list = Array.isArray(data) ? data : (data?.content ?? []);
-                setArtistNotices(list);
-            })
+            .then((data) => setArtistNotices(Array.isArray(data) ? data : (data?.content ?? [])))
             .catch(() => setArtistNotices([]));
     }, [groupId, isRealGroup]);
 
-    // 5. LIVE 탭 활성화 시 다시보기(VOD) 목록 로드
     useEffect(() => {
-        if (activeTab !== "LIVE" || !artist?.backendId) return;
+        if (activeTab !== "REPLAY" || !artist?.backendId) return;
         setVodLoading(true);
         listReplays(artist.backendId)
             .then((list) => setVodList(Array.isArray(list) ? list : []))
@@ -438,7 +333,6 @@ function ArtistDetailPageInner({ paramsId }) {
             .finally(() => setVodLoading(false));
     }, [activeTab, artist?.backendId]);
 
-    // 6. MV 탭 활성화 시 로드 (검색어 포함)
     const mvSearchTimerRef = useRef(null);
     const loadMusicVideos = useCallback((keyword) => {
         if (!artist) return;
@@ -456,13 +350,10 @@ function ArtistDetailPageInner({ paramsId }) {
     useEffect(() => {
         if (activeTab !== "MV" || !artist) return;
         clearTimeout(mvSearchTimerRef.current);
-        mvSearchTimerRef.current = setTimeout(() => {
-            loadMusicVideos(mvSearchQuery);
-        }, 300);
+        mvSearchTimerRef.current = setTimeout(() => loadMusicVideos(mvSearchQuery), 300);
         return () => clearTimeout(mvSearchTimerRef.current);
     }, [mvSearchQuery]);
 
-    // MV 댓글 로드
     const loadMvComments = useCallback((videoId) => {
         if (!videoId) return;
         setMvCommentsLoading(true);
@@ -477,33 +368,23 @@ function ArtistDetailPageInner({ paramsId }) {
         else setMvComments([]);
     }, [selectedMV?.id]);
 
+    // --- Handlers ---
+
     const handleMvCommentSubmit = async () => {
         if (!mvNewComment.trim() || !selectedMV?.id || mvCommentSubmitting) return;
         setMvCommentSubmitting(true);
         try {
-            await request("/api/comments", {
-                method: "POST",
-                body: { targetId: selectedMV.id, targetType: "MEDIA", content: mvNewComment.trim() },
-            });
+            await request("/api/comments", { method: "POST", body: { targetId: selectedMV.id, targetType: "MEDIA", content: mvNewComment.trim() } });
             setMvNewComment("");
             loadMvComments(selectedMV.id);
-        } catch (err) {
-            console.error("댓글 작성 실패", err);
-        } finally {
-            setMvCommentSubmitting(false);
-        }
+        } catch (err) { console.error("댓글 작성 실패", err); }
+        finally { setMvCommentSubmitting(false); }
     };
 
     const handleMvCommentDelete = async (commentId) => {
-        try {
-            await request(`/api/comments/${commentId}`, { method: "DELETE" });
-            loadMvComments(selectedMV.id);
-        } catch (err) {
-            console.error("댓글 삭제 실패", err);
-        }
+        try { await request(`/api/comments/${commentId}`, { method: "DELETE" }); loadMvComments(selectedMV.id); }
+        catch (err) { console.error("댓글 삭제 실패", err); }
     };
-
-    // --- 핸들러 함수들 ---
 
     const handleTabClick = (tabId) => {
         if (tabId === "MARKET") {
@@ -511,7 +392,7 @@ function ArtistDetailPageInner({ paramsId }) {
             return;
         }
         setActiveTab(tabId);
-        router.replace(`?tab=${tabId}`, { scroll: false });
+        window.history.replaceState(null, "", `?tab=${tabId}`);
     };
 
     const handleAttendance = async () => {
@@ -519,11 +400,8 @@ function ArtistDetailPageInner({ paramsId }) {
         if (!fanProfile && !attendanceLoading && isRealGroup && groupId) {
             try {
                 const { data } = await axios.post(`${FAN_PROFILES_API}`, { groupId }, { headers: getAuthHeaders() });
-                if (data?.id) {
-                    setFanProfiles(prev => [...prev, data]);
-                    fanProfile = data;
-                }
-            } catch (e) { /* 이미 있거나 실패 시 아래에서 알림 */ }
+                if (data?.id) { setFanProfiles(prev => [...prev, data]); fanProfile = data; }
+            } catch {}
         }
         if (!fanProfile || attendanceLoading) {
             if (!fanProfile) alert("이 아티스트에 대한 출석 정보를 불러올 수 없습니다. 잠시 후 새로고침 후 다시 시도해 주세요.");
@@ -542,71 +420,32 @@ function ArtistDetailPageInner({ paramsId }) {
                 setFanProfiles(prev => prev.map(p => p.id === fanProfile.id ? { ...p, lastVisitDate: todayStr } : p));
                 alert("오늘 이미 출석했습니다.");
             } else console.error(err);
-        } finally {
-            setAttendanceLoading(false);
-        }
+        } finally { setAttendanceLoading(false); }
     };
 
     const handleLiveCardClick = async (session) => {
         if (liveCardCheckingId != null) return;
         setLiveCardCheckingId(session.id);
-        try {
-            await apiGet(`/api/live-sessions/${session.id}/access`);
-            router.push(`/live/${session.id}`);
-        } catch (e) {
-            setShowSubscriptionModal(true);
-        } finally {
-            setLiveCardCheckingId(null);
-        }
+        try { await apiGet(`/api/live-sessions/${session.id}/access`); router.push(`/live/${session.id}`); }
+        catch { setShowSubscriptionModal(true); }
+        finally { setLiveCardCheckingId(null); }
     };
 
     const handleDmConnectClick = async (m) => {
-        if (!m?.dmProductId || !currentUser) {
-            if (!currentUser) router.push("/login");
-            return;
-        }
+        if (!m?.dmProductId || !currentUser) { if (!currentUser) router.push("/login"); return; }
         if (dmConnectCheckingId != null) return;
         const artistId = Number(m.id);
         setDmConnectCheckingId(artistId);
         try {
             const check = await checkDmSubscription(artistId);
-            if (check?.error) {
-                setDmErrorModalOpen(true);
-                return;
-            }
-            if (check?.hasSubscription) {
-                const roomId = check?.roomId;
-                if (roomId != null) {
-                    router.push(`/dm/fan?roomId=${roomId}`);
-                } else {
-                    router.push("/dm/fan");
-                }
-                return;
-            }
-        } catch (e) {
-            console.error("DM 구독 확인 실패", e);
-            setDmErrorModalOpen(true);
-            return;
-        } finally {
-            setDmConnectCheckingId(null);
-        }
-        setDmModalMember(m);
-        setDmModalProduct(null);
-        setDmModalCandyBalance(null);
-        setDmModalOpen(true);
-        setDmModalLoading(true);
-        Promise.all([
-            getProduct(m.dmProductId),
-            getProfile(),
-        ])
-            .then(([product, profile]) => {
-                setDmModalProduct(product);
-                setDmModalCandyBalance(profile?.candy ?? 0);
-            })
-            .catch(() => {
-                setDmModalProduct(null);
-                setDmModalCandyBalance(0);
-            })
+            if (check?.error) { setDmErrorModalOpen(true); return; }
+            if (check?.hasSubscription) { router.push(check?.roomId != null ? `/dm/fan?roomId=${check.roomId}` : "/dm/fan"); return; }
+        } catch { setDmErrorModalOpen(true); return; }
+        finally { setDmConnectCheckingId(null); }
+        setDmModalMember(m); setDmModalProduct(null); setDmModalCandyBalance(null); setDmModalOpen(true); setDmModalLoading(true);
+        Promise.all([getProduct(m.dmProductId), getProfile()])
+            .then(([product, profile]) => { setDmModalProduct(product); setDmModalCandyBalance(profile?.candy ?? 0); })
+            .catch(() => { setDmModalProduct(null); setDmModalCandyBalance(0); })
             .finally(() => setDmModalLoading(false));
     };
 
@@ -614,40 +453,17 @@ function ArtistDetailPageInner({ paramsId }) {
         if (!dmModalProduct || dmModalPaying) return;
         const candyPrice = dmModalProduct?.candyPrice ?? 0;
         const balance = dmModalCandyBalance ?? 0;
-        if (balance < candyPrice) {
-            router.push("/candy/recharge");
-            setDmModalOpen(false);
-            return;
-        }
+        if (balance < candyPrice) { router.push("/candy/recharge"); setDmModalOpen(false); return; }
         setDmModalPaying(true);
         try {
             await createCandySubscription(dmModalProduct.id);
             setDmModalOpen(false);
             const check = await checkDmSubscription(Number(dmModalMember?.id));
-            if (check?.error) {
-                setDmErrorModalOpen(true);
-                return;
-            }
-            if (check?.hasSubscription) {
-                const roomId = check?.roomId;
-                router.push(roomId != null ? `/dm/fan?roomId=${roomId}` : "/dm/fan");
-            } else {
-                router.push("/dm/fan");
-            }
-        } catch (e) {
-            alert(e?.message || "DM 구독에 실패했습니다.");
-        } finally {
-            setDmModalPaying(false);
-        }
-    };
-
-    const handleLike = (postId) => {
-        setLikedPostIds(prev => {
-            const next = new Set(prev);
-            if (next.has(postId)) next.delete(postId);
-            else next.add(postId);
-            return next;
-        });
+            if (check?.error) { setDmErrorModalOpen(true); return; }
+            if (check?.hasSubscription) router.push(check?.roomId != null ? `/dm/fan?roomId=${check.roomId}` : "/dm/fan");
+            else router.push("/dm/fan");
+        } catch (e) { alert(e?.message || "DM 구독에 실패했습니다."); }
+        finally { setDmModalPaying(false); }
     };
 
     const handleArtistPostLike = (postId) => {
@@ -674,23 +490,13 @@ function ArtistDetailPageInner({ paramsId }) {
 
     const handleDeleteFanPost = async (postId) => {
         if (!window.confirm("게시글을 삭제하시겠습니까?")) return;
-        try {
-            await request(`/api/fan-posts/${postId}`, { method: "DELETE" });
-            setFanPosts((prev) => prev.filter((p) => p.id !== postId));
-        } catch (err) {
-            console.error("팬 포스트 삭제 실패", err);
-        }
+        try { await request(`/api/fan-posts/${postId}`, { method: "DELETE" }); setFanPosts((prev) => prev.filter((p) => p.id !== postId)); }
+        catch (err) { console.error("팬 포스트 삭제 실패", err); }
     };
 
-    const handleEditFanPost = (postId) => {
-        router.push(`/posts/${postId}/edit?type=FAN&groupId=${postGroupId}`);
-    };
+    const handleEditFanPost = (postId) => router.push(`/posts/${postId}/edit?type=FAN&groupId=${postGroupId}`);
 
-    const closeFanPostModal = () => {
-        setNewPostContent("");
-        resetFanPostAttachments();
-        setShowCreateModal(false);
-    };
+    const closeFanPostModal = () => { setNewPostContent(""); resetFanPostAttachments(); setShowCreateModal(false); };
 
     const handleFanPostFileChange = async (e) => {
         const file = e?.target?.files?.[0];
@@ -701,42 +507,19 @@ function ArtistDetailPageInner({ paramsId }) {
 
     const handleCreatePost = async () => {
         if (!newPostContent.trim() || createPostLoading || fanPostUploading) return;
-
         if (isRealGroup && groupId) {
             setCreatePostLoading(true);
             try {
                 const created = await request("/api/fan-posts", {
                     method: "POST",
-                    body: {
-                        groupId,
-                        title: "",
-                        content: newPostContent.trim(),
-                        mediaAssetIds: fanPostMediaAssetIds.length > 0 ? fanPostMediaAssetIds : null,
-                        representativeMediaAssetId: fanPostRepresentativeId,
-                    },
+                    body: { groupId, title: "", content: newPostContent.trim(), mediaAssetIds: fanPostMediaAssetIds.length > 0 ? fanPostMediaAssetIds : null, representativeMediaAssetId: fanPostRepresentativeId },
                 });
                 const newPost = transformFanPost(created);
                 setFanPosts((prev) => [newPost, ...prev]);
                 closeFanPostModal();
                 fetchFanPostsMeta([newPost]).catch(() => {});
-            } catch (err) {
-                console.error("팬 포스트 생성 실패", err);
-            } finally {
-                setCreatePostLoading(false);
-            }
-        } else {
-            const newPost = {
-                id: `p-new-${Date.now()}`,
-                writerId: myUserId,
-                authorName: currentUser?.email?.split("@")[0] || "Me",
-                authorAvatar: "",
-                content: newPostContent,
-                image: null,
-                timestamp: "방금 전",
-                type: "FAN",
-            };
-            setFanPosts([newPost, ...fanPosts]);
-            closeFanPostModal();
+            } catch (err) { console.error("팬 포스트 생성 실패", err); }
+            finally { setCreatePostLoading(false); }
         }
     };
 
@@ -751,28 +534,21 @@ function ArtistDetailPageInner({ paramsId }) {
         { id: "ARTIST", label: "Artist" },
         { id: "FAN", label: "Fan" },
         { id: "LIVE", label: "Live" },
+        { id: "REPLAY", label: "Replay" },
         { id: "CONCERT", label: "Concert" },
-        { id: "MARKET", label: "Market" },
         { id: "MV", label: "MV" },
+        { id: "MARKET", label: "Market" },
     ];
 
     return (
         <div className="flex flex-col min-h-full relative pb-20">
-            {/* 커버 섹션 */}
-            <div className="h-64 w-full relative overflow-hidden shrink-0 group/cover">
+            {/* 커버 섹션 — h-64 풀폭 배너 */}
+            <div className="h-64 w-full relative overflow-hidden shrink-0">
                 {artist.cover ? <img src={artist.cover} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-white/5" />}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
-                {isRealGroup && myGroupId != null && String(myGroupId) === String(groupId) && (
-                    <Link
-                        href="/mypage?open=artist-profile"
-                        className="absolute top-4 right-4 px-4 py-2 rounded-xl bg-black/50 hover:bg-violet-600/80 text-white text-sm font-medium border border-white/10 opacity-0 group-hover/cover:opacity-100 transition-opacity"
-                    >
-                        커버 이미지 변경
-                    </Link>
-                )}
             </div>
 
-            {/* 헤더 프로필 */}
+            {/* 프로필 카드 — 160px 아바타, 겹침 디자인 */}
             <div className="max-w-6xl w-full mx-auto px-8 relative -mt-20 z-10 shrink-0">
                 <Surface variant="primary" className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]">
                     <div className="flex items-end gap-6">
@@ -792,37 +568,24 @@ function ArtistDetailPageInner({ paramsId }) {
                     <div className="pb-1 flex items-center gap-3">
                         {artist.isFollowing ? (
                             <>
-                                {artist.isSubscribed ? (
-                                    <Button variant="ghost" className="px-8" disabled>구독 중</Button>
-                                ) : (
-                                    <Button variant="ghost" className="px-8" disabled>팔로우중</Button>
-                                )}
+                                <Button variant="ghost" className="px-8" disabled>{artist.isSubscribed ? "구독 중" : "팔로우중"}</Button>
                                 <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
                                     {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
                                 </Button>
                             </>
                         ) : (
-                            <Button
-                                variant="primary"
-                                className="px-10 py-4"
-                                onClick={async () => {
-                                    const id = artist.backendId ?? artist.id;
-                                    if (!id || !isRealGroup) return;
-                                    try {
-                                        await apiPost(`/api/user/follow/${id}`);
-                                        setArtist((prev) => (prev ? { ...prev, isFollowing: true, memberCount: (prev.memberCount || 0) + 1 } : prev));
-                                    } catch (e) {
-                                        console.error(e);
-                                    }
-                                }}>
-                                팔로우하기
-                            </Button>
+                            <Button variant="primary" className="px-10 py-4" onClick={async () => {
+                                const id = artist.backendId ?? artist.id;
+                                if (!id || !isRealGroup) return;
+                                try { await apiPost(`/api/user/follow/${id}`); setArtist((prev) => prev ? { ...prev, isFollowing: true, memberCount: (prev.memberCount || 0) + 1 } : prev); }
+                                catch (e) { console.error(e); }
+                            }}>팔로우하기</Button>
                         )}
                     </div>
                 </Surface>
             </div>
 
-            {/* 참여 공연 섹션 (다가오는 공연만, 상태/D-Day 동일 스타일) */}
+            {/* 예정 콘서트 */}
             {artistConcerts.length > 0 && (() => {
                 const now = new Date();
                 return (
@@ -831,71 +594,42 @@ function ArtistDetailPageInner({ paramsId }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {artistConcerts.map((c, i) => {
                                 const concertId = getConcertId(c);
-                                if (!concertId && typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
                                 const status = getConcertStatus(c, now);
                                 const badgeLabel = getConcertStatusBadgeLabel(c, now);
-                                const badgeClass = {
-                                    [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium",
-                                    [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90",
-                                    [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium",
-                                    [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium",
-                                    [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium",
-                                    [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium",
-                                }[status.key] ?? "bg-white/20 text-white/90 font-medium";
-                                const cardContent = (
-                                    <>
-                                        <div className="aspect-[16/10] overflow-hidden relative">
-                                            <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                            <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
-                                                {badgeLabel}
-                                            </span>
-                                        </div>
-                                        <div className="p-5">
-                                            <h4 className="font-bold text-white truncate">{c.title}</h4>
-                                            <p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                <span>{formatDateShort(c.startDateTime)}</span>
-                                                <span>•</span>
-                                                <span>{c.placeName || c.venueName}</span>
-                                            </p>
-                                        </div>
-                                    </>
-                                );
+                                const badgeClass = { [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium", [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90", [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium", [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium" }[status.key] ?? "bg-white/20 text-white/90 font-medium";
                                 const key = concertId ?? `concert-${i}`;
-                                const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
-                                return concertId ? (
-                                    <Link key={key} href={`/concerts/${concertId}`} className={className}>
-                                        {cardContent}
-                                    </Link>
-                                ) : (
-                                    <div key={key} className={className} aria-disabled="true">
-                                        {cardContent}
-                                    </div>
-                                );
+                                const cls = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                                const inner = (<><div className="aspect-[16/10] overflow-hidden relative"><img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /><span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{badgeLabel}</span></div><div className="p-5"><h4 className="font-bold text-white truncate">{c.title}</h4><p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span>{formatDateShort(c.startDateTime)}</span><span>•</span><span>{c.placeName || c.venueName}</span></p></div></>);
+                                return concertId ? <Link key={key} href={`/concerts/${concertId}`} className={cls}>{inner}</Link> : <div key={key} className={cls}>{inner}</div>;
                             })}
                         </div>
                     </div>
                 );
             })()}
 
-            {/* 탭 메뉴 */}
-            <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 border-b border-white/[0.06] mt-12">
-                <div className="max-w-6xl mx-auto px-8 flex gap-8">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => handleTabClick(tab.id)}
-                            className={`py-5 text-sm font-bold tracking-wide transition-colors border-b-2 -mb-px ${
-                                activeTab === tab.id ? "border-violet-400 text-violet-300" : "border-transparent text-white/40 hover:text-white/80"
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+            {/* 탭 — pill 스타일 + sticky */}
+            <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 mt-12">
+                <div className="max-w-6xl mx-auto px-8 py-3">
+                    <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-2xl border border-white/[0.06] overflow-x-auto">
+                        {tabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleTabClick(tab.id)}
+                                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                                    activeTab === tab.id
+                                        ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
+                                        : "text-white/55 hover:text-white/80"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* 공지사항 섹션 (탭과 피드 사이) - Artist 탭 활성화 시에만 표시 */}
-            {activeTab === "ARTIST" && (() => {
+            {/* 공지사항 */}
+            {(() => {
                 const notices = isRealGroup ? artistNotices : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE");
                 if (notices.length === 0) return null;
                 const latest = notices[0];
@@ -903,18 +637,12 @@ function ArtistDetailPageInner({ paramsId }) {
                     <div className="max-w-6xl w-full mx-auto px-8 pt-8">
                         <div className="flex items-center justify-between gap-4 mb-4">
                             <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">공지사항</h3>
-                            <Link
-                                href={`/artists/${paramsId}/notices`}
-                                className="text-xs font-bold text-violet-300 hover:text-violet-200 flex items-center gap-1"
-                            >
+                            <Link href={`/artists/${paramsId}/notices`} className="text-xs font-bold text-violet-300 hover:text-violet-200 flex items-center gap-1">
                                 전체 공지 확인
                                 <span className="material-symbols-outlined text-sm">chevron_right</span>
                             </Link>
                         </div>
-                        <Link
-                            href={`/posts/${latest.id}?type=ARTIST&groupId=${groupId}`}
-                            className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-5"
-                        >
+                        <Link href={`/posts/${latest.id}?type=ARTIST&groupId=${groupId}`} className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-5">
                             <div className="flex gap-3 items-center mb-2">
                                 <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold">NOTICE</span>
                                 <span className="text-white/40 text-xs">{latest.timestamp || formatTimestamp(latest.createdAt)}</span>
@@ -925,34 +653,19 @@ function ArtistDetailPageInner({ paramsId }) {
                 );
             })()}
 
-            {/* 소속 멤버 섹션 (멤버 카드는 모두 표시, DM 연결하기는 dmProductId 있을 때만) - Artist 탭 활성화 시에만 표시 */}
-            {activeTab === "ARTIST" && artist?.members && artist.members.length > 0 && (
+            {/* 소속 멤버 */}
+            {artist?.members && artist.members.length > 0 && (
                 <div className="max-w-6xl w-full mx-auto px-8 pt-8">
                     <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-4">소속 멤버</h3>
                     <div className="flex flex-wrap gap-4">
                         {artist.members.map((m) => (
-                            <div
-                                key={m.id}
-                                className="flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-4 min-w-[200px]"
-                            >
-                                <img src={m.avatar || `https://picsum.photos/seed/${m.id}/100/100`} className="size-12 rounded-xl object-cover shrink-0" alt="" />
+                            <div key={m.id} className="flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-4 min-w-[200px]">
+                                <img src={m.avatar || getDefaultAvatarUrl(m.name || "?")} className="size-12 rounded-xl object-cover shrink-0" alt="" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-white font-bold truncate">{m.name}</p>
                                     {m.dmProductId && (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDmConnectClick(m)}
-                                            disabled={dmConnectCheckingId === Number(m.id)}
-                                            className="text-[10px] text-violet-400 font-black hover:underline uppercase mt-1 inline-flex items-center gap-1 disabled:opacity-60"
-                                        >
-                                            {dmConnectCheckingId === Number(m.id) ? (
-                                                <span className="animate-pulse">확인 중...</span>
-                                            ) : (
-                                                <>
-                                                    <span className="material-symbols-outlined text-xs">mail</span>
-                                                    DM 연결하기
-                                                </>
-                                            )}
+                                        <button type="button" onClick={() => handleDmConnectClick(m)} disabled={dmConnectCheckingId === Number(m.id)} className="text-[10px] text-violet-400 font-black hover:underline uppercase mt-1 inline-flex items-center gap-1 disabled:opacity-60">
+                                            {dmConnectCheckingId === Number(m.id) ? <span className="animate-pulse">확인 중...</span> : <><span className="material-symbols-outlined text-xs">mail</span>DM 연결하기</>}
                                         </button>
                                     )}
                                 </div>
@@ -962,361 +675,207 @@ function ArtistDetailPageInner({ paramsId }) {
                 </div>
             )}
 
-            {/* 메인 콘텐츠 영역 */}
+            {/* 메인 콘텐츠 */}
             <div className="max-w-6xl w-full mx-auto px-8 py-10">
                 <div className="w-full">
+                    {/* ARTIST 탭 */}
                     {activeTab === "ARTIST" && (
                         !currentUser ? (
                             <Surface className="p-20 text-center border border-white/10">
                                 <p className="text-white/70 font-medium mb-2">로그인 후 이용해 주세요.</p>
                                 <p className="text-sm text-white/50 mb-6">아티스트 게시글을 보려면 로그인이 필요합니다.</p>
-                                <Button href="/login" variant="primary" className="px-8 py-3">
-                                    로그인
-                                </Button>
+                                <Button href="/login" variant="primary" className="px-8 py-3">로그인</Button>
                             </Surface>
                         ) : artistPostsLoading ? (
-                            <Surface className="py-12 text-center">
-                                <p className="text-white/55">로딩 중...</p>
-                            </Surface>
+                            <Surface className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
                         ) : (() => {
-                            const posts = isRealGroup ? artistPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "ARTIST").map(p => ({
-                                id: p.id,
-                                authorName: p.authorName,
-                                authorAvatar: p.authorAvatar,
-                                content: p.content,
-                                image: p.image,
-                                timestamp: p.timestamp,
-                                type: "ARTIST",
-                            }));
-                            if (posts.length === 0) {
-                                return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">아티스트 게시글이 없습니다.</p>;
-                            }
+                            const posts = isRealGroup ? artistPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "ARTIST").map(p => ({ id: p.id, authorName: p.authorName, authorAvatar: p.authorAvatar, content: p.content, image: p.image, timestamp: p.timestamp, type: "ARTIST" }));
+                            if (posts.length === 0) return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">아티스트 게시글이 없습니다.</p>;
                             return (
                                 <>
                                     <PostFeed
-                                        posts={posts}
-                                        postLinkBase="/posts"
-                                        postLinkQuery={`type=ARTIST&groupId=${postGroupId}`}
-                                        showVerifiedByType={true}
-                                        isLikedMap={artistIsLikedMap}
-                                        likeCountMap={artistLikeCountMap}
-                                        commentCountMap={artistCommentCountMap}
-                                        onLike={handleArtistPostLike}
+                                        posts={posts} postLinkBase="/posts" postLinkQuery={`type=ARTIST&groupId=${postGroupId}`}
+                                        showVerifiedByType={true} isLikedMap={artistIsLikedMap} likeCountMap={artistLikeCountMap}
+                                        commentCountMap={artistCommentCountMap} onLike={handleArtistPostLike}
                                         onComment={(postId) => router.push(`/posts/${postId}?type=ARTIST&groupId=${postGroupId}`)}
-                                        isLockedMap={Object.fromEntries(
-                                            posts.map((p) => [
-                                                p.id,
-                                                p.isLockedByServer || !!(p.isMembershipOnly && !artist?.isSubscribed),
-                                            ])
-                                        )}
+                                        isLockedMap={Object.fromEntries(posts.map((p) => [p.id, p.isLockedByServer || !!(p.isMembershipOnly && !artist?.isSubscribed)]))}
                                     />
-                                    <div ref={artistPostsBottomRef} className="py-1">
-                                        {artistPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}
-                                    </div>
+                                    <div ref={artistPostsBottomRef} className="py-1">{artistPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}</div>
                                 </>
                             );
                         })()
                     )}
 
+                    {/* FAN 탭 */}
                     {activeTab === "FAN" && (
                         !currentUser ? (
                             <Surface className="p-20 text-center border border-white/10">
                                 <p className="text-white/70 font-medium mb-2">로그인 후 이용해 주세요.</p>
                                 <p className="text-sm text-white/50 mb-6">팬 탭 게시글을 보려면 로그인이 필요합니다.</p>
-                                <Button href="/login" variant="primary" className="px-8 py-3">
-                                    로그인
-                                </Button>
+                                <Button href="/login" variant="primary" className="px-8 py-3">로그인</Button>
                             </Surface>
+                        ) : artist.isFollowing ? (
+                            <div className="space-y-6">
+                                <div className="flex justify-end">
+                                    <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+                                        <span className="material-symbols-outlined mr-2">edit</span> 팬 포스트 작성
+                                    </Button>
+                                </div>
+                                {fanPostsLoading ? (
+                                    <Surface className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
+                                ) : (() => {
+                                    const posts = isRealGroup ? fanPosts : [];
+                                    if (posts.length === 0) return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">등록된 포스트가 없습니다.</p>;
+                                    return (
+                                        <>
+                                            <PostFeed
+                                                posts={posts} postLinkBase="/posts" postLinkQuery={`type=FAN&groupId=${postGroupId}`}
+                                                showVerifiedByType={true} isLikedMap={fanIsLikedMap} likeCountMap={fanLikeCountMap}
+                                                commentCountMap={fanCommentCountMap} onLike={handleFanPostLike}
+                                                onComment={(postId) => router.push(`/posts/${postId}?type=FAN&groupId=${postGroupId}`)}
+                                                onDelete={handleDeleteFanPost} onEdit={handleEditFanPost}
+                                                canDeleteSet={myUserId ? new Set(posts.filter((p) => p.writerId === myUserId).map((p) => p.id)) : undefined}
+                                                canEditSet={myUserId ? new Set(posts.filter((p) => p.writerId === myUserId).map((p) => p.id)) : undefined}
+                                            />
+                                            <div ref={fanPostsBottomRef} className="py-1">{fanPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}</div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
                         ) : (
-                            <>
-                                {artist.isFollowing ? (
-                                    <div className="space-y-6">
-                                        <div className="flex justify-end">
-                                            <Button variant="primary" onClick={() => setShowCreateModal(true)}>
-                                                <span className="material-symbols-outlined mr-2">edit</span> 팬 포스트 작성
-                                            </Button>
-                                        </div>
-                                        {fanPostsLoading ? (
-                                            <Surface className="py-12 text-center">
-                                                <p className="text-white/55">로딩 중...</p>
-                                            </Surface>
-                                        ) : (() => {
-                                            const posts = isRealGroup ? fanPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "FAN").map(p => ({
-                                                id: p.id,
-                                                writerId: null,
-                                                authorName: p.authorName,
-                                                authorAvatar: p.authorAvatar,
-                                                content: p.content,
-                                                image: p.image,
-                                                timestamp: p.timestamp,
-                                                type: "FAN",
-                                            }));
-                                            if (posts.length === 0) {
-                                                return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">등록된 포스트가 없습니다.</p>;
-                                            }
-                                            return (
-                                                <>
-                                                    <PostFeed
-                                                        posts={posts}
-                                                        postLinkBase="/posts"
-                                                        postLinkQuery={`type=FAN&groupId=${postGroupId}`}
-                                                        showVerifiedByType={true}
-                                                        isLikedMap={fanIsLikedMap}
-                                                        likeCountMap={fanLikeCountMap}
-                                                        commentCountMap={fanCommentCountMap}
-                                                        onLike={handleFanPostLike}
-                                                        onComment={(postId) => router.push(`/posts/${postId}?type=FAN&groupId=${postGroupId}`)}
-                                                        onDelete={handleDeleteFanPost}
-                                                        canDeleteSet={myUserId ? new Set(posts.filter((p) => p.writerId === myUserId).map((p) => p.id)) : undefined}
-                                                        onEdit={handleEditFanPost}
-                                                        canEditSet={myUserId ? new Set(posts.filter((p) => p.writerId === myUserId).map((p) => p.id)) : undefined}
-                                                    />
-                                                    <div ref={fanPostsBottomRef} className="py-1">
-                                                        {fanPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}
-                                                    </div>
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                ) : (
-                                    <Surface className="p-20 text-center italic text-white/40">팔로우한 회원만 이용할 수 있습니다.</Surface>
-                                )}
-                            </>
+                            <Surface className="p-20 text-center italic text-white/40">팔로우한 회원만 이용할 수 있습니다.</Surface>
                         )
                     )}
 
+                    {/* LIVE 탭 — 진행 중 라이브만 */}
                     {activeTab === "LIVE" && (
-                        <div className="space-y-12">
-                            <section>
-                                <h3 className="text-xs font-black text-white/40 mb-6 uppercase tracking-widest">Live Now</h3>
-                                {liveLoading ? <p className="text-white/40">로딩 중...</p> :
-                                    liveSessions.length > 0 ? (
-                                        <div className="grid gap-6">
-                                            {liveSessions.map(session => (
-                                                <button key={session.id} onClick={() => handleLiveCardClick(session)} className="relative aspect-video rounded-3xl overflow-hidden group">
-                                                    <img src="https://picsum.photos/seed/live/800/450" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
-                                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
-                                                    <div className="absolute top-4 left-4 flex gap-2">
-                                                        <span className="bg-red-600 px-3 py-1 text-[10px] font-black rounded text-white">LIVE</span>
-                                                        {session.isPaid && <span className="bg-violet-600 px-3 py-1 text-[10px] font-black rounded text-white">MEMBERSHIP</span>}
-                                                    </div>
-                                                    <div className="absolute bottom-6 left-6 text-left">
-                                                        <h4 className="text-2xl font-bold text-white">{session.title}</h4>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ) : <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">현재 진행 중인 라이브가 없습니다.</p>}
-                            </section>
-
-                            <section>
-                                <h3 className="text-xs font-black text-white/40 mb-6 uppercase tracking-widest">Replay (VOD)</h3>
-                                {vodLoading ? (
-                                    <p className="text-white/40 py-12 text-center">로딩 중...</p>
-                                ) : vodList.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-6">
-                                        {vodList.map((vod) => (
-                                            <Link key={vod.replayId} href={`/replay/${vod.replayId}`} className="group">
-                                                <div className="aspect-video rounded-2xl overflow-hidden relative mb-3 bg-gradient-to-br from-violet-900/30 to-indigo-900/20 border border-white/[0.06]">
-                                                    {vod.thumbnailUrl ? (
-                                                        <img src={vod.thumbnailUrl} className="w-full h-full object-cover" alt="" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center">
-                                                            <span className="material-symbols-outlined text-5xl text-white/15">smart_display</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
-                                                        <div className="size-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                                                            <span className="material-symbols-outlined text-white text-3xl fill-icon">play_arrow</span>
-                                                        </div>
-                                                    </div>
-                                                    {vod.accessType === "PAID" && (
-                                                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-violet-500/80 text-[9px] font-black text-white uppercase">
-                                                            멤버십
-                                                        </span>
-                                                    )}
+                        <div className="space-y-6">
+                            <h3 className="text-xs font-black text-white/40 mb-2 uppercase tracking-widest">Live Now</h3>
+                            {liveLoading ? <p className="text-white/40">로딩 중...</p> :
+                                liveSessions.length > 0 ? (
+                                    <div className="grid gap-6">
+                                        {liveSessions.map(session => (
+                                            <button key={session.id} onClick={() => handleLiveCardClick(session)} className="relative aspect-video rounded-3xl overflow-hidden group">
+                                                <img src="https://picsum.photos/seed/live/800/450" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
+                                                <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
+                                                <div className="absolute top-4 left-4 flex gap-2">
+                                                    <span className="bg-red-600 px-3 py-1 text-[10px] font-black rounded text-white">LIVE</span>
+                                                    {session.isPaid && <span className="bg-violet-600 px-3 py-1 text-[10px] font-black rounded text-white">MEMBERSHIP</span>}
                                                 </div>
-                                                <h5 className="font-bold text-white truncate">{vod.title || `다시보기 #${vod.replayId}`}</h5>
-                                                <p className="text-white/40 text-xs mt-1">{vod.publishedAt ? new Date(vod.publishedAt).toLocaleDateString("ko-KR") : ""}</p>
-                                            </Link>
+                                                <div className="absolute bottom-6 left-6 text-left">
+                                                    <h4 className="text-2xl font-bold text-white">{session.title}</h4>
+                                                </div>
+                                            </button>
                                         ))}
                                     </div>
-                                ) : (
-                                    <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">다시보기가 없습니다.</p>
-                                )}
-                            </section>
+                                ) : <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">현재 진행 중인 라이브가 없습니다.</p>}
                         </div>
                     )}
 
+                    {/* REPLAY 탭 — LIVE에서 분리 */}
+                    {activeTab === "REPLAY" && (
+                        <div className="space-y-6">
+                            <h3 className="text-xs font-black text-white/40 mb-2 uppercase tracking-widest">Replay (VOD)</h3>
+                            {vodLoading ? (
+                                <p className="text-white/40 py-12 text-center">로딩 중...</p>
+                            ) : vodList.length > 0 ? (
+                                <div className="grid grid-cols-2 gap-6">
+                                    {vodList.map((vod) => (
+                                        <Link key={vod.replayId} href={`/replay/${vod.replayId}`} className="group">
+                                            <div className="aspect-video rounded-2xl overflow-hidden relative mb-3 bg-gradient-to-br from-violet-900/30 to-indigo-900/20 border border-white/[0.06]">
+                                                {vod.thumbnailUrl ? (
+                                                    <img src={vod.thumbnailUrl} className="w-full h-full object-cover" alt="" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-5xl text-white/15">smart_display</span>
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
+                                                    <div className="size-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                                        <span className="material-symbols-outlined text-white text-3xl fill-icon">play_arrow</span>
+                                                    </div>
+                                                </div>
+                                                {vod.accessType === "PAID" && (
+                                                    <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-violet-500/80 text-[9px] font-black text-white uppercase">멤버십</span>
+                                                )}
+                                            </div>
+                                            <h5 className="font-bold text-white truncate">{vod.title || `다시보기 #${vod.replayId}`}</h5>
+                                            <p className="text-white/40 text-xs mt-1">{vod.publishedAt ? new Date(vod.publishedAt).toLocaleDateString("ko-KR") : ""}</p>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">다시보기가 없습니다.</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* CONCERT 탭 — 인라인 그리드 */}
                     {activeTab === "CONCERT" && (
                         <div className="space-y-6">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-white/40 px-1">
-                                Concert
-                            </h3>
+                            <h3 className="text-xs font-black uppercase tracking-widest text-white/40 px-1">Concert</h3>
                             {artistConcertsForTab.length === 0 ? (
-                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">
-                                    공연이 없습니다.
-                                </p>
-                            ) : (
-                                (() => {
-                                    const now = new Date();
-                                    return (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                            {artistConcertsForTab.map((c, i) => {
-                                                const concertId = getConcertId(c);
-                                                if (!concertId && typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
-                                                const key = concertId ?? `concert-${i}`;
-                                                const status = getConcertStatus(c, now);
-                                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
-                                                const badgeClass = {
-                                                    [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium",
-                                                    [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90",
-                                                    [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium",
-                                                    [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium",
-                                                    [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium",
-                                                    [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium",
-                                                }[status.key] ?? "bg-white/20 text-white/90 font-medium";
-                                                const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
-                                                const cardContent = (
-                                                    <>
-                                                        <div className="aspect-[16/10] overflow-hidden relative">
-                                                            <img
-                                                                src={c.concertImageUrl || c.posterImageUrl}
-                                                                alt=""
-                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                            />
-                                                            <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
-                                                                {badgeLabel}
-                                                            </span>
-                                                        </div>
-                                                        <div className="p-5">
-                                                            <h4 className="font-bold text-white truncate">{c.title}</h4>
-                                                            <p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                                <span>{formatDateShort(c.startDateTime)}</span>
-                                                                <span>•</span>
-                                                                <span>{c.placeName || c.venueName}</span>
-                                                            </p>
-                                                        </div>
-                                                    </>
-                                                );
-                                                return concertId ? (
-                                                    <Link key={key} href={`/concerts/${concertId}`} className={className}>
-                                                        {cardContent}
-                                                    </Link>
-                                                ) : (
-                                                    <div key={key} className={className} aria-disabled="true">
-                                                        {cardContent}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })()
-                            )}
+                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">공연이 없습니다.</p>
+                            ) : (() => {
+                                const now = new Date();
+                                return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                        {artistConcertsForTab.map((c, i) => {
+                                            const concertId = getConcertId(c);
+                                            const key = concertId ?? `concert-${i}`;
+                                            const status = getConcertStatus(c, now);
+                                            const badgeLabel = getConcertStatusBadgeLabel(c, now);
+                                            const badgeClass = { [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium", [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90", [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium", [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium" }[status.key] ?? "bg-white/20 text-white/90 font-medium";
+                                            const cls = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                                            const inner = (<><div className="aspect-[16/10] overflow-hidden relative"><img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /><span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{badgeLabel}</span></div><div className="p-5"><h4 className="font-bold text-white truncate">{c.title}</h4><p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span>{formatDateShort(c.startDateTime)}</span><span>•</span><span>{c.placeName || c.venueName}</span></p></div></>);
+                                            return concertId ? <Link key={key} href={`/concerts/${concertId}`} className={cls}>{inner}</Link> : <div key={key} className={cls}>{inner}</div>;
+                                        })}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 
+                    {/* MV 탭 — 검색창 항상 노출 (우측 상단), 설명 line-clamp-4 */}
                     {activeTab === "MV" && (
                         <div className="space-y-6">
-                            {musicVideos.length > 0 && (
-                                <div className="relative">
-                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
-                                    <input
-                                        type="text"
-                                        value={mvSearchQuery}
-                                        onChange={(e) => setMvSearchQuery(e.target.value)}
-                                        placeholder="MV 제목 검색"
-                                        className="pl-9 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm w-full sm:w-72 placeholder:text-white/30"
-                                    />
-                                </div>
-                            )}
-
                             {selectedMV && (
                                 <Surface variant="primary" className="p-6">
                                     <div className="flex items-center justify-between mb-4">
                                         <h3 className="font-bold text-white truncate flex-1 mr-4">{selectedMV.title}</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedMV(null)}
-                                            className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors shrink-0"
-                                        >
+                                        <button type="button" onClick={() => setSelectedMV(null)} className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors shrink-0">
                                             <span className="material-symbols-outlined text-lg">close</span>
                                         </button>
                                     </div>
                                     <div className="aspect-video rounded-xl overflow-hidden bg-black">
-                                        <iframe
-                                            src={getSafeEmbedUrl(selectedMV.embedUrl)}
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowFullScreen
-                                            className="w-full h-full"
-                                            title={selectedMV.title}
-                                            referrerPolicy="strict-origin-when-cross-origin"
-                                        />
+                                        <iframe src={getSafeEmbedUrl(selectedMV.embedUrl)} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full" title={selectedMV.title} referrerPolicy="strict-origin-when-cross-origin" />
                                     </div>
-                                    {selectedMV.description && (
-                                        <p className="text-white/60 text-sm mt-4 whitespace-pre-wrap">{selectedMV.description}</p>
-                                    )}
+                                    {selectedMV.description && <p className="text-white/60 text-sm mt-4 whitespace-pre-wrap line-clamp-4">{selectedMV.description}</p>}
 
-                                    {/* 댓글 섹션 */}
                                     <div className="mt-6 border-t border-white/[0.06] pt-6">
-                                        <h4 className="text-sm font-bold text-white/80 mb-4">
-                                            댓글 {mvComments.length > 0 && `(${mvComments.length})`}
-                                        </h4>
+                                        <h4 className="text-sm font-bold text-white/80 mb-4">댓글 {mvComments.length > 0 && `(${mvComments.length})`}</h4>
                                         {currentUser && (
                                             <div className="flex gap-3 mb-4">
-                                                <input
-                                                    type="text"
-                                                    value={mvNewComment}
-                                                    onChange={(e) => setMvNewComment(e.target.value)}
-                                                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }}
-                                                    placeholder="댓글을 입력하세요..."
-                                                    className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-500 transition-colors disabled:opacity-50 shrink-0"
-                                                    onClick={handleMvCommentSubmit}
-                                                    disabled={mvCommentSubmitting || !mvNewComment.trim()}
-                                                >
-                                                    {mvCommentSubmitting ? "..." : "작성"}
-                                                </button>
+                                                <input type="text" value={mvNewComment} onChange={(e) => setMvNewComment(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }} placeholder="댓글을 입력하세요..." className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30" />
+                                                <button type="button" className="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-500 transition-colors disabled:opacity-50 shrink-0" onClick={handleMvCommentSubmit} disabled={mvCommentSubmitting || !mvNewComment.trim()}>{mvCommentSubmitting ? "..." : "작성"}</button>
                                             </div>
                                         )}
-                                        {mvCommentsLoading ? (
-                                            <p className="text-white/40 text-sm">댓글 로딩 중...</p>
-                                        ) : mvComments.length === 0 ? (
-                                            <p className="text-white/40 text-sm">아직 댓글이 없습니다.</p>
-                                        ) : (
+                                        {mvCommentsLoading ? <p className="text-white/40 text-sm">댓글 로딩 중...</p> : mvComments.length === 0 ? <p className="text-white/40 text-sm">아직 댓글이 없습니다.</p> : (
                                             <div className="space-y-3 max-h-80 overflow-y-auto">
                                                 {mvComments.map((c) => (
                                                     <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03]">
-                                                        <img
-                                                            src={c.profileImageUrl || getDefaultAvatarUrl(c.nickname || "?")}
-                                                            alt=""
-                                                            className="size-8 rounded-full object-cover shrink-0 border border-white/[0.08]"
-                                                        />
+                                                        <img src={c.profileImageUrl || getDefaultAvatarUrl(c.nickname || "?")} alt="" className="size-8 rounded-full object-cover shrink-0 border border-white/[0.08]" />
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 mb-0.5">
                                                                 <span className="text-xs font-bold text-white/80 truncate">{c.nickname || "알 수 없음"}</span>
-                                                                {c.isArtist && (
-                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-bold">아티스트</span>
-                                                                )}
-                                                                {c.writerGradeName && !c.isArtist && (
-                                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/60 font-bold">{c.writerGradeName}</span>
-                                                                )}
-                                                                <span className="text-[10px] text-white/30">
-                                                                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString("ko-KR") : ""}
-                                                                </span>
+                                                                {c.isArtist && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-bold">아티스트</span>}
+                                                                {c.writerGradeName && !c.isArtist && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/60 font-bold">{c.writerGradeName}</span>}
+                                                                <span className="text-[10px] text-white/30">{c.createdAt ? new Date(c.createdAt).toLocaleDateString("ko-KR") : ""}</span>
                                                             </div>
                                                             <p className="text-sm text-white/70 break-words">{c.content}</p>
                                                         </div>
                                                         {currentUser && c.userId === currentUser.id && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleMvCommentDelete(c.id)}
-                                                                className="text-white/30 hover:text-red-400 transition-colors shrink-0"
-                                                                title="삭제"
-                                                            >
+                                                            <button type="button" onClick={() => handleMvCommentDelete(c.id)} className="text-white/30 hover:text-red-400 transition-colors shrink-0" title="삭제">
                                                                 <span className="material-symbols-outlined text-sm">delete</span>
                                                             </button>
                                                         )}
@@ -1328,25 +887,34 @@ function ArtistDetailPageInner({ paramsId }) {
                                 </Surface>
                             )}
 
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-white">뮤직비디오</h3>
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
+                                    <input type="text" value={mvSearchQuery} onChange={(e) => setMvSearchQuery(e.target.value)} placeholder="제목 또는 설명 검색" className="pl-9 pr-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm w-64 placeholder:text-white/30" />
+                                </div>
+                            </div>
+
                             {musicVideosLoading ? (
                                 <p className="text-white/40">로딩 중...</p>
-                            ) : musicVideos.length === 0 && !mvSearchQuery.trim() ? (
-                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">MV가 없습니다.</p>
-                            ) : musicVideos.length === 0 ? (
+                            ) : musicVideos.length === 0 && mvSearchQuery.trim() ? (
                                 <p className="text-white/30 py-12 text-center bg-white/5 rounded-2xl">검색 결과가 없습니다.</p>
+                            ) : musicVideos.length === 0 ? (
+                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">MV가 없습니다.</p>
                             ) : (
                                 <div className="grid grid-cols-2 gap-6">
                                     {musicVideos.map(mv => (
-                                        <Surface key={mv.id} className={`overflow-hidden group cursor-pointer transition-all ${selectedMV?.id === mv.id ? "ring-2 ring-violet-500" : ""}`}>
+                                        <Surface key={mv.id} variant="card" className={`overflow-hidden group cursor-pointer transition-all ${selectedMV?.id === mv.id ? "ring-2 ring-violet-500" : ""}`}>
                                             <button type="button" onClick={() => setSelectedMV(mv)} className="w-full text-left">
                                                 <div className="aspect-video relative overflow-hidden">
-                                                    <img src={mv.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="" />
+                                                    {mv.thumbnailUrl ? <img src={mv.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="" /> : <div className="w-full h-full bg-white/5 flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span></div>}
                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
                                                         <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
                                                     </div>
                                                 </div>
                                                 <div className="p-4">
                                                     <h4 className="font-bold text-white truncate">{mv.title}</h4>
+                                                    {mv.description && <p className="text-sm text-white/50 truncate mt-0.5">{mv.description}</p>}
                                                 </div>
                                             </button>
                                         </Surface>
@@ -1355,192 +923,105 @@ function ArtistDetailPageInner({ paramsId }) {
                             )}
                         </div>
                     )}
-
                 </div>
             </div>
 
-            {/* 팬 포스트 작성 모달 */}
+            {/* 팬 포스트 작성 모달 — 작성자 표시, 드래그앤드롭 + 대표이미지 선택 */}
             {showCreateModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
                     <Surface className="w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 sm:p-8">
                         <div className="flex justify-between items-center mb-6 sticky top-0 z-10">
                             <h3 className="text-xl font-bold text-white">포스트 작성</h3>
-                            <button onClick={closeFanPostModal} className="text-white/50 hover:text-white">
-                                <span className="material-symbols-outlined">close</span>
+                            <button type="button" onClick={closeFanPostModal} className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors">
+                                <span className="material-symbols-outlined text-lg">close</span>
                             </button>
                         </div>
-                        <textarea
-                            className="w-full h-40 bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-violet-500/50"
-                            placeholder="아티스트에게 전할 메시지를 입력하세요..."
-                            value={newPostContent}
-                            onChange={(e) => setNewPostContent(e.target.value)}
-                        />
-                        {/* 첨부파일 */}
+                        {currentUser && (
+                            <div className="flex items-center gap-3 mb-6">
+                                <img src={getDefaultAvatarUrl(currentUser.email?.split("@")[0] || "?")} className="size-10 rounded-full border border-white/[0.08]" alt="" />
+                                <p className="font-bold text-white text-sm">{currentUser.email?.split("@")[0] || "Me"}</p>
+                            </div>
+                        )}
+                        <textarea className="w-full h-40 bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-violet-500/50" placeholder="아티스트에게 전할 메시지를 입력하세요..." value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} />
                         <div className="mt-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-sm text-white/40">attach_file</span>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-white/55">첨부파일</span>
                                 <span className="text-[10px] font-bold text-white/40">{fanPostMediaAssetIds.length}/{MAX_POST_ATTACHMENTS}</span>
-                                {fanPostAttachmentPreviews.length > 1 && (
-                                    <span className="text-[9px] text-violet-400/70 ml-auto">클릭하여 대표 이미지 선택</span>
-                                )}
+                                {fanPostAttachmentPreviews.length > 1 && <span className="text-[9px] text-violet-400/70 ml-auto">클릭하여 대표 이미지 선택</span>}
                             </div>
                             <input ref={fanPostFileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFanPostFileChange} />
-                            {fanPostUploadError && (
-                                <p className="text-red-400 text-xs mb-2">{fanPostUploadError}</p>
-                            )}
+                            {fanPostUploadError && <p className="text-red-400 text-xs mb-2">{fanPostUploadError}</p>}
                             {fanPostAttachmentPreviews.length > 0 ? (
                                 <div className="space-y-3">
-                                    <p className="text-[10px] text-white/30 font-medium">
-                                        클릭하여 대표 설정 · 드래그하여 순서 변경
-                                    </p>
-                                    <DraggableAttachmentGrid
-                                        attachments={fanPostAttachmentPreviews}
-                                        representativeId={fanPostRepresentativeId}
-                                        onSetRepresentative={setFanPostRepresentative}
-                                        onReorder={reorderFanPostAttachments}
-                                        onRemove={removeFanPostAttachment}
-                                    />
+                                    <p className="text-[10px] text-white/30 font-medium">클릭하여 대표 설정 · 드래그하여 순서 변경</p>
+                                    <DraggableAttachmentGrid attachments={fanPostAttachmentPreviews} representativeId={fanPostRepresentativeId} onSetRepresentative={setFanPostRepresentative} onReorder={reorderFanPostAttachments} onRemove={removeFanPostAttachment} />
                                     {canAddFanPostAttachment && !fanPostUploading && (
-                                        <button
-                                            type="button"
-                                            onClick={() => fanPostFileInputRef.current?.click()}
-                                            className="w-full py-3 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/40 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            <span className="material-symbols-outlined text-lg">add</span>
-                                            <span className="text-[10px] font-bold">파일 추가</span>
+                                        <button type="button" onClick={() => fanPostFileInputRef.current?.click()} className="w-full py-3 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/40 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex items-center justify-center gap-2">
+                                            <span className="material-symbols-outlined text-lg">add</span><span className="text-[10px] font-bold">파일 추가</span>
                                         </button>
                                     )}
-                                    {fanPostUploading && (
-                                        <div className="flex items-center gap-2 py-2">
-                                            <div className="size-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
-                                            <span className="text-violet-300 text-xs font-medium">업로드 중...</span>
-                                        </div>
-                                    )}
+                                    {fanPostUploading && <div className="flex items-center gap-2 py-2"><div className="size-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" /><span className="text-violet-300 text-xs font-medium">업로드 중...</span></div>}
                                 </div>
                             ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => fanPostFileInputRef.current?.click()}
-                                    disabled={fanPostUploading}
-                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50"
-                                >
+                                <button type="button" onClick={() => fanPostFileInputRef.current?.click()} disabled={fanPostUploading} className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
                                     <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
                                     <span className="text-xs font-bold">{fanPostUploading ? "업로드 중..." : "사진 또는 동영상 추가"}</span>
                                     <span className="text-[10px] text-white/30">이미지·영상 최대 {MAX_POST_ATTACHMENTS}개</span>
                                 </button>
                             )}
                         </div>
-                        <Button variant="primary" className="w-full mt-6 py-4" onClick={handleCreatePost} disabled={createPostLoading || fanPostUploading || !newPostContent.trim()}>
-                            {createPostLoading ? "게시 중..." : "게시하기"}
-                        </Button>
+                        <div className="mt-6 flex gap-3">
+                            <Button variant="ghost" className="flex-1 py-4 text-sm uppercase tracking-widest" onClick={closeFanPostModal}>취소</Button>
+                            <Button variant="primary" className="flex-1 py-4 text-sm uppercase tracking-widest" onClick={handleCreatePost} disabled={createPostLoading || fanPostUploading || !newPostContent.trim()}>
+                                {createPostLoading ? "게시 중..." : "게시하기"}
+                            </Button>
+                        </div>
                     </Surface>
                 </div>
             )}
 
-            <MembershipOnlyModal
-                isOpen={showSubscriptionModal}
-                onClose={() => setShowSubscriptionModal(false)}
-                artistId={artist.id}
-                artistName={artist.name}
-            />
+            <MembershipOnlyModal isOpen={showSubscriptionModal} onClose={() => setShowSubscriptionModal(false)} artistId={artist.id} artistName={artist.name} />
 
-            {/* DM 오류 모달 (DM 방 없음 등) */}
+            {/* DM 에러 모달 */}
             {dmErrorModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-                    onClick={() => setDmErrorModalOpen(false)}
-                >
-                    <div
-                        className="bg-[#201a33] rounded-[2rem] p-8 max-w-md w-full border border-white/[0.12] shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setDmErrorModalOpen(false)}>
+                    <div className="bg-[#201a33] rounded-[2rem] p-8 max-w-md w-full border border-white/[0.12] shadow-2xl" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-3 mb-6">
                             <span className="material-symbols-outlined text-red-400/90 text-2xl">error</span>
                             <h3 className="text-xl font-black text-white">오류가 발생했습니다</h3>
                         </div>
                         <p className="text-white/80 mb-6">오류가 발생했습니다. 관리자에게 문의해 주세요.</p>
-                        <button
-                            type="button"
-                            onClick={() => setDmErrorModalOpen(false)}
-                            className="w-full py-4 rounded-2xl bg-violet-500/90 text-white font-black hover:brightness-110"
-                        >
-                            확인
-                        </button>
+                        <button type="button" onClick={() => setDmErrorModalOpen(false)} className="w-full py-4 rounded-2xl bg-violet-500/90 text-white font-black hover:brightness-110">확인</button>
                     </div>
                 </div>
             )}
 
-            {/* DM 결제 모달 (구독 미완료 시) */}
+            {/* DM 결제 모달 */}
             {dmModalOpen && dmModalMember && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-                    onClick={() => !dmModalPaying && setDmModalOpen(false)}
-                >
-                    <div
-                        className="bg-[#201a33] rounded-[2rem] p-8 max-w-md w-full border border-white/[0.12] shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <h3 className="text-xl font-black text-white mb-6">
-                            {dmModalMember?.name}님과 DM하기
-                        </h3>
-                        {dmModalLoading ? (
-                            <p className="text-white/55">잔액 확인 중...</p>
-                        ) : (() => {
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !dmModalPaying && setDmModalOpen(false)}>
+                    <div className="bg-[#201a33] rounded-[2rem] p-8 max-w-md w-full border border-white/[0.12] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-xl font-black text-white mb-6">{dmModalMember?.name}님과 DM하기</h3>
+                        {dmModalLoading ? <p className="text-white/55">잔액 확인 중...</p> : (() => {
                             const candyTotal = dmModalProduct?.candyPrice ?? 0;
                             const balance = dmModalCandyBalance ?? 0;
                             const isSufficient = balance >= candyTotal;
                             const afterBalance = balance - candyTotal;
                             return (
                                 <div className="space-y-6">
-                                    {!isSufficient && (
-                                        <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-center gap-3">
-                                            <span className="material-symbols-outlined text-red-400/90 text-2xl">error</span>
-                                            <p className="font-bold text-red-400/90">캔디 수가 부족합니다.</p>
-                                        </div>
-                                    )}
+                                    {!isSufficient && <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-center gap-3"><span className="material-symbols-outlined text-red-400/90 text-2xl">error</span><p className="font-bold text-red-400/90">캔디 수가 부족합니다.</p></div>}
                                     <div className="space-y-3">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-white/55">잔여 캔디</span>
-                                            <span className="text-white font-bold">{balance.toLocaleString()} 캔디</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-white/55">소모 캔디</span>
-                                            <span className="text-violet-300 font-bold">{candyTotal.toLocaleString()} 캔디/월</span>
-                                        </div>
+                                        <div className="flex justify-between text-sm"><span className="text-white/55">잔여 캔디</span><span className="text-white font-bold">{balance.toLocaleString()} 캔디</span></div>
+                                        <div className="flex justify-between text-sm"><span className="text-white/55">소모 캔디</span><span className="text-violet-300 font-bold">{candyTotal.toLocaleString()} 캔디/월</span></div>
                                         <div className="h-px bg-white/[0.06]" />
-                                        <div className="flex justify-between">
-                                            <span className="text-white font-bold">구매 후 잔액</span>
-                                            <span className={`font-black text-lg ${afterBalance < 0 ? "text-red-400" : "text-violet-300"}`}>
-                                                {afterBalance.toLocaleString()} 캔디
-                                            </span>
-                                        </div>
+                                        <div className="flex justify-between"><span className="text-white font-bold">구매 후 잔액</span><span className={`font-black text-lg ${afterBalance < 0 ? "text-red-400" : "text-violet-300"}`}>{afterBalance.toLocaleString()} 캔디</span></div>
                                     </div>
                                     <div className="flex gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setDmModalOpen(false)}
-                                            disabled={dmModalPaying}
-                                            className="flex-1 py-4 rounded-2xl border border-white/[0.12] text-white/80 font-bold hover:bg-white/[0.06] disabled:opacity-50"
-                                        >
-                                            취소
-                                        </button>
+                                        <button type="button" onClick={() => setDmModalOpen(false)} disabled={dmModalPaying} className="flex-1 py-4 rounded-2xl border border-white/[0.12] text-white/80 font-bold hover:bg-white/[0.06] disabled:opacity-50">취소</button>
                                         {isSufficient ? (
-                                            <button
-                                                type="button"
-                                                onClick={handleDmModalConfirm}
-                                                disabled={dmModalPaying}
-                                                className="flex-1 py-4 rounded-2xl bg-violet-500/90 text-white font-black hover:brightness-110 disabled:opacity-50"
-                                            >
-                                                {dmModalPaying ? "처리 중..." : "구매하기"}
-                                            </button>
+                                            <button type="button" onClick={handleDmModalConfirm} disabled={dmModalPaying} className="flex-1 py-4 rounded-2xl bg-violet-500/90 text-white font-black hover:brightness-110 disabled:opacity-50">{dmModalPaying ? "처리 중..." : "구매하기"}</button>
                                         ) : (
-                                            <Link
-                                                href="/candy/recharge"
-                                                className="flex-1 py-4 rounded-2xl bg-violet-500/90 text-white font-black text-center hover:brightness-110 block"
-                                            >
-                                                캔디 충전하기
-                                            </Link>
+                                            <Link href="/candy/recharge" className="flex-1 py-4 rounded-2xl bg-violet-500/90 text-white font-black text-center hover:brightness-110 block">캔디 충전하기</Link>
                                         )}
                                     </div>
                                 </div>
@@ -1553,11 +1034,9 @@ function ArtistDetailPageInner({ paramsId }) {
     );
 }
 
-// --- 최종 Export 컴포넌트 (Next.js Params 대응) ---
 export default function ArtistDetailPage({ params }) {
     const resolvedParams = React.use(params);
     const id = resolvedParams?.id;
-
     return (
         <Suspense fallback={<div className="p-20 text-center text-white/50">Loading Artist Page...</div>}>
             <ArtistDetailPageInner paramsId={id} />
