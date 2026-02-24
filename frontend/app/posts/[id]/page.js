@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MOCK_POSTS, MOCK_ARTISTS } from "@/lib/mockData";
 import { request } from "@/lib/api";
@@ -53,6 +54,114 @@ function enhanceComment(c) {
     isLiked: c.isLiked ?? false,
     isEdited: c.isEdited ?? false,
   };
+}
+
+function AttachmentCarousel({ attachments }) {
+  const scrollRef = useRef(null);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const count = attachments.length;
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setCurrentIdx(Math.min(Math.max(idx, 0), count - 1));
+  }, [count]);
+
+  const goTo = useCallback((idx) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: el.clientWidth * idx, behavior: "smooth" });
+  }, []);
+
+  if (count === 1) {
+    const att = attachments[0];
+    const isVideo = att.contentType?.startsWith("video/") || att.category === "POST_VIDEO";
+    return (
+      <div className="mt-6 rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
+        {isVideo ? (
+          <video src={att.url} controls preload="metadata" className="w-full max-h-[480px] object-contain" />
+        ) : (
+          <img
+            src={att.url}
+            alt="첨부"
+            className="w-full max-h-[480px] object-contain cursor-pointer"
+            onClick={() => window.open(att.url, "_blank")}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 relative group">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide rounded-2xl border border-white/[0.06]"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+      >
+        {attachments.map((att, idx) => {
+          const isVideo = att.contentType?.startsWith("video/") || att.category === "POST_VIDEO";
+          return (
+            <div
+              key={att.mediaAssetId || idx}
+              className="w-full shrink-0 snap-center bg-black/20"
+            >
+              {isVideo ? (
+                <video src={att.url} controls preload="metadata" className="w-full h-[400px] object-contain" />
+              ) : (
+                <img
+                  src={att.url}
+                  alt={`첨부 ${idx + 1}`}
+                  className="w-full h-[400px] object-contain cursor-pointer"
+                  onClick={() => window.open(att.url, "_blank")}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {currentIdx > 0 && (
+        <button
+          type="button"
+          onClick={() => goTo(currentIdx - 1)}
+          className="absolute left-3 top-1/2 -translate-y-1/2 size-10 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+        >
+          <span className="material-symbols-outlined text-lg">chevron_left</span>
+        </button>
+      )}
+      {currentIdx < count - 1 && (
+        <button
+          type="button"
+          onClick={() => goTo(currentIdx + 1)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 size-10 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/80"
+        >
+          <span className="material-symbols-outlined text-lg">chevron_right</span>
+        </button>
+      )}
+
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+        {attachments.map((_, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => goTo(idx)}
+            className={`rounded-full transition-all ${
+              idx === currentIdx
+                ? "w-6 h-2 bg-white"
+                : "size-2 bg-white/40 hover:bg-white/60"
+            }`}
+          />
+        ))}
+      </div>
+
+      <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-xs font-bold">
+        {currentIdx + 1} / {count}
+      </span>
+    </div>
+  );
 }
 
 function PostDetailContent({ id }) {
@@ -689,18 +798,34 @@ function PostDetailContent({ id }) {
 
   if (!post) return null;
 
+  const backHref = fromNotices
+    ? "/notices"
+    : fromArtistConsole
+    ? "/home"
+    : backArtistId
+    ? `/artists/${backArtistId}${type === "FAN" ? "?tab=FAN" : ""}`
+    : "/";
+
+  const backLabel = fromNotices
+    ? "전체 공지사항으로 돌아가기"
+    : fromArtistConsole
+    ? "아티스트 홈으로 돌아가기"
+    : type === "FAN"
+    ? "팬 페이지로 돌아가기"
+    : "아티스트 페이지로 돌아가기";
+
   return (
-    <div className="max-w-6xl mx-auto p-8 flex flex-col lg:flex-row gap-8 min-h-full">
-      <div className="flex-1 space-y-6">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4"
+    <div className="max-w-6xl mx-auto p-4 sm:p-8 flex flex-col md:flex-row gap-6 h-[calc(100vh-80px)]">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <Link
+          href={backHref}
+          className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          뒤로가기
-        </button>
+          {backLabel}
+        </Link>
 
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
         <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden relative">
           {post.isMembershipOnly && (
             <span className="absolute top-6 right-6 z-10 px-3 py-1.5 rounded-lg bg-violet-500/25 text-violet-300 text-xs font-black uppercase tracking-widest border border-violet-400/30">
@@ -744,35 +869,7 @@ function PostDetailContent({ id }) {
                   </p>
                 </div>
                 {post.attachments?.length > 0 && (
-                  <div className={`mt-6 gap-3 ${
-                    post.attachments.length === 1
-                      ? "flex"
-                      : "grid grid-cols-2"
-                  }`}>
-                    {post.attachments.map((att, idx) => {
-                      const isVideo = att.contentType?.startsWith("video/") ||
-                        att.category === "POST_VIDEO";
-                      return isVideo ? (
-                        <div key={att.mediaAssetId || idx} className="rounded-2xl overflow-hidden bg-black border border-white/[0.06]">
-                          <video
-                            src={att.url}
-                            controls
-                            preload="metadata"
-                            className="w-full max-h-80 object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div key={att.mediaAssetId || idx} className="rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
-                          <img
-                            src={att.url}
-                            alt={`첨부 ${idx + 1}`}
-                            className="w-full max-h-80 object-contain cursor-pointer hover:scale-[1.02] transition-transform"
-                            onClick={() => window.open(att.url, "_blank")}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <AttachmentCarousel attachments={post.attachments} />
                 )}
               </>
             )}
@@ -806,11 +903,12 @@ function PostDetailContent({ id }) {
             </div>
           </div>
         </article>
+        </div>
       </div>
 
       {post != null && !post.isNotice && (
-      <aside className="w-full lg:w-96 flex flex-col gap-6 shrink-0">
-        <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-[calc(100vh-160px)] sticky top-24">
+      <aside className="w-full md:w-96 shrink-0 min-h-0">
+        <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-full">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
             <h3 className="font-extrabold text-white">댓글</h3>
             <span className="text-xs font-bold text-white/55 uppercase tracking-widest">

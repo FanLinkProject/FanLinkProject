@@ -163,6 +163,7 @@ export default function ArtistLivePage() {
     const [manualStep, setManualStep] = useState("idle"); // idle | created | uploading | processing | ready | published
     const [manualReplay, setManualReplay] = useState(null);
     const [manualAccessType, setManualAccessType] = useState(ReplayAccessType.FREE);
+    const [manualTitle, setManualTitle] = useState("");
     const [manualError, setManualError] = useState("");
     const [manualPublishing, setManualPublishing] = useState(false);
     const manualVideoPresignItem = manualReplay?.replayId
@@ -245,7 +246,11 @@ export default function ArtistLivePage() {
         }
         setManualError("");
         try {
-            const res = await createManualReplay({ artistId: numericArtistId, accessType: manualAccessType });
+            const res = await createManualReplay({
+                artistId: numericArtistId,
+                accessType: manualAccessType,
+                title: manualTitle.trim() || null,
+            });
             setManualReplay({
                 replayId: res.replayId,
                 artistId: res.artistId,
@@ -312,6 +317,7 @@ export default function ArtistLivePage() {
     const resetManualFlow = () => {
         setManualStep("idle");
         setManualReplay(null);
+        setManualTitle("");
         setManualError("");
     };
 
@@ -495,22 +501,8 @@ export default function ArtistLivePage() {
                     다시보기 발행
                 </SectionTitle>
                 <p className="text-sm text-white/55 mb-4">
-                    녹화 완료된 라이브 세션을 다시보기로 발행합니다. (ARTIST 본인 artistId
-                    필요)
+                    녹화 완료된 라이브 세션을 다시보기로 발행합니다.
                 </p>
-
-                <label className="block mb-3">
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/55">
-            artistId
-          </span>
-                    <input
-                        type="number"
-                        min="1"
-                        value={artistId != null ? artistId : ""}
-                        onChange={(e) => setArtistId(Number(e.target.value) || null)}
-                        className="mt-1 w-24 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
-                    />
-                </label>
 
                 {publishError && (
                     <p className="text-red-400 text-sm mb-3">{publishError}</p>
@@ -567,14 +559,14 @@ export default function ArtistLivePage() {
                             }
                             className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
                         >
-                            <option value={ReplayAccessType.FREE}>FREE</option>
-                            <option value={ReplayAccessType.PAID}>PAID</option>
+                            <option value={ReplayAccessType.FREE}>무료 (전체 공개)</option>
+                            <option value={ReplayAccessType.PAID}>유료 (멤버십 전용)</option>
                         </select>
                     </label>
 
                     <label className="block">
             <span className="text-[10px] font-black uppercase tracking-widest text-white/55">
-              제목 (선택)
+              제목
             </span>
                         <input
                             type="text"
@@ -583,7 +575,8 @@ export default function ArtistLivePage() {
                             onChange={(e) =>
                                 setPublishForm((f) => ({ ...f, title: e.target.value }))
                             }
-                            className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
+                            placeholder="다시보기 제목을 입력하세요"
+                            className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white placeholder:text-white/30"
                         />
                     </label>
 
@@ -639,17 +632,28 @@ export default function ArtistLivePage() {
                 {manualStep === "idle" && (
                     <form onSubmit={handleCreateManualSlot} className="space-y-3 max-w-md">
                         <label className="block">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/55">제목</span>
+                            <input
+                                type="text"
+                                maxLength={200}
+                                value={manualTitle}
+                                onChange={(e) => setManualTitle(e.target.value)}
+                                placeholder="다시보기 제목을 입력하세요"
+                                className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white placeholder:text-white/30"
+                            />
+                        </label>
+                        <label className="block">
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/55">접근 타입</span>
                             <select
                                 value={manualAccessType}
                                 onChange={(e) => setManualAccessType(e.target.value)}
                                 className="mt-1 w-full bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white"
                             >
-                                <option value={ReplayAccessType.FREE}>FREE</option>
-                                <option value={ReplayAccessType.PAID}>PAID</option>
+                                <option value={ReplayAccessType.FREE}>무료 (전체 공개)</option>
+                                <option value={ReplayAccessType.PAID}>유료 (멤버십 전용)</option>
                             </select>
                         </label>
-                        <Button type="submit" variant="primary">슬롯 생성 후 영상 업로드</Button>
+                        <Button type="submit" variant="primary">영상 업로드 시작</Button>
                     </form>
                 )}
 

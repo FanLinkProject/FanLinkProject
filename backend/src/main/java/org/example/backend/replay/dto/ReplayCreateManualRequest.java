@@ -11,6 +11,8 @@ public record ReplayCreateManualRequest(
         @NotNull
         Long artistId,
         @NotNull
-        ReplayAccessType accessType
+        ReplayAccessType accessType,
+        @jakarta.validation.constraints.Size(max = 200)
+        String title
 ) {
 }

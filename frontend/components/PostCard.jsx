@@ -106,8 +106,8 @@ export default function PostCard({
         <>
           <p className="text-white/80 text-lg leading-relaxed mb-6 font-normal whitespace-pre-wrap">{post.content}</p>
           {post.image && (
-            <div className="relative">
-              <img src={post.image} className="rounded-2xl w-full border border-white/[0.06] object-cover max-h-80" alt="" />
+            <div className="relative rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
+              <img src={post.image} className="w-full h-48 object-cover" alt="" />
               {post.attachmentCount > 1 && (
                 <span className="absolute top-3 right-3 px-2 py-0.5 rounded-lg bg-black/60 backdrop-blur-sm text-white text-xs font-bold">
                   +{post.attachmentCount - 1}

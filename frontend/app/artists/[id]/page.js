@@ -983,13 +983,26 @@ function ArtistDetailPageInner({ paramsId }) {
                                     <div className="grid grid-cols-2 gap-6">
                                         {vodList.map((vod) => (
                                             <Link key={vod.replayId} href={`/replay/${vod.replayId}`} className="group">
-                                                <div className="aspect-video rounded-2xl overflow-hidden relative mb-3">
-                                                    <img src={vod.thumbnailUrl || "https://picsum.photos/seed/vod/800/450"} className="w-full h-full object-cover" alt="" />
+                                                <div className="aspect-video rounded-2xl overflow-hidden relative mb-3 bg-gradient-to-br from-violet-900/30 to-indigo-900/20 border border-white/[0.06]">
+                                                    {vod.thumbnailUrl ? (
+                                                        <img src={vod.thumbnailUrl} className="w-full h-full object-cover" alt="" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-5xl text-white/15">smart_display</span>
+                                                        </div>
+                                                    )}
                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity">
-                                                        <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
+                                                        <div className="size-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                                            <span className="material-symbols-outlined text-white text-3xl fill-icon">play_arrow</span>
+                                                        </div>
                                                     </div>
+                                                    {vod.accessType === "PAID" && (
+                                                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-violet-500/80 text-[9px] font-black text-white uppercase">
+                                                            멤버십
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <h5 className="font-bold text-white truncate">다시보기</h5>
+                                                <h5 className="font-bold text-white truncate">{vod.title || `다시보기 #${vod.replayId}`}</h5>
                                                 <p className="text-white/40 text-xs mt-1">{vod.publishedAt ? new Date(vod.publishedAt).toLocaleDateString("ko-KR") : ""}</p>
                                             </Link>
                                         ))}
@@ -1248,9 +1261,9 @@ function ArtistDetailPageInner({ paramsId }) {
 
             {/* 팬 포스트 작성 모달 */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-                    <Surface className="w-full max-w-xl p-8">
-                        <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
+                    <Surface className="w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 sm:p-8">
+                        <div className="flex justify-between items-center mb-6 sticky top-0 z-10">
                             <h3 className="text-xl font-bold text-white">포스트 작성</h3>
                             <button onClick={closeFanPostModal} className="text-white/50 hover:text-white">
                                 <span className="material-symbols-outlined">close</span>

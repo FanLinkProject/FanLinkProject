@@ -896,10 +896,10 @@ export default function ArtistConsolePage() {
                                         </h4>
                                         <Button
                                             variant="primary"
-                                            href={live.id ? `/artist-console/live/${live.id}` : "#"}
+                                            href="/artist-console/live"
                                             className="w-full py-3 text-[10px] uppercase tracking-widest"
                                         >
-                                            다시보기
+                                            다시보기 관리
                                         </Button>
                                     </div>
                                 </Surface>
@@ -1132,9 +1132,9 @@ export default function ArtistConsolePage() {
 
             {/* 새 글 작성 모달 */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
-                    <Surface variant="primary" className="w-full max-w-2xl p-10">
-                        <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+                    <Surface variant="primary" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 sm:p-10">
+                        <div className="flex justify-between items-center mb-6 sticky top-0 z-10">
                             <h3 className="text-xl font-semibold text-white">새 글 작성</h3>
                             <button
                                 type="button"
