@@ -44,11 +44,13 @@ public class ConcertController {
     }
 
     /**
-     * 공연 목록 조회 (다가오는 공연만, 목록 전용 DTO)
+     * 공연 목록 조회. includeEnded=true면 다가오는 공연 + 종료된 공연 모두 반환.
      */
     @GetMapping
-    public ResponseEntity<List<ConcertListItemResponse>> getAllConcerts() {
-        List<ConcertListItemResponse> response = concertService.getAllConcerts();
+    public ResponseEntity<List<ConcertListItemResponse>> getAllConcerts(
+            @RequestParam(required = false, defaultValue = "false") Boolean includeEnded
+    ) {
+        List<ConcertListItemResponse> response = concertService.getAllConcerts(includeEnded);
         return ResponseEntity.ok(response);
     }
 

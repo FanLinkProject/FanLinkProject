@@ -138,24 +138,39 @@ public class ConcertService {
     }
 
     /**
-     * 공연 목록 조회 - 다가오는 공연만, startDateTime 오름차순, 2쿼리 전략(N+1 방지)
+     * 공연 목록 조회. includeEnded가 true면 다가오는 공연 + 종료된 공연 모두 반환 (다가오는 것 먼저, 그 다음 종료된 것).
      */
     @Transactional(readOnly = true)
-    public List<ConcertListItemResponse> getAllConcerts() {
+    public List<ConcertListItemResponse> getAllConcerts(Boolean includeEnded) {
         Instant now = Instant.now();
+        if (includeEnded != null && includeEnded) {
+            List<Concert> upcoming = concertRepository.findUpcomingConcerts(now);
+            List<Concert> ended = concertRepository.findEndedConcerts(now);
+            List<Concert> combined = new ArrayList<>(upcoming);
+            combined.addAll(ended);
+            return buildConcertListItems(combined);
+        }
         List<Concert> concerts = concertRepository.findUpcomingConcerts(now);
         return buildConcertListItems(concerts);
     }
 
     /**
-     * 아티스트 콘솔용: 로그인한 아티스트(또는 그룹+소속 멤버)가 참여한 다가오는 공연만 조회
+     * 아티스트 콘솔용: 로그인한 아티스트(또는 그룹+소속 멤버)가 참여한 공연 조회.
+     * includeEnded가 true면 다가오는 공연 + 종료된 공연 모두 반환.
      */
     @Transactional(readOnly = true)
-    public List<ConcertListItemResponse> getUpcomingConcertsForArtistIds(List<Long> artistIds) {
+    public List<ConcertListItemResponse> getConcertsForArtistIds(List<Long> artistIds, Boolean includeEnded) {
         if (artistIds == null || artistIds.isEmpty()) {
             return Collections.emptyList();
         }
         Instant now = Instant.now();
+        if (includeEnded != null && includeEnded) {
+            List<Concert> upcoming = concertRepository.findUpcomingConcertsByArtistIdsIn(artistIds, now);
+            List<Concert> ended = concertRepository.findEndedConcertsByArtistIdsIn(artistIds, now);
+            List<Concert> combined = new ArrayList<>(upcoming);
+            combined.addAll(ended);
+            return buildConcertListItems(combined);
+        }
         List<Concert> concerts = concertRepository.findUpcomingConcertsByArtistIdsIn(artistIds, now);
         return buildConcertListItems(concerts);
     }
@@ -489,62 +504,46 @@ public class ConcertService {
      */
     private void validateSalePeriod(ConcertCreateRequest request) {
         Instant startDateTime = request.getStartDateTime();
-        Instant endDateTime = request.getEndDateTime();
         Instant presaleStart = request.getPresaleStartDateTime();
         Instant presaleEnd = request.getPresaleEndDateTime();
         Instant saleStart = request.getSaleStartDateTime();
         Instant saleEnd = request.getSaleEndDateTime();
 
-        // 선예매 기간 검증
-        if (presaleStart.isAfter(presaleEnd) || presaleStart.equals(presaleEnd)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-
-        // 일반 예매 기간 검증
-        if (saleStart.isAfter(saleEnd) || saleStart.equals(saleEnd)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-
-        // 선예매 종료 후 일반 예매 시작 확인
-        if (presaleEnd.isAfter(saleStart)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-
-        // 예매 종료는 공연 시작 전이어야 함
-        if (saleEnd.isAfter(startDateTime)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-    }
+		validatePeriod(startDateTime, presaleStart, presaleEnd, saleStart, saleEnd);
+	}
 
     /**
      * 예매 기간 검증 (Update용)
      */
     private void validateSalePeriod(ConcertUpdateRequest request) {
         Instant startDateTime = request.getStartDateTime();
-        Instant endDateTime = request.getEndDateTime();
         Instant presaleStart = request.getPresaleStartDateTime();
         Instant presaleEnd = request.getPresaleEndDateTime();
         Instant saleStart = request.getSaleStartDateTime();
         Instant saleEnd = request.getSaleEndDateTime();
 
-        // 선예매 기간 검증
-        if (presaleStart.isAfter(presaleEnd) || presaleStart.equals(presaleEnd)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-
-        // 일반 예매 기간 검증
-        if (saleStart.isAfter(saleEnd) || saleStart.equals(saleEnd)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-
-        // 선예매 종료 후 일반 예매 시작 확인
-        if (presaleEnd.isAfter(saleStart)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
-
-        // 예매 종료는 공연 시작 전이어야 함
-        if (saleEnd.isAfter(startDateTime)) {
-            throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
-        }
+		validatePeriod(startDateTime, presaleStart, presaleEnd, saleStart, saleEnd);
     }
+
+	private void validatePeriod(Instant startDateTime, Instant presaleStart, Instant presaleEnd, Instant saleStart, Instant saleEnd) {
+		// 선예매 기간 검증
+		if (presaleStart.isAfter(presaleEnd) || presaleStart.equals(presaleEnd)) {
+			throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
+		}
+
+		// 일반 예매 기간 검증
+		if (saleStart.isAfter(saleEnd) || saleStart.equals(saleEnd)) {
+			throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
+		}
+
+		// 선예매 종료 후 일반 예매 시작 확인
+		if (presaleEnd.isAfter(saleStart)) {
+			throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
+		}
+
+		// 예매 종료는 공연 시작 전이어야 함
+		if (saleEnd.isAfter(startDateTime)) {
+			throw new ConcertException(ConcertErrorCode.INVALID_SALE_PERIOD);
+		}
+	}
 }
