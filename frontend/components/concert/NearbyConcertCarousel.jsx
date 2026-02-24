@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   getTicketStatus,
@@ -12,8 +13,15 @@ import {
   getPrimaryMeta,
 } from "@/lib/concertUtils";
 
+const CARD_WIDTH = 280;
+const GAP = 16;
+
 export function NearbyConcertCarousel({ concerts, userCoords }) {
   const list = concerts || [];
+  const scrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
   const sorted = [...list].sort((a, b) => {
     if (userCoords?.latitude != null && userCoords?.longitude != null) {
       const latA = a.latitude ?? 0;
@@ -27,14 +35,64 @@ export function NearbyConcertCarousel({ concerts, userCoords }) {
     return new Date(a.startDateTime) - new Date(b.startDateTime);
   });
 
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", updateScrollState); ro.disconnect(); };
+  }, [updateScrollState, sorted.length]);
+
+  const scroll = (direction) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const step = (CARD_WIDTH + GAP) * 2;
+    el.scrollBy({ left: direction === "left" ? -step : step, behavior: "smooth" });
+  };
+
   if (sorted.length === 0) return null;
 
   return (
     <section className="mb-10">
-      <h2 className="text-lg font-bold text-white mb-4 px-1">
-        {userCoords ? "내 주변 공연" : "다가오는 공연"}
-      </h2>
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="flex items-center justify-between mb-4 px-1">
+        <h2 className="text-lg font-bold text-white">
+          {userCoords ? "내 주변 공연" : "다가오는 공연"}
+        </h2>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => scroll("left")}
+            disabled={!canScrollLeft}
+            className="size-8 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-25 disabled:cursor-default"
+            aria-label="이전"
+          >
+            <span className="material-symbols-outlined text-lg">chevron_left</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => scroll("right")}
+            disabled={!canScrollRight}
+            className="size-8 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-25 disabled:cursor-default"
+            aria-label="다음"
+          >
+            <span className="material-symbols-outlined text-lg">chevron_right</span>
+          </button>
+        </div>
+      </div>
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
         {sorted.slice(0, 12).map((c) => {
           const status = getTicketStatus(c);
           const saleDdayStr = formatUpcomingSaleDday(c);

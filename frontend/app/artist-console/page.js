@@ -56,6 +56,7 @@ export default function ArtistConsolePage() {
     const [profileBio, setProfileBio] = useState(null);
     const [coverImageUrl, setCoverImageUrl] = useState(null);
     const [coverImageLoading, setCoverImageLoading] = useState(false);
+    const [groupMembers, setGroupMembers] = useState([]);
     const coverFileRef = useRef(null);
 
     const [artistPosts, setArtistPosts] = useState([]);
@@ -139,8 +140,16 @@ export default function ArtistConsolePage() {
         if (!groupId || !myId) return;
         if (groupId === myId) { setGroupProfile(myProfile); return; }
         request(`/api/user/artists/${groupId}/dashboard`)
-            .then((data) => setGroupProfile({ nickname: data.artistInfo?.nickname || "", profileImageUrl: data.artistInfo?.profileImageUrl || "", bio: data.artistInfo?.bio ?? "" }))
-            .catch(() => setGroupProfile(null));
+            .then((data) => {
+                setGroupProfile({ nickname: data.artistInfo?.nickname || "", profileImageUrl: data.artistInfo?.profileImageUrl || "", bio: data.artistInfo?.bio ?? "" });
+                const rawMembers = data?.members ?? [];
+                setGroupMembers((Array.isArray(rawMembers) ? rawMembers : []).map((m) => ({
+                    id: m.memberId ?? m.id,
+                    name: m.nickname ?? m.name,
+                    avatar: m.profileImageUrl ?? m.avatar,
+                })));
+            })
+            .catch(() => { setGroupProfile(null); setGroupMembers([]); });
     }, [groupId, myId, myProfile]);
 
     useEffect(() => {
@@ -434,7 +443,7 @@ export default function ArtistConsolePage() {
     };
 
     const handleTabClick = (tabId) => {
-        if (tabId === "MARKET") { router.push("/market"); return; }
+        if (tabId === "MARKET") { router.push(`/artists/${groupId}/market`); return; }
         setActiveTab(tabId);
         window.history.replaceState(null, "", `?tab=${tabId}`);
     };
@@ -495,23 +504,35 @@ export default function ArtistConsolePage() {
                             )}
                         </div>
                     </div>
-                    <div className="pb-1 flex items-center gap-3">
-                        {activeTab === "POSTS" && (
-                            <Button variant="primary" className="text-xs uppercase tracking-widest px-6 py-3 shrink-0" onClick={() => setShowCreateModal(true)}>
-                                <span className="material-symbols-outlined text-lg mr-1.5 align-middle">edit_note</span>새 글 작성
-                            </Button>
+                    <div className="pb-1 flex flex-col items-end gap-3">
+                        {groupMembers.length > 0 && (
+                            <div className="flex items-center gap-3 flex-wrap justify-end">
+                                {groupMembers.map((m) => (
+                                    <div key={m.id} className="flex flex-col items-center gap-1">
+                                        <img src={m.avatar || ""} className="size-9 rounded-full object-cover border border-white/[0.08]" alt="" />
+                                        <span className="text-[10px] font-medium text-white/60 truncate max-w-[72px]">{m.name}</span>
+                                    </div>
+                                ))}
+                            </div>
                         )}
-                        {activeTab === "MV" && (
-                            <Button variant="primary" className="text-xs uppercase tracking-widest px-6 py-3 shrink-0" onClick={() => setMvShowForm((v) => !v)}>
-                                <span className="material-symbols-outlined text-lg mr-1.5 align-middle">video_call</span>{mvShowForm ? "취소" : "영상 등록"}
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-3">
+                            {activeTab === "POSTS" && (
+                                <Button variant="primary" className="text-xs uppercase tracking-widest px-6 py-3 shrink-0" onClick={() => setShowCreateModal(true)}>
+                                    <span className="material-symbols-outlined text-lg mr-1.5 align-middle">edit_note</span>새 글 작성
+                                </Button>
+                            )}
+                            {activeTab === "MV" && (
+                                <Button variant="primary" className="text-xs uppercase tracking-widest px-6 py-3 shrink-0" onClick={() => setMvShowForm((v) => !v)}>
+                                    <span className="material-symbols-outlined text-lg mr-1.5 align-middle">video_call</span>{mvShowForm ? "취소" : "영상 등록"}
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </Surface>
             </div>
 
             {/* 예정 콘서트 */}
-            {artistConcerts.length > 0 && (() => {
+            {activeTab !== "CONCERT" && artistConcerts.length > 0 && (() => {
                 const now = new Date();
                 return (
                     <div className="max-w-6xl w-full mx-auto px-8 mt-12">
@@ -545,8 +566,8 @@ export default function ArtistConsolePage() {
                 </div>
             </div>
 
-            {/* 공지사항 */}
-            {artistNotices.length > 0 && (() => {
+            {/* 공지사항 — POSTS 탭에서만 노출 */}
+            {activeTab === "POSTS" && artistNotices.length > 0 && (() => {
                 const latest = artistNotices[0];
                 return (
                     <div className="max-w-6xl w-full mx-auto px-8 pt-8">

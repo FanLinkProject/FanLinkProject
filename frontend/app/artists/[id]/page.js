@@ -563,40 +563,41 @@ function ArtistDetailPageInner({ paramsId }) {
                             <p className="text-white/55 font-medium mt-2">
                                 팔로우 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트 {Number(artist.postCount ?? 0).toLocaleString()}개
                             </p>
-                            {/* 그룹일 때만 프로필 카드 내 작은 멤버 표시 (가로 나열, 원형 아바타 + 이름) */}
-                            {artist?.members && artist.members.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-4 mt-3">
-                                    {artist.members.map((m) => (
-                                        <div key={m.id} className="flex flex-col items-center gap-1">
-                                            <img src={m.avatar || getDefaultAvatarUrl(m.name || "?")} className="size-8 rounded-full object-cover border border-white/[0.08]" alt="" />
-                                            <span className="text-[10px] font-medium text-white/70 truncate max-w-[72px]">{m.name}</span>
-                                            {m.dmProductId && (
-                                                <button type="button" onClick={() => handleDmConnectClick(m)} disabled={dmConnectCheckingId === Number(m.id)} className="text-[9px] text-violet-400 font-bold hover:underline disabled:opacity-60">
-                                                    {dmConnectCheckingId === Number(m.id) ? "..." : "DM"}
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     </div>
-                    <div className="pb-1 flex items-center gap-3">
-                        {artist.isFollowing ? (
-                            <>
-                                <Button variant="ghost" className="px-8" disabled>{artist.isSubscribed ? "구독 중" : "팔로우중"}</Button>
-                                <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
-                                    {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
-                                </Button>
-                            </>
-                        ) : (
-                            <Button variant="primary" className="px-10 py-4" onClick={async () => {
-                                const id = artist.backendId ?? artist.id;
-                                if (!id || !isRealGroup) return;
-                                try { await apiPost(`/api/user/follow/${id}`); setArtist((prev) => prev ? { ...prev, isFollowing: true, memberCount: (prev.memberCount || 0) + 1 } : prev); }
-                                catch (e) { console.error(e); }
-                            }}>팔로우하기</Button>
+                    <div className="pb-1 flex flex-col items-end gap-3">
+                        {artist?.members && artist.members.length > 0 && (
+                            <div className="flex items-center gap-3 flex-wrap justify-end">
+                                {artist.members.map((m) => (
+                                    <div key={m.id} className="flex flex-col items-center gap-1">
+                                        <img src={m.avatar || getDefaultAvatarUrl(m.name || "?")} className="size-9 rounded-full object-cover border border-white/[0.08]" alt="" />
+                                        <span className="text-[10px] font-medium text-white/60 truncate max-w-[72px]">{m.name}</span>
+                                        {m.dmProductId && (
+                                            <button type="button" onClick={() => handleDmConnectClick(m)} disabled={dmConnectCheckingId === Number(m.id)} className="text-[9px] text-violet-400 font-bold hover:underline disabled:opacity-60">
+                                                {dmConnectCheckingId === Number(m.id) ? "..." : "DM"}
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         )}
+                        <div className="flex items-center gap-3">
+                            {artist.isFollowing ? (
+                                <>
+                                    <Button variant="ghost" className="px-8" disabled>{artist.isSubscribed ? "구독 중" : "팔로우중"}</Button>
+                                    <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
+                                        {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button variant="primary" className="px-10 py-4" onClick={async () => {
+                                    const id = artist.backendId ?? artist.id;
+                                    if (!id || !isRealGroup) return;
+                                    try { await apiPost(`/api/user/follow/${id}`); setArtist((prev) => prev ? { ...prev, isFollowing: true, memberCount: (prev.memberCount || 0) + 1 } : prev); }
+                                    catch (e) { console.error(e); }
+                                }}>팔로우하기</Button>
+                            )}
+                        </div>
                     </div>
                 </Surface>
             </div>
@@ -785,27 +786,6 @@ function ArtistDetailPageInner({ paramsId }) {
                     {/* CONCERT 탭 — UPCOMING CONCERTS + 전체 콘서트 그리드 */}
                     {activeTab === "CONCERT" && (
                         <div className="space-y-6">
-                            {/* UPCOMING CONCERTS — CONCERTS 탭 내부에서만 표시 */}
-                            {artistConcerts.length > 0 && (() => {
-                                const now = new Date();
-                                return (
-                                    <div>
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                            {artistConcerts.map((c, i) => {
-                                                const concertId = getConcertId(c);
-                                                const status = getConcertStatus(c, now);
-                                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
-                                                const badgeClass = { [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium", [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90", [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium", [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium" }[status.key] ?? "bg-white/20 text-white/90 font-medium";
-                                                const key = concertId ?? `concert-${i}`;
-                                                const cls = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
-                                                const inner = (<><div className="aspect-[16/10] overflow-hidden relative"><img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /><span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{badgeLabel}</span></div><div className="p-5"><h4 className="font-bold text-white truncate">{c.title}</h4><p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span>{formatDateShort(c.startDateTime)}</span><span>•</span><span>{c.placeName || c.venueName}</span></p></div></>);
-                                                return concertId ? <Link key={key} href={`/concerts/${concertId}`} className={cls}>{inner}</Link> : <div key={key} className={cls}>{inner}</div>;
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
                             <h3 className="text-xs font-black uppercase tracking-widest text-white/40 px-1">Concert</h3>
                             {artistConcertsForTab.length === 0 ? (
                                 <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">공연이 없습니다.</p>
@@ -897,7 +877,7 @@ function ArtistDetailPageInner({ paramsId }) {
                             ) : (
                                 <div className="grid grid-cols-2 gap-6">
                                     {musicVideos.map(mv => (
-                                        <Surface key={mv.id} variant="card" className={`overflow-hidden group cursor-pointer transition-all ${selectedMV?.id === mv.id ? "ring-2 ring-violet-500" : ""}`}>
+                                        <Surface key={mv.id} variant="card" className={`overflow-hidden group transition-all ${selectedMV?.id === mv.id ? "ring-2 ring-violet-500" : ""}`}>
                                             <button type="button" onClick={() => setSelectedMV(mv)} className="w-full text-left">
                                                 <div className="aspect-video relative overflow-hidden">
                                                     {mv.thumbnailUrl ? <img src={mv.thumbnailUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="" /> : <div className="w-full h-full bg-white/5 flex items-center justify-center"><span className="material-symbols-outlined text-4xl text-white/20">videocam_off</span></div>}
@@ -905,11 +885,11 @@ function ArtistDetailPageInner({ paramsId }) {
                                                         <span className="material-symbols-outlined text-white text-5xl">play_circle</span>
                                                     </div>
                                                 </div>
-                                                <div className="p-4">
-                                                    <h4 className="font-bold text-white truncate">{mv.title}</h4>
-                                                    {mv.description && <p className="text-sm text-white/50 truncate mt-0.5">{mv.description}</p>}
-                                                </div>
                                             </button>
+                                            <div className="p-4">
+                                                <h4 className="font-bold text-white truncate">{mv.title}</h4>
+                                                {mv.description && <p className="text-sm text-white/50 truncate mt-0.5">{mv.description}</p>}
+                                            </div>
                                         </Surface>
                                     ))}
                                 </div>
