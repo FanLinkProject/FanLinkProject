@@ -290,11 +290,19 @@ public class AuthService {
         }
 
         String encodedPassword = currentUser.getPassword();
-        if (encodedPassword == null || encodedPassword.isBlank()) {
-            throw new BusinessException(UserErrorCode.OAUTH_ACCOUNT_NO_PASSWORD);
-        }
-        if (!passwordEncoder.matches(request.password(), encodedPassword)) {
-            throw new BusinessException(UserErrorCode.PASSWORD_MISMATCH);
+        boolean isOAuthAccount = encodedPassword == null || encodedPassword.isBlank();
+
+        if (isOAuthAccount) {
+            if (request.password() != null && !request.password().isBlank()) {
+                throw new BusinessException(UserErrorCode.OAUTH_ACCOUNT_NO_PASSWORD);
+            }
+        } else {
+            if (request.password() == null || request.password().isBlank()) {
+                throw new BusinessException(UserErrorCode.PASSWORD_MISMATCH);
+            }
+            if (!passwordEncoder.matches(request.password(), encodedPassword)) {
+                throw new BusinessException(UserErrorCode.PASSWORD_MISMATCH);
+            }
         }
 
         currentUser.delete();

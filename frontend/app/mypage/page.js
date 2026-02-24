@@ -201,7 +201,7 @@ function MyPageContent() {
   };
 
   const handleWithdrawConfirm = async (password) => {
-    await signout(password);
+    await signout(password ?? null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
@@ -398,6 +398,7 @@ function MyPageContent() {
   }
 
   const profile = data?.profile ?? null;
+  const isOAuthAccount = !!(profile?.provider && profile.provider !== "LOCAL");
   const followedArtists = data?.followedArtists ?? [];
   const memberships = data?.memberships ?? [];
   const purchaseHistory = data?.purchaseHistory ?? [];
@@ -498,6 +499,7 @@ function MyPageContent() {
                 {nicknameMessage && <p className="text-xs text-white/70 mt-2">{nicknameMessage}</p>}
               </Surface>
 
+              {!isOAuthAccount && (
               <Surface variant="primary" className="p-8">
                 <h3 className="text-lg font-semibold tracking-tight text-white mb-6">{"\uBE44\uBC00\uBC88\uD638 \uBCC0\uACBD"}</h3>
                 <div className="space-y-4">
@@ -521,6 +523,7 @@ function MyPageContent() {
                   </div>
                 </div>
               </Surface>
+              )}
 
               <Surface variant="primary" className="p-8">
                 <h3 className="text-lg font-black tracking-tight text-white mb-2">{"\uD68C\uC6D0\uD0C8\uD1F4"}</h3>
@@ -884,10 +887,12 @@ function MyPageContent() {
         isOpen={showWithdrawModal}
         onClose={() => setShowWithdrawModal(false)}
         onConfirm={handleWithdrawConfirm}
+        isOAuthAccount={isOAuthAccount}
       />
 
       {!isFan && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {!isOAuthAccount && (
         <section className="lg:col-span-6 space-y-6">
           <Surface variant="primary" className="p-8">
             <h3 className="text-lg font-semibold tracking-tight text-white mb-6">
@@ -943,8 +948,9 @@ function MyPageContent() {
             </div>
           </Surface>
         </section>
+        )}
 
-        <section className="lg:col-span-6 space-y-8">
+        <section className={`space-y-8 ${isOAuthAccount ? "lg:col-span-12" : "lg:col-span-6"}`}>
           {isArtistAccount && !isAdmin && (
             <>
               {/* 팬 수 변화 그래프 */}

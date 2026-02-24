@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * 회원탈퇴 비밀번호 확인 모달
+ * 회원탈퇴 확인 모달
  * - document.body에 포탈로 렌더링하여 전체 화면에 표시
- * - isOpen, onClose, onConfirm(password) 필수
+ * - isOpen, onClose, onConfirm(password?) 필수
+ * - isOAuthAccount: true면 비밀번호 입력 없이 확인만 (소셜 로그인 전용 계정)
  */
-export default function WithdrawConfirmModal({ isOpen, onClose, onConfirm }) {
+export default function WithdrawConfirmModal({ isOpen, onClose, onConfirm, isOAuthAccount = false }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,14 +41,14 @@ export default function WithdrawConfirmModal({ isOpen, onClose, onConfirm }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!password.trim()) {
+    if (!isOAuthAccount && !password.trim()) {
       setError("비밀번호를 입력해주세요.");
       return;
     }
     setError("");
     setLoading(true);
     try {
-      await onConfirm(password);
+      await onConfirm(isOAuthAccount ? null : password);
       onClose?.();
     } catch (err) {
       setError(err?.data?.message || err?.message || "회원탈퇴에 실패했습니다.");
@@ -86,25 +87,29 @@ export default function WithdrawConfirmModal({ isOpen, onClose, onConfirm }) {
 
         <form onSubmit={handleSubmit} className="px-8 pb-8 space-y-5">
           <p className="text-base text-white/75 leading-relaxed">
-            탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다. 비밀번호를 입력해 확인해주세요.
+            {isOAuthAccount
+              ? "정말 탈퇴하시겠습니까? 탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다."
+              : "탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다. 비밀번호를 입력해 확인해주세요."}
           </p>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-white/55 px-1">
-              비밀번호
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-              placeholder="비밀번호 입력"
-              className="w-full px-5 py-4 bg-[#16102a] border border-white/[0.08] rounded-xl text-base font-medium text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
-              autoComplete="current-password"
-              disabled={loading}
-            />
-          </div>
+          {!isOAuthAccount && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-white/55 px-1">
+                비밀번호
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError("");
+                }}
+                placeholder="비밀번호 입력"
+                className="w-full px-5 py-4 bg-[#16102a] border border-white/[0.08] rounded-xl text-base font-medium text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-violet-500/20"
+                autoComplete="current-password"
+                disabled={loading}
+              />
+            </div>
+          )}
           {error && (
             <p className="text-sm font-medium text-red-400">{error}</p>
           )}
