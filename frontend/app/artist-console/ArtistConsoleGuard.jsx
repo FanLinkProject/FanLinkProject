@@ -27,6 +27,7 @@ const GROUP_MEMBER_ALLOWED = [
   "/artist-console/posts",
   "/artist-console/live",
   "/artist-console/settlement",
+  "/artist-console/music-videos",
 ];
 
 function isAllowedForGroupMember(pathname) {

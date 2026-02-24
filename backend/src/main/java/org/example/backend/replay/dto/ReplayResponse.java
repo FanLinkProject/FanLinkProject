@@ -14,6 +14,7 @@ public record ReplayResponse(
         ReplayStatus status,
         String playbackUrl,
         String playbackPathPattern,
+        String thumbnailUrl,
         Instant createdAt,
         Instant publishedAt
 ) {

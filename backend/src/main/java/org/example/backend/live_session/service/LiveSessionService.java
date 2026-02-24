@@ -16,13 +16,16 @@ import org.example.backend.notification.service.NotificationService;
 import org.example.backend.live_session.event.LiveEndedEvent;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
+import org.example.backend.user.repository.FollowRepository;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.repository.UserRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Set;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -36,6 +39,7 @@ public class LiveSessionService {
 	private final LiveSessionRepository liveSessionRepository;
 	private final NotificationService notificationService;
 	private final SubscriptionRepository subscriptionRepository;
+	private final FollowRepository followRepository;
 	private final ApplicationEventPublisher eventPublisher;
 	private final UserRepository userRepository;
 
@@ -170,27 +174,42 @@ public class LiveSessionService {
 	}
 
 	/**
-	 * 라이브 시작 알림 (구독 팬들에게 SSE 발송)
-	 * - receiverId: 구독 중인 팬 userId
-	 * - senderId: 아티스트 userId
+	 * 라이브 시작 알림 (SSE 발송)
+	 * - 유료 라이브: 구독자에게만
+	 * - 무료 라이브: 팔로워 + 구독자 모두 (중복 제거)
 	 */
 	private void notifyLiveStarted(User artist, LiveSession session) {
-		List<Long> fanIds = subscriptionRepository.findActiveSubscriberUserIdsByArtistId(
+		boolean isPaidLive = session != null && session.isPaid();
+
+		Set<Long> targetUserIds = new LinkedHashSet<>();
+		List<Long> subscriberUserIds = subscriptionRepository.findActiveSubscriberUserIdsByArtistId(
 			session.getArtistId(),
 			Instant.now()
 		);
+		if (subscriberUserIds != null) {
+			for (Long id : subscriberUserIds) if (id != null) targetUserIds.add(id);
+		}
+		if (!isPaidLive) {
+			List<Long> followerUserIds = followRepository.findFollowerUserIdsByArtistId(session.getArtistId());
+			if (followerUserIds != null) {
+				for (Long id : followerUserIds) if (id != null) targetUserIds.add(id);
+			}
+		}
+		if (targetUserIds.isEmpty()) return;
 
 		String title = session.getTitle();
+		Long sessionId = session.getId();
+
 		String shortTitle = (title != null && title.length() > 20) ? title.substring(0, 20) + "…" : title;
 
-		for (Long fanId : fanIds) {
+		for (Long fanId : targetUserIds) {
 			NotificationSendRequest notificationRequest = NotificationSendRequest.builder()
 				.senderId(artist.getId())
 				.receiverId(fanId)
+				.targetId(sessionId)
 				.type(NotificationType.LIVE_STARTED)
 				.content(artist.getNickname() + " 님이 라이브를 시작했어요!" + " <" + shortTitle + ">")
 				.build();
-			// DB 저장 + SSE 발송 (DM과 동일)
 			notificationService.sendNotification(notificationRequest);
 		}
 	}

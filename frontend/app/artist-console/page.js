@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { request } from "@/lib/api";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
+import { useMediaUpload } from "@/lib/useMediaUpload";
+import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
@@ -116,8 +118,19 @@ export default function ArtistConsolePage() {
     const [newPostContent, setNewPostContent] = useState("");
     const [newPostIsMembershipOnly, setNewPostIsMembershipOnly] = useState(false);
     const [newPostIsNotice, setNewPostIsNotice] = useState(false);
+    const [newPostMediaAssetIds, setNewPostMediaAssetIds] = useState([]);
+    const [newPostAttachmentPreviews, setNewPostAttachmentPreviews] = useState([]);
     const [createPostLoading, setCreatePostLoading] = useState(false);
     const newPostFileInputRef = useRef(null);
+
+    const newPostPresignItem = {
+        category: MediaAssetCategory.POST_IMAGE,
+        scope: MediaAssetScope.PUBLIC,
+        artistId: groupId ?? undefined,
+        postIdOrTemp: "new",
+        attachmentCountInPost: newPostMediaAssetIds.length + 1,
+    };
+    const { upload: uploadNewPostImage } = useMediaUpload(newPostPresignItem);
 
     // 팬 포스트 state
     const [fanPosts, setFanPosts] = useState([]);
@@ -395,7 +408,25 @@ export default function ArtistConsolePage() {
         setNewPostContent("");
         setNewPostIsMembershipOnly(false);
         setNewPostIsNotice(false);
+        setNewPostMediaAssetIds([]);
+        setNewPostAttachmentPreviews([]);
         setShowCreateModal(false);
+    };
+
+    const handleNewPostImageChange = async (e) => {
+        const file = e?.target?.files?.[0];
+        if (!file || !file.type.startsWith("image/") || !uploadNewPostImage) return;
+        const result = await uploadNewPostImage(file);
+        if (result?.mediaAssetId && result?.url) {
+            setNewPostMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
+            setNewPostAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url }]);
+        }
+        e.target.value = "";
+    };
+
+    const removeNewPostImage = (mediaAssetId) => {
+        setNewPostMediaAssetIds((prev) => prev.filter((id) => id !== mediaAssetId));
+        setNewPostAttachmentPreviews((prev) => prev.filter((p) => p.mediaAssetId !== mediaAssetId));
     };
 
     // 아티스트 포스트 생성
@@ -411,7 +442,7 @@ export default function ArtistConsolePage() {
                     content: newPostContent.trim(),
                     isMembershipOnly: newPostIsMembershipOnly,
                     isNotice: newPostIsNotice,
-                    mediaAssetIds: [],
+                    mediaAssetIds: newPostMediaAssetIds,
                 },
             });
             const groupAvatar = myProfile?.profileImageUrl || "";
@@ -524,6 +555,7 @@ export default function ArtistConsolePage() {
                         { id: "FAN_POSTS", label: "Fan Posts" },
                         { id: "LIVE", label: "Live History" },
                         { id: "CONCERTS", label: "Concerts" },
+                        { id: "MV", label: "MV", href: "/artist-console/music-videos" },
                     ].map((tab) =>
                         tab.href ? (
                             <Link
@@ -827,20 +859,36 @@ export default function ArtistConsolePage() {
                             </label>
                         )}
 
-                        {/* 사진 첨부 버튼 */}
+                        {/* 사진 첨부 */}
                         <div className="mt-5">
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">
                                 사진 첨부
                             </span>
-                            <input ref={newPostFileInputRef} type="file" accept="image/*" className="hidden" />
-                            <button
-                                type="button"
-                                onClick={() => newPostFileInputRef.current?.click()}
-                                className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
-                                <span className="text-xs font-bold">클릭하여 사진 추가</span>
-                            </button>
+                            <input ref={newPostFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleNewPostImageChange} />
+                            {newPostAttachmentPreviews.length > 0 ? (
+                                <div className="space-y-3">
+                                    {newPostAttachmentPreviews.map((p) => (
+                                        <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
+                                            <img src={p.url} alt="미리보기" className="w-full max-h-48 object-contain bg-black/20" />
+                                            <button type="button" onClick={() => removeNewPostImage(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={() => newPostFileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">
+                                        + 추가
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => newPostFileInputRef.current?.click()}
+                                    className="w-full py-6 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
+                                    <span className="text-xs font-bold">클릭하여 사진 추가</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* 버튼 */}

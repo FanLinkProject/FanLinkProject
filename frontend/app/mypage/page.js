@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Link from "next/link";
 import Surface from "@/components/ui/Surface";
@@ -8,7 +8,9 @@ import Button from "@/components/ui/Button";
 import SectionTitle from "@/components/ui/SectionTitle";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 import { redirectToGuestHome } from "@/lib/authRedirect";
-import { BASE_URL } from "@/lib/api";
+import { BASE_URL, request } from "@/lib/api";
+import { useMediaUpload } from "@/lib/useMediaUpload";
+import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};
@@ -58,9 +60,15 @@ export default function MyPage() {
     bio: "",
     profileImageUrl: "",
     bannerImageUrl: "",
+    profileImageMediaAssetId: null,
+    bannerImageMediaAssetId: null,
+    profileImagePreviewUrl: null,
+    bannerImagePreviewUrl: null,
   });
   const [artistProfileEditLoading, setArtistProfileEditLoading] = useState(false);
   const [artistProfileEditMessage, setArtistProfileEditMessage] = useState("");
+  const artistProfileRefInput = useRef(null);
+  const artistBannerRefInput = useRef(null);
 
   const [showOfficialLinksModal, setShowOfficialLinksModal] = useState(false);
   const [officialLinksList, setOfficialLinksList] = useState([]);
@@ -74,6 +82,19 @@ export default function MyPage() {
   const [nicknameEdit, setNicknameEdit] = useState("");
   const [nicknameLoading, setNicknameLoading] = useState(false);
   const [nicknameMessage, setNicknameMessage] = useState("");
+
+  const artistIdForCover = artistProfile?.groupId ?? artistProfile?.id;
+  const profilePresignItem = {
+    category: MediaAssetCategory.PROFILE_IMAGE,
+    scope: MediaAssetScope.PUBLIC,
+  };
+  const coverPresignItem = {
+    category: MediaAssetCategory.ARTIST_COVER_IMAGE,
+    scope: MediaAssetScope.PUBLIC,
+    artistId: artistIdForCover ?? undefined,
+  };
+  const { upload: uploadProfileImage } = useMediaUpload(profilePresignItem);
+  const { upload: uploadCoverImage } = useMediaUpload(coverPresignItem);
 
   useEffect(() => {
     const headers = getAuthHeaders();
@@ -207,24 +228,56 @@ export default function MyPage() {
     setArtistProfileEditMessage("");
     setArtistProfileEditLoading(true);
     try {
-      const headers = getAuthHeaders();
-      const res = await axios.patch(
-        `${BASE_URL}/api/artist/profile`,
-        {
-          bio: artistProfileEdit.bio || null,
-          profileImageUrl: artistProfileEdit.profileImageUrl || null,
-          bannerImageUrl: artistProfileEdit.bannerImageUrl || null,
-        },
-        { headers }
-      );
-      setArtistProfile(res.data ?? artistProfile);
+      const body = {
+        bio: artistProfileEdit.bio || null,
+        profileImageUrl: artistProfileEdit.profileImageMediaAssetId ? null : (artistProfileEdit.profileImageUrl || null),
+        bannerImageUrl: artistProfileEdit.bannerImageMediaAssetId ? null : (artistProfileEdit.bannerImageUrl || null),
+        profileImageMediaAssetId: artistProfileEdit.profileImageMediaAssetId || null,
+        bannerImageMediaAssetId: artistProfileEdit.bannerImageMediaAssetId || null,
+        officialLinks: null,
+      };
+      const res = await request("/api/artist/profile", {
+        method: "PATCH",
+        body,
+      });
+      setArtistProfile(res ?? artistProfile);
       setArtistProfileEditMessage("저장되었습니다.");
       setShowArtistProfileEdit(false);
     } catch (e) {
-      setArtistProfileEditMessage(e.response?.data?.message ?? "저장에 실패했습니다.");
+      setArtistProfileEditMessage(e?.data?.message ?? e?.message ?? "저장에 실패했습니다.");
     } finally {
       setArtistProfileEditLoading(false);
     }
+  };
+
+  const handleArtistProfileImageUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !file.type.startsWith("image/") || !uploadProfileImage) return;
+    const result = await uploadProfileImage(file);
+    if (result?.mediaAssetId && result?.url) {
+      setArtistProfileEdit((p) => ({
+        ...p,
+        profileImageMediaAssetId: result.mediaAssetId,
+        profileImageUrl: "",
+        profileImagePreviewUrl: result.url,
+      }));
+    }
+    e.target.value = "";
+  };
+
+  const handleArtistBannerUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !file.type.startsWith("image/") || !uploadCoverImage || !artistIdForCover) return;
+    const result = await uploadCoverImage(file);
+    if (result?.mediaAssetId && result?.url) {
+      setArtistProfileEdit((p) => ({
+        ...p,
+        bannerImageMediaAssetId: result.mediaAssetId,
+        bannerImageUrl: "",
+        bannerImagePreviewUrl: result.url,
+      }));
+    }
+    e.target.value = "";
   };
 
   const OFFICIAL_LINK_TYPES = [
@@ -779,6 +832,10 @@ export default function MyPage() {
                         bio: artistProfile?.bio ?? "",
                         profileImageUrl: artistProfile?.profileImageUrl ?? "",
                         bannerImageUrl: artistProfile?.bannerImageUrl ?? "",
+                        profileImageMediaAssetId: null,
+                        bannerImageMediaAssetId: null,
+                        profileImagePreviewUrl: null,
+                        bannerImagePreviewUrl: null,
                       });
                       setArtistProfileEditMessage("");
                       setShowArtistProfileEdit(true);
@@ -894,23 +951,85 @@ export default function MyPage() {
               />
             </div>
             <div>
-              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">프로필 이미지 URL</label>
+              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">프로필 이미지</label>
+              <input
+                ref={artistProfileRefInput}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleArtistProfileImageUpload}
+              />
+              {artistProfileEdit.profileImagePreviewUrl || artistProfileEdit.profileImageUrl ? (
+                <div className="relative inline-block">
+                  <img
+                    src={artistProfileEdit.profileImagePreviewUrl || artistProfileEdit.profileImageUrl}
+                    alt="프로필 미리보기"
+                    className="size-20 rounded-xl object-cover border border-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setArtistProfileEdit((p) => ({ ...p, profileImagePreviewUrl: null, profileImageMediaAssetId: null, profileImageUrl: "" }))}
+                    className="absolute -top-1 -right-1 size-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => artistProfileRefInput.current?.click()}
+                  className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 hover:text-violet-300 text-sm"
+                >
+                  파일 업로드
+                </button>
+              )}
               <input
                 type="url"
                 value={artistProfileEdit.profileImageUrl}
-                onChange={(e) => setArtistProfileEdit((p) => ({ ...p, profileImageUrl: e.target.value }))}
-                className="w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
-                placeholder="https://..."
+                onChange={(e) => setArtistProfileEdit((p) => ({ ...p, profileImageUrl: e.target.value, profileImageMediaAssetId: null }))}
+                className="mt-2 w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
+                placeholder="또는 URL 입력"
               />
             </div>
             <div>
-              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">배너 이미지 URL</label>
+              <label className="text-[10px] font-black uppercase text-white/55 block mb-1">배너 이미지</label>
+              <input
+                ref={artistBannerRefInput}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleArtistBannerUpload}
+              />
+              {artistProfileEdit.bannerImagePreviewUrl || artistProfileEdit.bannerImageUrl ? (
+                <div className="relative inline-block">
+                  <img
+                    src={artistProfileEdit.bannerImagePreviewUrl || artistProfileEdit.bannerImageUrl}
+                    alt="배너 미리보기"
+                    className="w-full max-h-24 rounded-xl object-cover border border-white/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setArtistProfileEdit((p) => ({ ...p, bannerImagePreviewUrl: null, bannerImageMediaAssetId: null, bannerImageUrl: "" }))}
+                    className="absolute top-1 right-1 size-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => artistBannerRefInput.current?.click()}
+                  className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 hover:text-violet-300 text-sm"
+                >
+                  파일 업로드
+                </button>
+              )}
               <input
                 type="url"
                 value={artistProfileEdit.bannerImageUrl}
-                onChange={(e) => setArtistProfileEdit((p) => ({ ...p, bannerImageUrl: e.target.value }))}
-                className="w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
-                placeholder="https://..."
+                onChange={(e) => setArtistProfileEdit((p) => ({ ...p, bannerImageUrl: e.target.value, bannerImageMediaAssetId: null }))}
+                className="mt-2 w-full px-4 py-2 rounded-xl bg-[#201a33] text-white border border-white/[0.06] text-sm"
+                placeholder="또는 URL 입력"
               />
             </div>
             <div className="flex gap-2 pt-4">
