@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 /** 아티스트 프로필 이미지 URL: 여러 필드 안전 탐색 후 fallback */
 function getArtistImageUrl(artist) {
   if (!artist) return null;
@@ -25,13 +23,11 @@ export function ConcertArtistList({ artists }) {
         {list.map((a) => {
           const imageUrl = getArtistImageUrl(a);
           const displayName = a?.nickname ?? a?.name ?? "아티스트";
-          const href = `/artists/${a.slug ?? a.id}`;
 
           return (
-            <Link
+            <div
               key={a.id}
-              href={href}
-              className="flex-shrink-0 flex flex-col items-center gap-3 p-6 rounded-2xl border border-white/10 bg-white/[0.04] hover:border-violet-500/40 hover:bg-white/[0.06] transition-all"
+              className="flex-shrink-0 flex flex-col items-center gap-3 p-6 rounded-2xl border border-white/10 bg-white/[0.04] cursor-default"
             >
               <div className="w-20 h-20 rounded-full overflow-hidden border border-white/10 bg-white/10 flex-shrink-0 flex items-center justify-center">
                 {imageUrl ? (
@@ -57,7 +53,7 @@ export function ConcertArtistList({ artists }) {
               <p className="text-sm text-white/80 font-medium truncate max-w-[140px] text-center">
                 {displayName}
               </p>
-            </Link>
+            </div>
           );
         })}
       </div>

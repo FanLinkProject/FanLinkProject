@@ -180,6 +180,7 @@ function PostDetailContent({ id }) {
   const groupId = searchParams.get("groupId");
   const fromArtistConsole = searchParams.get("from") === "artist-console";
   const fromNotices = searchParams.get("from") === "notices";
+  const fromMypage = searchParams.get("from") === "mypage";
 
   const numericId = Number(id);
   const isRealPost = !!(type && !isNaN(numericId) && numericId > 0);
@@ -869,6 +870,8 @@ function PostDetailContent({ id }) {
 
   const backHref = fromNotices
     ? "/notices"
+    : fromMypage
+    ? "/mypage"
     : fromArtistConsole
     ? "/home"
     : backArtistId
@@ -877,6 +880,8 @@ function PostDetailContent({ id }) {
 
   const backLabel = fromNotices
     ? "전체 공지사항으로 돌아가기"
+    : fromMypage
+    ? "마이페이지로 돌아가기"
     : fromArtistConsole
     ? "아티스트 홈으로 돌아가기"
     : type === "FAN"
@@ -887,6 +892,15 @@ function PostDetailContent({ id }) {
     <button
       type="button"
       onClick={() => router.replace("/notices")}
+      className="inline-flex items-center justify-start gap-2 text-left text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0 self-start"
+    >
+      <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+      {backLabel}
+    </button>
+  ) : fromMypage ? (
+    <button
+      type="button"
+      onClick={() => router.back()}
       className="inline-flex items-center justify-start gap-2 text-left text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0 self-start"
     >
       <span className="material-symbols-outlined text-[18px]">arrow_back</span>

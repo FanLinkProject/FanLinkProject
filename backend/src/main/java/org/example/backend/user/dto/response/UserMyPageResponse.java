@@ -94,13 +94,19 @@ public record UserMyPageResponse(
     }
 
     /**
-     * 멤버십 상태
+     * 구독 중인 상품 (멤버십)
+     * candyPrice: 캔디 가격 (null이면 현금 상품)
+     * price: 현금 가격 원 (null이면 캔디 상품)
+     * nextPaymentDate: 다음 갱신일 (ISO-8601 문자열, null 가능)
      */
     public record MembershipStatus(
             Long subscriptionId,
             String productName,
+            Long candyPrice,
+            Long price,
             Boolean isActive,
-            String endDate
+            String endDate,
+            String nextPaymentDate
     ) {
     }
 

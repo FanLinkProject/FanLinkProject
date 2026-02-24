@@ -388,6 +388,7 @@ function MyPageContent() {
   const profile = data?.profile ?? null;
   const followedArtists = data?.followedArtists ?? [];
   const memberships = data?.memberships ?? [];
+  const purchaseHistory = data?.purchaseHistory ?? [];
   const myPosts = data?.myPosts ?? [];
   const myComments = data?.myComments ?? [];
   const myLikedPosts = data?.myLikedPosts ?? [];
@@ -539,6 +540,81 @@ function MyPageContent() {
               <Surface variant="primary" className="p-8">
                 <div className="flex items-center justify-between mb-6">
                   <div>
+                    <h3 className="text-lg font-black tracking-tight text-white">결제 내역</h3>
+                    <p className="text-[11px] text-white/55 font-medium">최근 결제 내역입니다.</p>
+                  </div>
+                  <Link href="/mypage/history" className="text-[10px] font-black text-violet-300 uppercase tracking-widest hover:underline">전체 결제내역보기</Link>
+                </div>
+                {(() => {
+                  const formatDate = (str) => {
+                    if (!str) return "—";
+                    try {
+                      const d = new Date(str);
+                      return isNaN(d.getTime()) ? str : d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, ".").replace(".", ".");
+                    } catch (_) {
+                      return str;
+                    }
+                  };
+                  const goodsList = purchaseHistory.map((o) => ({
+                    id: o.orderNo,
+                    date: o.createdAt,
+                    name: o.orderName,
+                    amount: o.totalAmount != null ? `${Number(o.totalAmount).toLocaleString()}원` : "—",
+                    status: o.status ?? "—",
+                  }));
+                  const membershipList = memberships.map((m) => {
+                    const candyPrice = m.candyPrice ?? m.candy_price;
+                    const price = m.price;
+                    const amountStr =
+                      candyPrice != null
+                        ? `${Number(candyPrice).toLocaleString()} 캔디`
+                        : price != null && price > 0
+                          ? `${Number(price).toLocaleString()}원`
+                          : "캔디";
+                    return {
+                      id: `SUB-${m.subscriptionId}`,
+                      date: m.endDate ?? m.createdAt,
+                      name: m.productName,
+                      amount: amountStr,
+                      status: m.isActive ? "구독 중" : "만료",
+                    };
+                  });
+                  const combined = [...goodsList, ...membershipList]
+                    .filter((i) => i.date)
+                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                    .slice(0, 3);
+                  if (combined.length === 0) {
+                    return (
+                      <div className="p-6 text-center border border-dashed border-white/[0.08] rounded-2xl">
+                        <p className="text-[11px] text-white/55 font-medium leading-relaxed italic">결제 내역이 없습니다.</p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {combined.map((item) => (
+                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06]">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-black text-white/45 uppercase tracking-[0.2em]">{formatDate(item.date)}</span>
+                              <span className="text-[10px] font-black text-violet-300 uppercase tracking-widest">#{String(item.id).replace(/^SUB-/, "")}</span>
+                            </div>
+                            <p className="font-bold text-white truncate mt-1">{item.name}</p>
+                            <p className="text-sm text-violet-300 font-bold mt-0.5">{item.amount}</p>
+                          </div>
+                          <span className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${["COMPLETED", "배송 완료", "구독 중"].includes(item.status) ? "bg-emerald-500/20 text-emerald-400" : "bg-violet-500/20 text-violet-300"}`}>
+                            {item.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </Surface>
+
+              <Surface variant="primary" className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
                     <h3 className="text-lg font-black tracking-tight text-white">팔로우 중인 아티스트</h3>
                     <p className="text-[11px] text-white/55 font-medium">멤버십 여부와 관계 없이, 내가 팔로우한 아티스트 목록입니다.</p>
                   </div>
@@ -576,7 +652,7 @@ function MyPageContent() {
               ) : (
                 <div className="space-y-3">
                   {myPosts.map((post) => (
-                    <Link key={post.postId} href={`/posts/${post.postId}`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
+                    <Link key={post.postId} href={`/posts/${post.postId}?type=FAN&from=mypage`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
                       <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">{post.title}</p>
                       {post.content && <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{post.content}</p>}
                       <p className="text-[10px] text-white/45 mt-2">{post.createdAt}</p>
@@ -597,12 +673,20 @@ function MyPageContent() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myComments.map((c) => (
-                    <Link key={c.commentId} href={`/posts/${c.targetId}`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
-                      <p className="text-[11px] text-white/70 line-clamp-2">{c.content}</p>
-                      <p className="text-[10px] text-white/45 mt-2">{c.targetType} · {c.createdAt}</p>
-                    </Link>
-                  ))}
+                  {myComments.map((c) => {
+                    const commentHref =
+                      c.targetType === "ARTIST" || c.targetType === "FAN"
+                        ? `/posts/${c.targetId}?type=${c.targetType}&from=mypage`
+                        : c.targetType === "LIVE"
+                          ? `/live/${c.targetId}`
+                          : "/home";
+                    return (
+                      <Link key={c.commentId} href={commentHref} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
+                        <p className="text-[11px] text-white/70 line-clamp-2">{c.content}</p>
+                        <p className="text-[10px] text-white/45 mt-2">{c.targetType} · {c.createdAt}</p>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </Surface>
@@ -618,14 +702,17 @@ function MyPageContent() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {myLikedPosts.map((item) => (
-                    <Link key={`${item.postType}-${item.postId}`} href={`/posts/${item.postId}`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
-                      <p className="text-[10px] text-violet-300/80 font-bold uppercase tracking-wider mb-1">{item.postType === "ARTIST_POST" ? "아티스트 글" : "팬글"}</p>
-                      <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">{item.title}</p>
-                      {item.content && <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{item.content}</p>}
-                      <p className="text-[10px] text-white/45 mt-2">좋아요: {item.likedAt}</p>
-                    </Link>
-                  ))}
+                  {myLikedPosts.map((item) => {
+                    const likePostType = item.postType === "ARTIST_POST" ? "ARTIST" : "FAN";
+                    return (
+                      <Link key={`${item.postType}-${item.postId}`} href={`/posts/${item.postId}?type=${likePostType}&from=mypage`} className="block p-4 rounded-2xl bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.08] transition-all group">
+                        <p className="text-[10px] text-violet-300/80 font-bold uppercase tracking-wider mb-1">{item.postType === "ARTIST_POST" ? "아티스트 글" : "팬글"}</p>
+                        <p className="font-bold text-white group-hover:text-violet-300 transition-colors truncate">{item.title}</p>
+                        {item.content && <p className="text-[11px] text-white/60 mt-1 line-clamp-2">{item.content}</p>}
+                        <p className="text-[10px] text-white/45 mt-2">좋아요: {item.likedAt}</p>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </Surface>
