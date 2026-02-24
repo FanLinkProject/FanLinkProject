@@ -38,7 +38,17 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:}
       password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:5s}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:3s}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:0}
 
   # 이메일 발송 설정 (Gmail SMTP 예시)
   mail:
@@ -330,6 +340,12 @@ app:
   kafka:
     trusted-packages: org.example.backend.chat.dto
     live-group-id: live-chat-group
+  redis:
+    ttl:
+      verification-code-minutes: ${REDIS_TTL_VERIFICATION_CODE_MINUTES:5}
+      phone-verified-minutes: ${REDIS_TTL_PHONE_VERIFIED_MINUTES:10}
+      refresh-token-seconds: ${REDIS_TTL_REFRESH_TOKEN_SECONDS:1209600}
+      oauth-code-seconds: ${REDIS_TTL_OAUTH_CODE_SECONDS:120}
 
 management:
   endpoints:
