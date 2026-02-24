@@ -93,8 +93,10 @@ export async function signup(body) {
 }
 
 /**
- * 회원탈퇴 (비밀번호 확인 필수)
- * @param {string} password
+ * 회원탈퇴
+ * - 일반 계정: 비밀번호 필수
+ * - 소셜 계정: password에 null 전달 (비밀번호 없이 확인만)
+ * @param {string | null} password
  */
 export async function signout(password) {
   const token =
@@ -106,7 +108,7 @@ export async function signout(password) {
   const res = await fetch(`${BASE_URL}/api/auth`, {
     method: "DELETE",
     headers,
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ password: password ?? null }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

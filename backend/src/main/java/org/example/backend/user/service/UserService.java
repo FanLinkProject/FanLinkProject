@@ -89,9 +89,9 @@ public class UserService {
 
         String currentPhone = normalizePhone(user.getPhoneNumber());
 
-        // 전화번호 중복 확인 (다른 사용자가 사용 중인지 확인, 본인 제외)
+        // 전화번호 중복 확인 (다른 사용자가 사용 중인지 확인)
         if (!currentPhone.equals(newPhone)
-                && userRepository.existsByPhoneNumberAndIdNot(newPhone, user.getId())) {
+                && userRepository.existsByPhoneNumber(newPhone)) {
             throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
         }
 
@@ -148,24 +148,30 @@ public class UserService {
         User currentUser = userRepository.findById(user.getId())
                 .orElseThrow(() -> new BusinessException(UserErrorCode.USER_NOT_FOUND));
 
-        if (request.name() != null && !request.name().isBlank()) {
-            currentUser.setName(request.name());
+        String nameVal = request.name() != null ? request.name().trim() : null;
+        String genderVal = request.gender() != null ? request.gender().trim() : null;
+        String birthVal = request.birth() != null ? request.birth().trim() : null;
+        String phoneVal = request.phoneNumber() != null ? request.phoneNumber().trim() : null;
+
+        if (nameVal != null && !nameVal.isBlank()) {
+            currentUser.setName(nameVal);
         }
-        if (request.gender() != null && !request.gender().isBlank()) {
-            currentUser.setGender(request.gender());
+        if (genderVal != null && !genderVal.isBlank()) {
+            currentUser.setGender(genderVal);
         }
-        if (request.birth() != null && !request.birth().isBlank()) {
-            currentUser.setBirth(request.birth());
+        if (birthVal != null && !birthVal.isBlank()) {
+            currentUser.setBirth(birthVal);
         }
-        if (request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
-            String newPhone = normalizePhone(request.phoneNumber());
+
+        if (phoneVal != null && !phoneVal.isBlank()) {
+            String newPhone = normalizePhone(phoneVal);
             String currentPhone = currentUser.getPhoneNumber();
             boolean isPlaceholder = currentPhone == null || currentPhone.isBlank()
-                    || currentPhone.startsWith("kakao_") || currentPhone.startsWith("google_")
-                    || currentPhone.startsWith("naver_") || currentPhone.startsWith("instagram_");
+                    || (currentPhone != null && (currentPhone.startsWith("kakao_") || currentPhone.startsWith("google_")
+                    || currentPhone.startsWith("naver_") || currentPhone.startsWith("instagram_")));
             String normalizedCurrentPhone = isPlaceholder ? "" : normalizePhone(currentPhone);
             if (isPlaceholder || !normalizedCurrentPhone.equals(newPhone)) {
-                if (userRepository.existsByPhoneNumberAndIdNot(newPhone, currentUser.getId())) {
+                if (userRepository.existsByPhoneNumber(newPhone)) {
                     throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
                 }
                 if (!verificationCodeService.consumePhoneVerified(newPhone)) {
