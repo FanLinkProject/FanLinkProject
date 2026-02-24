@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { BASE_URL } from "@/lib/api";
 
 const personalMenuItems = [
@@ -27,10 +27,16 @@ const businessMenuItems = [
     href: "/artist-console/market",
   },
   {
-    id: "ARTIST_ORDERS",
-    label: "주문/배송",
+    id: "ARTIST_ORDER_MGMT",
+    label: "주문 관리",
     icon: "local_shipping",
     href: "/artist-console/orders",
+  },
+  {
+    id: "ARTIST_SHIPPING_MGMT",
+    label: "배송 관리",
+    icon: "package_2",
+    href: "/artist-console/shipping",
   },
   {
     id: "ARTIST_SETTLEMENT",
@@ -42,7 +48,6 @@ const businessMenuItems = [
 
 export default function ArtistSidebar({ hideDm = false }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [canSeeMemberMenu, setCanSeeMemberMenu] = useState(false);
   const [isGroupMember, setIsGroupMember] = useState(false);
 
@@ -59,6 +64,9 @@ export default function ArtistSidebar({ hideDm = false }) {
 
   // 그룹 계정 또는 그룹 없는 개인 아티스트일 때만 공연 관리 표시
   const canSeeConcertMenu = !isGroupMember;
+  const visibleBusinessItems = isGroupMember
+    ? businessMenuItems.filter((item) => item.id === "ARTIST_SETTLEMENT")
+    : businessMenuItems;
 
   const isActive = (href) =>
     pathname === href ||
@@ -109,7 +117,7 @@ export default function ArtistSidebar({ hideDm = false }) {
             </h3>
           </div>
           <div className="flex flex-col gap-1">
-            {(isGroupMember ? businessMenuItems.filter((item) => item.id === "ARTIST_SETTLEMENT") : businessMenuItems).map((item) => (
+            {visibleBusinessItems.map((item) => (
               <Link
                 key={item.id}
                 href={item.href}

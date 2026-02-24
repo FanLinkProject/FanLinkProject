@@ -239,7 +239,13 @@ public class OrderService {
 
         @Transactional(readOnly = true)
         public List<ArtistOrderDeliveryResponseDto> getArtistConsoleOrders(Long operatorUserId, UserRole operatorRole) {
-                return orderRepository.findAllShippableOrdersWithDelivery().stream()
+                // 그룹 소속 아티스트(멤버)는 주문/배송 콘솔 접근 불가
+                if (operatorRole == UserRole.ARTIST
+                                && !artistPermissionService.isManageAccount(operatorUserId, operatorRole)) {
+                        return List.of();
+                }
+
+                return orderRepository.findAllArtistConsoleOrders().stream()
                                 .filter(order -> canManageOrder(order, operatorUserId, operatorRole))
                                 .map(ArtistOrderDeliveryResponseDto::from)
                                 .toList();
@@ -335,12 +341,12 @@ public class OrderService {
                         return false;
                 }
 
-                Set<Long> shippableArtistIds = resolveShippableArtistIds(order);
-                if (shippableArtistIds.isEmpty()) {
+                Set<Long> manageableArtistIds = resolveManageableArtistIds(order);
+                if (manageableArtistIds.isEmpty()) {
                         return false;
                 }
 
-                return shippableArtistIds.stream()
+                return manageableArtistIds.stream()
                                 .allMatch(artistId -> artistPermissionService.canManagePage(
                                                 artistId,
                                                 operatorUserId,
@@ -348,7 +354,7 @@ public class OrderService {
                                                 true));
         }
 
-        private Set<Long> resolveShippableArtistIds(Order order) {
+        private Set<Long> resolveManageableArtistIds(Order order) {
                 Set<Long> ids = new HashSet<>();
                 if (order == null || order.getOrderItems() == null) {
                         return ids;
@@ -360,12 +366,6 @@ public class OrderService {
                         }
                         Product product = item.getProduct();
                         if (product == null || product.getArtistId() == null) {
-                                continue;
-                        }
-                        if (Boolean.TRUE.equals(product.getIsMembership())) {
-                                continue;
-                        }
-                        if (product.getConcertId() != null) {
                                 continue;
                         }
                         ids.add(product.getArtistId());

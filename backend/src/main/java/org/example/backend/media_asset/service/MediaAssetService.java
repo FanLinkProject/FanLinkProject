@@ -22,6 +22,7 @@ import org.example.backend.replay.entity.Replay;
 import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.replay.service.MediaConvertJobService;
 import org.example.backend.replay.entity.ReplayStatus;
+import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.backend.user.enums.UserRole;

@@ -75,11 +75,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                         JOIN FETCH o.orderItems oi
                         JOIN FETCH oi.product p
                         LEFT JOIN FETCH o.delivery d
-                        WHERE d IS NOT NULL
-                          AND p.artistId IS NOT NULL
-                          AND p.isMembership = false
-                          AND p.concertId IS NULL
+                        WHERE p.artistId IS NOT NULL
                         ORDER BY o.createdAt DESC
                         """)
-        List<Order> findAllShippableOrdersWithDelivery();
+        List<Order> findAllArtistConsoleOrders();
 }
