@@ -27,12 +27,13 @@ public class S3MediaClient {
     private final S3Presigner s3Presigner;
     private final AwsProperties awsProperties;
 
-    // S3에 대한 presigned PUT URL과 필수 헤더를 생성한다.
+    // S3에 대한 presigned PUT URL을 생성한다.
+    // Content-Type을 서명에 넣지 않아, 클라이언트가 보내는 Content-Type과 불일치로 403이 나지 않도록 함.
+    // 클라이언트는 응답의 requiredHeaders(Content-Type)를 PUT 요청에 넣어 객체 메타데이터를 설정할 수 있다.
     public PresignedUpload presignPut(String objectKey, String contentType, Duration duration) {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(awsProperties.getS3().getBucketName())
                 .key(objectKey)
-                .contentType(contentType)
                 .build();
 
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()

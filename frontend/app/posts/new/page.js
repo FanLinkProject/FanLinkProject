@@ -7,15 +7,9 @@ import Surface from "@/components/ui/Surface";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
-import { BASE_URL, request } from "@/lib/api";
-import { uploadFile, MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
-
-function getAuthHeaders() {
-  if (typeof window === "undefined") return {};
-  const token = localStorage.getItem("accessToken");
-  const pure = token?.replace(/^Bearer\s+/i, "").trim();
-  return pure ? { Authorization: `Bearer ${pure}` } : {};
-}
+import { BASE_URL, request, getAuthHeaders } from "@/lib/api";
+import { usePostAttachments } from "@/lib/usePostAttachments";
+import { MAX_POST_ATTACHMENTS } from "@/lib/mediaAssetApi";
 
 export default function NewPostPage() {
   const router = useRouter();
@@ -23,67 +17,34 @@ export default function NewPostPage() {
   const [artistId, setArtistId] = useState(null);
   const [groupId, setGroupId] = useState(null);
   const [content, setContent] = useState("");
-  const [mediaAssetIds, setMediaAssetIds] = useState([]);
-  const [attachmentPreviews, setAttachmentPreviews] = useState([]);
   const [submitLoading, setSubmitLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [profileError, setProfileError] = useState("");
   const fileInputRef = useRef(null);
 
   const postGroupId = groupId ?? artistId;
-  const canAddAttachment = postGroupId != null && mediaAssetIds.length < 5;
+  const postGroupIdNum = postGroupId != null ? Number(postGroupId) : null;
+  const attachments = usePostAttachments({
+    postGroupId: postGroupIdNum,
+    postIdOrTemp: "tmp_new",
+    initialAttachments: [],
+  });
 
-  const handleAttachmentChange = async (e) => {
+  const handleAttachmentChange = (e) => {
     const file = e.target.files?.[0];
-    if (!file || !postGroupId || mediaAssetIds.length >= 5) {
-      e.target.value = "";
+    e.target.value = "";
+    if (!file) return;
+    if (!attachments.canAddAttachment && profile != null && (postGroupIdNum == null || isNaN(postGroupIdNum))) {
+      attachments.setUploadError("첨부는 아티스트 프로필 로드 후 가능합니다.");
       return;
     }
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    if (!isImage && !isVideo) {
-      setUploadError("이미지 또는 영상 파일만 첨부할 수 있습니다.");
-      e.target.value = "";
-      return;
-    }
-    setUploadError("");
-    setUploading(true);
-    try {
-      const presignItem = {
-        category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
-        scope: MediaAssetScope.PUBLIC,
-        artistId: postGroupId,
-        postIdOrTemp: "tmp_new",
-        attachmentCountInPost: mediaAssetIds.length + 1,
-      };
-      if (isVideo) presignItem.durationSecondsRequested = 600;
-      const result = await uploadFile(file, presignItem);
-      if (result?.status === "READY" && result?.mediaAssetId && result?.url) {
-        setMediaAssetIds((prev) => [...prev, result.mediaAssetId]);
-        setAttachmentPreviews((prev) => [...prev, { mediaAssetId: result.mediaAssetId, url: result.url, isVideo }]);
-      } else {
-        setUploadError(result?.errorCode || "업로드 검증 실패");
-      }
-    } catch (err) {
-      setUploadError(err?.data?.message || err?.message || "업로드 실패");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
-
-  const removeImage = (mediaAssetId) => {
-    setMediaAssetIds((prev) => prev.filter((id) => id !== mediaAssetId));
-    setAttachmentPreviews((prev) => prev.filter((p) => p.mediaAssetId !== mediaAssetId));
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    attachments.addAttachment(file);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
-    // 게시글 소유 주체 = groupId(그룹/소속 그룹 id) ?? artistId(솔로일 때 본인 id)
-    const postGroupId = groupId ?? artistId;
-    if (!postGroupId) {
+    const gid = groupId ?? artistId;
+    if (!gid) {
       router.push("/home");
       return;
     }
@@ -92,13 +53,13 @@ export default function NewPostPage() {
       await request("/api/artist-posts", {
         method: "POST",
         body: {
-          groupId: postGroupId,
+          groupId: gid,
           title: "",
           content: content.trim(),
           isMembershipOnly: false,
           isNotice: false,
-          mediaAssetIds: mediaAssetIds.length ? mediaAssetIds : null,
-          representativeMediaAssetId: mediaAssetIds[0] ?? null,
+          mediaAssetIds: attachments.mediaAssetIds.length ? attachments.mediaAssetIds : null,
+          representativeMediaAssetId: attachments.representativeMediaAssetId,
         },
       });
       router.push("/posts");
@@ -115,15 +76,20 @@ export default function NewPostPage() {
   useEffect(() => {
     const headers = getAuthHeaders();
     if (!headers.Authorization) return;
+    setProfileError("");
     axios.get(`${BASE_URL}/api/artist/mypage`, { headers })
       .then((res) => {
         const p = res.data?.profile;
         setProfile(p ?? null);
         if (p?.id != null) setArtistId(p.id);
-        // groupId가 있으면 사용, 없으면 id 사용 (솔로 아티스트 또는 구 API 호환)
         setGroupId(p?.groupId ?? p?.id ?? null);
       })
-      .catch(() => { setArtistId(null); setGroupId(null); setProfile(null); });
+      .catch((err) => {
+        setArtistId(null);
+        setGroupId(null);
+        setProfile(null);
+        setProfileError(err?.response?.data?.message || "아티스트 프로필을 불러올 수 없습니다. 새 글 작성은 아티스트 계정에서 가능합니다.");
+      });
   }, []);
 
   return (
@@ -154,33 +120,34 @@ export default function NewPostPage() {
           </label>
           <div className="mt-6">
             <span className="text-[10px] font-black uppercase tracking-widest text-white/55 mb-2 block">첨부 (이미지·영상 최대 5개, 목록 미리보기용 첫 장 표시)</span>
-            {uploadError && <p className="text-red-400 text-xs mb-2">{uploadError}</p>}
+            {profileError && <p className="text-amber-400 text-xs mb-2">{profileError}</p>}
+            {attachments.uploadError && <p className="text-red-400 text-xs mb-2">{attachments.uploadError}</p>}
             <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleAttachmentChange} className="hidden" />
-            {attachmentPreviews.length > 0 ? (
+            {attachments.attachmentPreviews.length > 0 ? (
               <div className="space-y-3">
-                {attachmentPreviews.map((p) => (
+                {attachments.attachmentPreviews.map((p) => (
                   <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
                     {p.isVideo ? (
                       <video src={p.url} controls className="w-full max-h-80 object-contain bg-black/20" />
                     ) : (
                       <img src={p.url} alt="미리보기" className="w-full max-h-80 object-contain bg-black/20" />
                     )}
-                    <button type="button" onClick={() => removeImage(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+                    <button type="button" onClick={() => attachments.removeAttachment(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
                       <span className="material-symbols-outlined text-lg">close</span>
                     </button>
                   </div>
                 ))}
-                {canAddAttachment && (
-                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm disabled:opacity-50">
-                    {uploading ? "업로드 중..." : "+ 추가"}
+                {attachments.canAddAttachment && (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={attachments.uploading} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm disabled:opacity-50">
+                    {attachments.uploading ? "업로드 중..." : "+ 추가"}
                   </button>
                 )}
-                {attachmentPreviews.length >= 5 && <p className="text-white/50 text-xs">최대 5개까지 첨부 가능합니다.</p>}
+                {attachments.attachmentPreviews.length >= MAX_POST_ATTACHMENTS && <p className="text-white/50 text-xs">최대 {MAX_POST_ATTACHMENTS}개까지 첨부 가능합니다.</p>}
               </div>
             ) : (
-              <button type="button" onClick={() => canAddAttachment && fileInputRef.current?.click()} disabled={!canAddAttachment || uploading} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
+              <button type="button" onClick={() => attachments.canAddAttachment && fileInputRef.current?.click()} disabled={!attachments.canAddAttachment || attachments.uploading} className="w-full py-8 rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/50 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center gap-2 disabled:opacity-50">
                 <span className="material-symbols-outlined text-4xl">add_photo_alternate</span>
-                <span className="text-sm font-bold">{!postGroupId ? "프로필 로딩 중…" : "이미지 또는 영상 추가 (최대 5개)"}</span>
+                <span className="text-sm font-bold">{profileError ? "프로필을 불러올 수 없음" : !postGroupIdNum ? "프로필 로딩 중…" : "이미지 또는 영상 추가 (최대 " + MAX_POST_ATTACHMENTS + "개)"}</span>
               </button>
             )}
           </div>
