@@ -15,6 +15,7 @@ import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.example.backend.user.entity.User;
 import org.example.backend.user.repository.UserRepository;
 import org.example.backend.user.repository.FollowRepository;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.order.exception.OrderErrorCode;
 import org.example.backend.order.exception.OrderException;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class SubscriptionService {
         private final ProductRepository productRepository;
         private final PaymentService paymentService;
         private final FollowRepository followRepository;
+        private final GroupMemberRepository groupMemberRepository;
 
         /**
          * 현금 정기결제 구독을 생성합니다. (캔디 정기 충전)
@@ -146,11 +148,22 @@ public class SubscriptionService {
                         throw new IllegalArgumentException("구독 상품만 구독할 수 있습니다. 단건 상품은 마켓에서 구매해 주세요.");
                 }
 
-                // 아티스트 상품: 팔로우 필수
+                // 아티스트 상품: 팔로우 필수. 소속 멤버 DM은 그룹 팔로우 시에도 구매 가능
                 if (product.getArtistId() != null) {
                         User artist = userRepository.findById(product.getArtistId()).orElse(null);
-                        if (artist != null && !followRepository.existsByFollowerAndArtist(user, artist)) {
-                                throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                        if (artist != null) {
+                                boolean followsArtist = followRepository.existsByFollowerAndArtist(user, artist);
+                                if (!followsArtist) {
+                                        var groupMembership = groupMemberRepository.findByMember(artist).orElse(null);
+                                        if (groupMembership != null && groupMembership.getGroup() != null) {
+                                                boolean followsGroup = followRepository.existsByFollowerAndArtist(user, groupMembership.getGroup());
+                                                if (!followsGroup) {
+                                                        throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                                                }
+                                        } else {
+                                                throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                                        }
+                                }
                         }
                 }
 

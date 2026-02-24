@@ -23,6 +23,9 @@ import {
 } from "@/lib/concertUtils";
 import { usePostAttachments } from "@/lib/usePostAttachments";
 import { MAX_POST_ATTACHMENTS } from "@/lib/mediaAssetApi";
+import { getProfile } from "@/lib/userApi";
+import { getProduct } from "@/lib/productApi";
+import { createCandySubscription, checkDmSubscription } from "@/lib/subscriptionApi";
 
 // 컴포넌트
 import Surface from "@/components/ui/Surface";
@@ -156,6 +159,14 @@ function ArtistDetailPageInner({ paramsId }) {
     const [attendanceLoading, setAttendanceLoading] = useState(false);
     const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
     const [liveCardCheckingId, setLiveCardCheckingId] = useState(null);
+    const [dmModalOpen, setDmModalOpen] = useState(false);
+    const [dmModalMember, setDmModalMember] = useState(null);
+    const [dmModalProduct, setDmModalProduct] = useState(null);
+    const [dmModalCandyBalance, setDmModalCandyBalance] = useState(null);
+    const [dmModalLoading, setDmModalLoading] = useState(false);
+    const [dmModalPaying, setDmModalPaying] = useState(false);
+    const [dmConnectCheckingId, setDmConnectCheckingId] = useState(null); // DM 연결 확인 중인 멤버 ID
+    const [dmErrorModalOpen, setDmErrorModalOpen] = useState(false);
     const [likedPostIds, setLikedPostIds] = useState(new Set());
 
     const fanPostFileInputRef = useRef(null);
@@ -196,6 +207,8 @@ function ArtistDetailPageInner({ paramsId }) {
                     const info = data?.artistInfo || {};
                     const follow = data?.followStatus || {};
                     const membership = data?.membershipInfo || {};
+                    // members는 응답 최상위에 있음 (그룹: 소속 멤버, 개인: 본인)
+                    const rawMembers = data?.members ?? info?.members ?? [];
                     setArtist({
                         id: String(groupId),
                         name: info.nickname || "",
@@ -205,7 +218,12 @@ function ArtistDetailPageInner({ paramsId }) {
                         isSubscribed: membership.hasActiveMembership || false,
                         memberCount: info.followerCount || 0,
                         postCount: info.postCount || 0,
-                        members: info.members || [],
+                        members: (Array.isArray(rawMembers) ? rawMembers : []).map((m) => ({
+                            id: m.memberId ?? m.id,
+                            name: m.nickname ?? m.name,
+                            avatar: m.profileImageUrl ?? m.avatar,
+                            dmProductId: m.dmProductId,
+                        })),
                         backendId: groupId
                     });
                 })
@@ -544,6 +562,87 @@ function ArtistDetailPageInner({ paramsId }) {
         }
     };
 
+    const handleDmConnectClick = async (m) => {
+        if (!m?.dmProductId || !currentUser) {
+            if (!currentUser) router.push("/login");
+            return;
+        }
+        if (dmConnectCheckingId != null) return;
+        const artistId = Number(m.id);
+        setDmConnectCheckingId(artistId);
+        try {
+            const check = await checkDmSubscription(artistId);
+            if (check?.error) {
+                setDmErrorModalOpen(true);
+                return;
+            }
+            if (check?.hasSubscription) {
+                const roomId = check?.roomId;
+                if (roomId != null) {
+                    router.push(`/dm/fan?roomId=${roomId}`);
+                } else {
+                    router.push("/dm/fan");
+                }
+                return;
+            }
+        } catch (e) {
+            console.error("DM 구독 확인 실패", e);
+            setDmErrorModalOpen(true);
+            return;
+        } finally {
+            setDmConnectCheckingId(null);
+        }
+        setDmModalMember(m);
+        setDmModalProduct(null);
+        setDmModalCandyBalance(null);
+        setDmModalOpen(true);
+        setDmModalLoading(true);
+        Promise.all([
+            getProduct(m.dmProductId),
+            getProfile(),
+        ])
+            .then(([product, profile]) => {
+                setDmModalProduct(product);
+                setDmModalCandyBalance(profile?.candy ?? 0);
+            })
+            .catch(() => {
+                setDmModalProduct(null);
+                setDmModalCandyBalance(0);
+            })
+            .finally(() => setDmModalLoading(false));
+    };
+
+    const handleDmModalConfirm = async () => {
+        if (!dmModalProduct || dmModalPaying) return;
+        const candyPrice = dmModalProduct?.candyPrice ?? 0;
+        const balance = dmModalCandyBalance ?? 0;
+        if (balance < candyPrice) {
+            router.push("/candy/recharge");
+            setDmModalOpen(false);
+            return;
+        }
+        setDmModalPaying(true);
+        try {
+            await createCandySubscription(dmModalProduct.id);
+            setDmModalOpen(false);
+            const check = await checkDmSubscription(Number(dmModalMember?.id));
+            if (check?.error) {
+                setDmErrorModalOpen(true);
+                return;
+            }
+            if (check?.hasSubscription) {
+                const roomId = check?.roomId;
+                router.push(roomId != null ? `/dm/fan?roomId=${roomId}` : "/dm/fan");
+            } else {
+                router.push("/dm/fan");
+            }
+        } catch (e) {
+            alert(e?.message || "DM 구독에 실패했습니다.");
+        } finally {
+            setDmModalPaying(false);
+        }
+    };
+
     const handleLike = (postId) => {
         setLikedPostIds(prev => {
             const next = new Set(prev);
@@ -828,9 +927,46 @@ function ArtistDetailPageInner({ paramsId }) {
                 );
             })()}
 
+            {/* 소속 멤버 섹션 (멤버 카드는 모두 표시, DM 연결하기는 dmProductId 있을 때만) */}
+            {artist?.members && artist.members.length > 0 && (
+                <div className="max-w-6xl w-full mx-auto px-8 pt-8">
+                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-4">소속 멤버</h3>
+                    <div className="flex flex-wrap gap-4">
+                        {artist.members.map((m) => (
+                            <div
+                                key={m.id}
+                                className="flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-4 min-w-[200px]"
+                            >
+                                <img src={m.avatar || `https://picsum.photos/seed/${m.id}/100/100`} className="size-12 rounded-xl object-cover shrink-0" alt="" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-white font-bold truncate">{m.name}</p>
+                                    {m.dmProductId && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDmConnectClick(m)}
+                                            disabled={dmConnectCheckingId === Number(m.id)}
+                                            className="text-[10px] text-violet-400 font-black hover:underline uppercase mt-1 inline-flex items-center gap-1 disabled:opacity-60"
+                                        >
+                                            {dmConnectCheckingId === Number(m.id) ? (
+                                                <span className="animate-pulse">확인 중...</span>
+                                            ) : (
+                                                <>
+                                                    <span className="material-symbols-outlined text-xs">mail</span>
+                                                    DM 연결하기
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* 메인 콘텐츠 영역 */}
-            <div className="max-w-6xl w-full mx-auto px-8 py-10 grid grid-cols-12 gap-10">
-                <div className="col-span-12 lg:col-span-8">
+            <div className="max-w-6xl w-full mx-auto px-8 py-10">
+                <div className="w-full">
                     {activeTab === "ARTIST" && (
                         !currentUser ? (
                             <Surface className="p-20 text-center border border-white/10">
@@ -1223,40 +1359,6 @@ function ArtistDetailPageInner({ paramsId }) {
                     )}
 
                 </div>
-
-                {/* 사이드바 */}
-                <aside className="hidden lg:col-span-4 lg:flex flex-col gap-8">
-                    <Surface variant="primary" className="p-8 border border-violet-500/20">
-                        <span className="text-violet-300 text-[10px] font-black tracking-widest uppercase">Membership</span>
-                        <p className="text-white/60 text-sm mt-4 leading-relaxed">
-                            {artist.name}의 미공개 포스트와 라이브 스트리밍 혜택을 누리세요.
-                        </p>
-                        <div className="my-8 p-4 bg-white/5 rounded-xl border border-white/5 flex justify-between items-center">
-                            <span className="text-xs text-white/50 font-bold">월 구독료</span>
-                            <span className="text-white font-bold">{CANDY_COST} 캔디</span>
-                        </div>
-                        <Button variant="primary" className="w-full py-4">멤버십 시작하기</Button>
-                    </Surface>
-
-                    {artist.members && artist.members.length > 0 && (
-                        <Surface variant="secondary" className="p-8 sticky top-24">
-                            <h3 className="text-xs font-black text-white/40 uppercase tracking-widest mb-6">Members</h3>
-                            <div className="space-y-4">
-                                {artist.members.map(m => (
-                                    <div key={m.id} className="flex items-center gap-4 group">
-                                        <img src={m.avatar} className="size-12 rounded-xl object-cover" alt="" />
-                                        <div className="flex-1">
-                                            <p className="text-white font-bold">{m.name}</p>
-                                            <Link href="/dm" className="text-[10px] text-violet-400 font-black hover:underline uppercase mt-1 inline-flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-xs">mail</span> Send DM
-                                            </Link>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Surface>
-                    )}
-                </aside>
             </div>
 
             {/* 팬 포스트 작성 모달 */}
@@ -1344,6 +1446,111 @@ function ArtistDetailPageInner({ paramsId }) {
                 artistId={artist.id}
                 artistName={artist.name}
             />
+
+            {/* DM 오류 모달 (DM 방 없음 등) */}
+            {dmErrorModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                    onClick={() => setDmErrorModalOpen(false)}
+                >
+                    <div
+                        className="bg-[#201a33] rounded-[2rem] p-8 max-w-md w-full border border-white/[0.12] shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 mb-6">
+                            <span className="material-symbols-outlined text-red-400/90 text-2xl">error</span>
+                            <h3 className="text-xl font-black text-white">오류가 발생했습니다</h3>
+                        </div>
+                        <p className="text-white/80 mb-6">오류가 발생했습니다. 관리자에게 문의해 주세요.</p>
+                        <button
+                            type="button"
+                            onClick={() => setDmErrorModalOpen(false)}
+                            className="w-full py-4 rounded-2xl bg-violet-500/90 text-white font-black hover:brightness-110"
+                        >
+                            확인
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* DM 결제 모달 (구독 미완료 시) */}
+            {dmModalOpen && dmModalMember && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+                    onClick={() => !dmModalPaying && setDmModalOpen(false)}
+                >
+                    <div
+                        className="bg-[#201a33] rounded-[2rem] p-8 max-w-md w-full border border-white/[0.12] shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-xl font-black text-white mb-6">
+                            {dmModalMember?.name}님과 DM하기
+                        </h3>
+                        {dmModalLoading ? (
+                            <p className="text-white/55">잔액 확인 중...</p>
+                        ) : (() => {
+                            const candyTotal = dmModalProduct?.candyPrice ?? 0;
+                            const balance = dmModalCandyBalance ?? 0;
+                            const isSufficient = balance >= candyTotal;
+                            const afterBalance = balance - candyTotal;
+                            return (
+                                <div className="space-y-6">
+                                    {!isSufficient && (
+                                        <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20 flex items-center gap-3">
+                                            <span className="material-symbols-outlined text-red-400/90 text-2xl">error</span>
+                                            <p className="font-bold text-red-400/90">캔디 수가 부족합니다.</p>
+                                        </div>
+                                    )}
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-white/55">잔여 캔디</span>
+                                            <span className="text-white font-bold">{balance.toLocaleString()} 캔디</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-white/55">소모 캔디</span>
+                                            <span className="text-violet-300 font-bold">{candyTotal.toLocaleString()} 캔디/월</span>
+                                        </div>
+                                        <div className="h-px bg-white/[0.06]" />
+                                        <div className="flex justify-between">
+                                            <span className="text-white font-bold">구매 후 잔액</span>
+                                            <span className={`font-black text-lg ${afterBalance < 0 ? "text-red-400" : "text-violet-300"}`}>
+                                                {afterBalance.toLocaleString()} 캔디
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDmModalOpen(false)}
+                                            disabled={dmModalPaying}
+                                            className="flex-1 py-4 rounded-2xl border border-white/[0.12] text-white/80 font-bold hover:bg-white/[0.06] disabled:opacity-50"
+                                        >
+                                            취소
+                                        </button>
+                                        {isSufficient ? (
+                                            <button
+                                                type="button"
+                                                onClick={handleDmModalConfirm}
+                                                disabled={dmModalPaying}
+                                                className="flex-1 py-4 rounded-2xl bg-violet-500/90 text-white font-black hover:brightness-110 disabled:opacity-50"
+                                            >
+                                                {dmModalPaying ? "처리 중..." : "구매하기"}
+                                            </button>
+                                        ) : (
+                                            <Link
+                                                href="/candy/recharge"
+                                                className="flex-1 py-4 rounded-2xl bg-violet-500/90 text-white font-black text-center hover:brightness-110 block"
+                                            >
+                                                캔디 충전하기
+                                            </Link>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

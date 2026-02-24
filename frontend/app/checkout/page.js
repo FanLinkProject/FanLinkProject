@@ -35,6 +35,7 @@ function CheckoutContent() {
   const productIdParam = searchParams.get("productId");
   const quantityParam = parseInt(searchParams.get("quantity") || "1", 10);
   const isCandyRecharge = searchParams.get("candyRecharge") === "1";
+  const returnPathParam = searchParams.get("returnPath");
 
   const [items, setItems] = useState([]);
   const [productDetails, setProductDetails] = useState({});
@@ -52,11 +53,15 @@ function CheckoutContent() {
   });
 
   useEffect(() => {
+    if (returnPathParam && returnPathParam.startsWith("/")) {
+      setReturnPath(returnPathParam);
+      return;
+    }
     if (typeof window !== "undefined") {
       const saved = sessionStorage.getItem("checkoutReturnPath");
       setReturnPath(saved && saved.startsWith("/") ? saved : "/cart");
     }
-  }, []);
+  }, [returnPathParam]);
 
   useEffect(() => {
     let rawItems = [];

@@ -55,6 +55,25 @@ export function isPresalePeriodNotEnded(concert) {
   return NOW() < presaleEnd;
 }
 
+/** 현재 예매 기간에 맞는 티켓 상품 반환. 선예매 기간이면 선예매 상품, 일반 기간이면 일반 상품. 없으면 null */
+export function getEligibleTicketProduct(concert, products) {
+  if (!concert || !Array.isArray(products) || products.length === 0) return null;
+  const now = NOW();
+  const presaleStart = concert?.presaleStartDateTime ? new Date(concert.presaleStartDateTime) : null;
+  const presaleEnd = concert?.presaleEndDateTime ? new Date(concert.presaleEndDateTime) : null;
+  const saleStart = concert?.saleStartDateTime ? new Date(concert.saleStartDateTime) : null;
+  const saleEnd = concert?.saleEndDateTime ? new Date(concert.saleEndDateTime) : null;
+  const inPresale = presaleStart && presaleEnd && now >= presaleStart && now <= presaleEnd;
+  const inSale = saleStart && saleEnd && now >= saleStart && now <= saleEnd;
+  if (inPresale) {
+    return products.find((p) => p.isMembershipOnly === true || (p.name && p.name.includes("선예매"))) ?? null;
+  }
+  if (inSale) {
+    return products.find((p) => p.isMembershipOnly === false && p.concertId != null) ?? products.find((p) => p.name && p.name.includes("일반")) ?? null;
+  }
+  return null;
+}
+
 /** 예매 예정(UPCOMING)일 때 표시용 문자열: "선예매 D-3", "일반 예매 D-3", "선예매 D-Day", "일반 예매 D-Day", null */
 export function formatUpcomingSaleDday(concert) {
   const presaleD = getDaysUntilPresaleStart(concert);

@@ -5,10 +5,15 @@ import { request, BASE_URL } from "@/lib/api";
 
 export function getProducts(params = {}) {
   const query = {};
+  if (params.concertId != null) query.concertId = params.concertId;
   if (params.artistId != null) query.artistId = params.artistId;
   if (params.artistIds?.length) query.artistIds = params.artistIds.join(",");
   if (params.market === true) query.market = "true";
   return request("/api/products", { query });
+}
+
+export function getProductsByConcert(concertId) {
+  return getProducts({ concertId });
 }
 
 export function getProductsByArtist(artistId) {

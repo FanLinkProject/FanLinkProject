@@ -31,7 +31,8 @@ public record ArtistDashboardResponse(
     // 팔로우 상태
     public record FollowStatus(
             boolean isFollowing,
-            String followButtonText  // "팔로우" 또는 "팔로우 취소"
+            String followButtonText,  // "팔로우" 또는 "팔로우 취소"
+            boolean isFollowingGroup  // 소속 멤버인 경우: 그룹 팔로우 여부 (구매 가능 판단용)
     ) {
     }
 
