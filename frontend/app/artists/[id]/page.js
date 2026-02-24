@@ -512,7 +512,7 @@ function ArtistDetailPageInner({ paramsId }) {
             try {
                 const created = await request("/api/fan-posts", {
                     method: "POST",
-                    body: { groupId, title: "", content: newPostContent.trim(), mediaAssetIds: fanPostMediaAssetIds.length > 0 ? fanPostMediaAssetIds : null, representativeMediaAssetId: fanPostRepresentativeId },
+                    body: { groupId, title: "", content: newPostContent.trim(), mediaAssetIds: fanPostMediaAssetIds.length > 0 ? fanPostMediaAssetIds : null },
                 });
                 const newPost = transformFanPost(created);
                 setFanPosts((prev) => [newPost, ...prev]);

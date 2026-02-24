@@ -4,8 +4,8 @@
 import { request } from "@/lib/api";
 
 export function list(artistId, keyword) {
-  const query = keyword?.trim() ? `?q=${encodeURIComponent(keyword.trim())}` : "";
-  return request(`/api/artists/${artistId}/music-videos${query}`);
+  const query = keyword?.trim() ? { q: keyword.trim() } : undefined;
+  return request(`/api/artists/${artistId}/music-videos`, { query });
 }
 
 export function getDetail(artistId, id) {
