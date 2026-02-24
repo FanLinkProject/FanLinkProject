@@ -701,7 +701,7 @@ export default function UserHomePage() {
                   showVerified={true}
                   isLocked={post.isLockedByServer ?? false}
                   isMembershipOnly={post.isMembershipOnly ?? false}
-                  showCommentButton={!post.isNotice}
+                  showCommentButton={true}
                   likeCount={feedLikeCountMap[post.id] ?? feedLikeCountMap[String(post.id)]}
                   commentCount={feedCommentCountMap[post.id] ?? feedCommentCountMap[String(post.id)]}
                 />

@@ -9,6 +9,7 @@ import { createCandyOrder } from "@/lib/orderApi";
 import { createCandySubscription } from "@/lib/subscriptionApi";
 import { request } from "@/lib/api";
 import { apiGet } from "@/lib/api";
+import { isArtistOrGroupAccount } from "@/lib/authRedirect";
 
 function getProductImageUrl(product) {
   const rep = product.attachments?.find(
@@ -50,6 +51,11 @@ export default function ProductDetailPage({ params }) {
   const [candyPaying, setCandyPaying] = useState(false);
   const [isFollowing, setIsFollowing] = useState(null); // null: 로딩/플랫폼상품, true/false: 아티스트 상품
   const [concert, setConcert] = useState(null); // 티켓 상품일 때 공연 기간 정보
+  const [hidePurchaseUI, setHidePurchaseUI] = useState(false); // 그룹/아티스트 계정: 구매·장바구니·팔로우 안내 숨김
+
+  useEffect(() => {
+    setHidePurchaseUI(isArtistOrGroupAccount());
+  }, []);
 
   useEffect(() => {
     const saved = sessionStorage.getItem("productDetailReturnPath");
@@ -248,51 +254,55 @@ export default function ProductDetailPage({ params }) {
           )}
           <h1 className="text-4xl font-black text-white mb-3 tracking-tight">{product.name}</h1>
           <p className="text-3xl font-black text-violet-300 mb-10">{formatPrice(product)}</p>
-          <div
-            className={`mt-12 flex gap-4 ${!canPurchase ? "cursor-not-allowed" : ""}`}
-            title={purchaseDisabledTooltip}
-          >
-            <button
-              type="button"
-              onClick={handleBuyNowClick}
-              disabled={!canPurchase}
-              title={purchaseDisabledTooltip}
-              className={`flex-1 py-5 rounded-3xl font-black text-base uppercase tracking-widest text-center transition-all ${
-                canPurchase
-                  ? "bg-violet-500/90 text-white hover:brightness-110"
-                  : "bg-white/10 text-white/40 cursor-not-allowed"
-              }`}
-            >
-              {ticketDisabledMessage || "지금 바로 구매하기"}
-            </button>
-            {!isCandyOnly && !isTicketProduct && (
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={!canPurchase}
+          {!hidePurchaseUI && (
+            <>
+              <div
+                className={`mt-12 flex gap-4 ${!canPurchase ? "cursor-not-allowed" : ""}`}
                 title={purchaseDisabledTooltip}
-                className={`size-16 rounded-3xl border flex items-center justify-center transition-all ${
-                  canPurchase
-                    ? "border-white/[0.08] text-white/55 hover:bg-white/[0.06] hover:text-violet-300"
-                    : "border-white/[0.06] text-white/30 cursor-not-allowed"
-                }`}
               >
-                <span className="material-symbols-outlined">shopping_cart</span>
-              </button>
-            )}
-          </div>
-          {!canPurchase && product.artistId != null && !ticketDisabledMessage && (
-            <div className="mt-4 space-y-2">
-              <p className="text-sm text-amber-400/90 flex items-start gap-2">
-                <span className="material-symbols-outlined text-lg shrink-0">info</span>
-                <span>{followTooltip}</span>
-              </p>
-              <p className="text-sm">
-                <Link href={`/artists/${product.artistId}`} className="text-amber-400/90 underline hover:text-amber-300">
-                  아티스트 페이지에서 팔로우하기 →
-                </Link>
-              </p>
-            </div>
+                <button
+                  type="button"
+                  onClick={handleBuyNowClick}
+                  disabled={!canPurchase}
+                  title={purchaseDisabledTooltip}
+                  className={`flex-1 py-5 rounded-3xl font-black text-base uppercase tracking-widest text-center transition-all ${
+                    canPurchase
+                      ? "bg-violet-500/90 text-white hover:brightness-110"
+                      : "bg-white/10 text-white/40 cursor-not-allowed"
+                  }`}
+                >
+                  {ticketDisabledMessage || "지금 바로 구매하기"}
+                </button>
+                {!isCandyOnly && !isTicketProduct && (
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={!canPurchase}
+                    title={purchaseDisabledTooltip}
+                    className={`size-16 rounded-3xl border flex items-center justify-center transition-all ${
+                      canPurchase
+                        ? "border-white/[0.08] text-white/55 hover:bg-white/[0.06] hover:text-violet-300"
+                        : "border-white/[0.06] text-white/30 cursor-not-allowed"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined">shopping_cart</span>
+                  </button>
+                )}
+              </div>
+              {!canPurchase && product.artistId != null && !ticketDisabledMessage && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm text-amber-400/90 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-lg shrink-0">info</span>
+                    <span>{followTooltip}</span>
+                  </p>
+                  <p className="text-sm">
+                    <Link href={`/artists/${product.artistId}`} className="text-amber-400/90 underline hover:text-amber-300">
+                      아티스트 페이지에서 팔로우하기 →
+                    </Link>
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

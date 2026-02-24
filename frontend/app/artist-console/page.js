@@ -67,6 +67,7 @@ function transformArtistPost(p, groupAvatar = "") {
     const attachments = Array.isArray(p.attachments) ? p.attachments : [];
     return {
         id: p.id,
+        writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
         authorAvatar: p.writerProfileImageUrl || groupAvatar,
@@ -102,7 +103,7 @@ const POSTS_LIMIT = 10;
 export default function ArtistConsolePage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const VALID_TABS = ["POSTS", "FAN_POSTS", "LIVE", "CONCERTS", "MV"];
+    const VALID_TABS = ["POSTS", "FAN_POSTS", "LIVE", "MV"];
     const tabParam = searchParams.get("tab");
     const [activeTab, setActiveTab] = useState(tabParam && VALID_TABS.includes(tabParam) ? tabParam : "POSTS");
 
@@ -231,16 +232,6 @@ export default function ArtistConsolePage() {
             .then((list) => setEndedLives(Array.isArray(list) ? list : []))
             .catch(() => setEndedLives([]));
     }, [groupId]);
-
-    // Concerts 탭 활성화 시 공연 목록 로드 (그룹/소속 아티스트면 그룹 공연 전체, 아니면 본인 공연만)
-    useEffect(() => {
-        if (activeTab !== "CONCERTS") return;
-        setConcertsLoading(true);
-        request("/api/artist/concerts")
-            .then((data) => setConcertsList(Array.isArray(data) ? data : []))
-            .catch(() => setConcertsList([]))
-            .finally(() => setConcertsLoading(false));
-    }, [activeTab]);
 
     // MV 목록 로드 (검색어 포함)
     const loadMvList = useCallback((keyword) => {
@@ -624,6 +615,22 @@ export default function ArtistConsolePage() {
         });
     };
 
+    // 아티스트 포스트 수정 (본인 작성 글만)
+    const handleEditArtistPost = (postId) => {
+        router.push(`/artist-console/posts/${postId}/edit`);
+    };
+
+    // 아티스트 포스트 삭제 (본인 작성 글만)
+    const handleDeleteArtistPost = async (postId) => {
+        if (!window.confirm("게시글을 삭제하시겠습니까?")) return;
+        try {
+            await request(`/api/artist-posts/${postId}`, { method: "DELETE" });
+            setArtistPosts((prev) => prev.filter((p) => p.id !== postId));
+        } catch (err) {
+            console.error("게시글 삭제 실패", err);
+        }
+    };
+
     // 팬 포스트 좋아요 토글
     const handleFanPostLike = (postId) => {
         if (!currentUser) { router.push("/login"); return; }
@@ -736,20 +743,34 @@ export default function ArtistConsolePage() {
                         { id: "FAN_POSTS", label: "Fan Posts" },
                         { id: "LIVE", label: "Live History" },
                         { id: "MV", label: "MV" },
-                    ].map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                                activeTab === tab.id
-                                    ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
-                                    : "text-white/55 hover:text-white/80"
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
+                        ...(currentUser?.role === "ARTIST" && myProfile?.groupId != null
+                            ? [{ id: "CONCERTS", label: "Concerts", href: "/artist-console/concerts" }]
+                            : []),
+                        { id: "MARKET", label: "MARKET", href: "/market" },
+                    ].map((tab) =>
+                        tab.href ? (
+                            <Link
+                                key={tab.id}
+                                href={tab.href}
+                                className="px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-white/55 hover:text-white/80"
+                            >
+                                {tab.label}
+                            </Link>
+                        ) : (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                                    activeTab === tab.id
+                                        ? "bg-[#201a33] text-violet-300 border border-white/[0.08]"
+                                        : "text-white/55 hover:text-white/80"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        )
+                    )}
                 </div>
                 {activeTab === "POSTS" && (
                     <Button
@@ -801,6 +822,10 @@ export default function ArtistConsolePage() {
                                             `/posts/${postId}?type=ARTIST&groupId=${groupId}&from=artist-console`
                                         )
                                     }
+                                    onEdit={handleEditArtistPost}
+                                    onDelete={handleDeleteArtistPost}
+                                    canEditSet={myId ? new Set(artistPosts.filter((p) => Number(p.writerId) === Number(myId)).map((p) => p.id)) : undefined}
+                                    canDeleteSet={myId ? new Set(artistPosts.filter((p) => Number(p.writerId) === Number(myId)).map((p) => p.id)) : undefined}
                                 />
                                 {/* 무한스크롤 sentinel */}
                                 <div ref={artistPostsBottomRef} className="py-1">

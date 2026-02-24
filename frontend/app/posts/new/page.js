@@ -95,7 +95,7 @@ export default function NewPostPage() {
   return (
     <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-8">
       <header className="flex items-center gap-4">
-        <Button variant="ghost" href="/posts" className="size-10 rounded-full">
+        <Button variant="ghost" onClick={() => router.back()} className="size-10 rounded-full">
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
         <div>
@@ -153,7 +153,7 @@ export default function NewPostPage() {
           </div>
         </Surface>
         <div className="flex gap-3 justify-end">
-          <Button variant="ghost" href="/posts">취소</Button>
+          <Button variant="ghost" onClick={() => router.back()}>취소</Button>
           <Button type="submit" variant="primary" className="px-8 py-3" disabled={submitLoading}>
             {submitLoading ? "게시 중..." : "게시하기"}
           </Button>

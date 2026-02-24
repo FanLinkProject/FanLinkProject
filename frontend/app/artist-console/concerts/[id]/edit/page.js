@@ -480,7 +480,7 @@ export default function EditConcertPage() {
       <div className="p-8 lg:p-12 max-w-3xl mx-auto space-y-6">
         <Button
           variant="ghost"
-          href="/artist-console/concerts"
+          onClick={() => router.back()}
           className="size-10 rounded-full">
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
@@ -496,7 +496,7 @@ export default function EditConcertPage() {
       <header className="flex items-center gap-4">
         <Button
           variant="ghost"
-          href="/artist-console/concerts"
+          onClick={() => router.back()}
           className="size-10 rounded-full">
           <span className="material-symbols-outlined">arrow_back</span>
         </Button>
@@ -884,7 +884,7 @@ export default function EditConcertPage() {
         <div className="flex gap-3 justify-end">
           <Button
             variant="ghost"
-            href="/artist-console/concerts"
+            onClick={() => router.back()}
             disabled={loading}>
             취소
           </Button>
