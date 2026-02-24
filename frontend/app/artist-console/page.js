@@ -11,6 +11,7 @@ import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import PostFeed from "@/components/PostFeed";
+import ProfileImageModal from "@/components/common/ProfileImageModal";
 
 function getCurrentUser() {
     if (typeof window === "undefined") return null;
@@ -127,6 +128,7 @@ export default function ArtistConsolePage() {
         attachmentPreviews: newPostAttachmentPreviews,
         addAttachment: addNewPostAttachment,
         removeAttachment: removeNewPostAttachment,
+        setRepresentative: setNewPostRepresentative,
         resetAttachments: resetNewPostAttachments,
         canAddAttachment: canAddNewPostAttachment,
         uploading: newPostUploading,
@@ -152,6 +154,7 @@ export default function ArtistConsolePage() {
     const fanPostsBottomRef = useRef(null);
 
     const [endedLives, setEndedLives] = useState([]);
+    const [showProfileImageModal, setShowProfileImageModal] = useState(false);
 
     // Concerts 탭 (인라인 목록)
     const [concertsList, setConcertsList] = useState([]);
@@ -506,11 +509,20 @@ export default function ArtistConsolePage() {
                 variant="primary"
                 className="p-10 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden"
             >
-                <img
-                    src={displayAvatar || getDefaultAvatarUrl(displayName)}
-                    className="size-32 rounded-2xl border-2 border-white/[0.08] shrink-0 object-cover"
-                    alt=""
-                />
+                <div className="relative group shrink-0">
+                    <img
+                        src={displayAvatar || getDefaultAvatarUrl(displayName)}
+                        className="size-32 rounded-2xl border-2 border-white/[0.08] object-cover"
+                        alt=""
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowProfileImageModal(true)}
+                        className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                    >
+                        사진 변경
+                    </button>
+                </div>
                 <div className="flex-1 text-center md:text-left min-w-0">
                     <SectionTitle className="text-3xl font-black">
                         {displayName} Studio
@@ -857,13 +869,19 @@ export default function ArtistConsolePage() {
 
                         {/* 첨부파일 */}
                         <div className="mt-5">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-sm text-white/40">attach_file</span>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-white/55">
                                     첨부파일
                                 </span>
                                 <span className="text-[10px] font-bold text-white/40">
                                     {newPostMediaAssetIds.length}/{MAX_POST_ATTACHMENTS}
                                 </span>
+                                {newPostAttachmentPreviews.length > 1 && (
+                                    <span className="text-[9px] text-violet-400/70 ml-auto">
+                                        클릭하여 대표 이미지 선택
+                                    </span>
+                                )}
                             </div>
                             <input ref={newPostFileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleNewPostFileChange} />
                             {newPostUploadError && (
@@ -871,27 +889,58 @@ export default function ArtistConsolePage() {
                             )}
                             {newPostAttachmentPreviews.length > 0 ? (
                                 <div className="space-y-3">
-                                    {newPostAttachmentPreviews.map((p) => (
-                                        <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                                            {p.isVideo ? (
-                                                <div className="w-full h-48 bg-black/30 flex items-center justify-center">
-                                                    <span className="material-symbols-outlined text-5xl text-white/40">videocam</span>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {newPostAttachmentPreviews.map((p, idx) => {
+                                            const isRepresentative = p.mediaAssetId === newPostRepresentativeId;
+                                            return (
+                                                <div
+                                                    key={p.mediaAssetId}
+                                                    className={`relative rounded-2xl overflow-hidden border-2 cursor-pointer transition-colors ${
+                                                        isRepresentative
+                                                            ? "border-violet-500 ring-1 ring-violet-500/30"
+                                                            : "border-white/[0.08] hover:border-white/20"
+                                                    }`}
+                                                    onClick={() => !p.isVideo && setNewPostRepresentative(p.mediaAssetId)}
+                                                >
+                                                    {p.isVideo ? (
+                                                        <div className="w-full aspect-video bg-black/30 flex flex-col items-center justify-center gap-1">
+                                                            <span className="material-symbols-outlined text-4xl text-white/40">videocam</span>
+                                                            <span className="text-[9px] text-white/30 font-bold">VIDEO</span>
+                                                        </div>
+                                                    ) : (
+                                                        <img src={p.url} alt={`첨부 ${idx + 1}`} className="w-full aspect-video object-cover bg-black/20" />
+                                                    )}
+                                                    {isRepresentative && (
+                                                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-violet-600 text-[9px] font-bold text-white">
+                                                            대표
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); removeNewPostAttachment(p.mediaAssetId); }}
+                                                        className="absolute top-2 right-2 size-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">close</span>
+                                                    </button>
                                                 </div>
-                                            ) : (
-                                                <img src={p.url} alt="미리보기" className="w-full max-h-48 object-contain bg-black/20" />
-                                            )}
-                                            <button type="button" onClick={() => removeNewPostAttachment(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            );
+                                        })}
+                                        {canAddNewPostAttachment && !newPostUploading && (
+                                            <button
+                                                type="button"
+                                                onClick={() => newPostFileInputRef.current?.click()}
+                                                className="aspect-video rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/40 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center justify-center gap-1"
+                                            >
+                                                <span className="material-symbols-outlined text-2xl">add</span>
+                                                <span className="text-[10px] font-bold">추가</span>
                                             </button>
-                                        </div>
-                                    ))}
-                                    {canAddNewPostAttachment && !newPostUploading && (
-                                        <button type="button" onClick={() => newPostFileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">
-                                            + 추가
-                                        </button>
-                                    )}
+                                        )}
+                                    </div>
                                     {newPostUploading && (
-                                        <p className="text-violet-300 text-xs py-2">업로드 중...</p>
+                                        <div className="flex items-center gap-2 py-2">
+                                            <div className="size-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                                            <span className="text-violet-300 text-xs font-medium">업로드 중...</span>
+                                        </div>
                                     )}
                                 </div>
                             ) : (
@@ -903,6 +952,7 @@ export default function ArtistConsolePage() {
                                 >
                                     <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
                                     <span className="text-xs font-bold">{newPostUploading ? "업로드 중..." : "사진 또는 동영상 추가"}</span>
+                                    <span className="text-[10px] text-white/30">이미지·영상 최대 {MAX_POST_ATTACHMENTS}개</span>
                                 </button>
                             )}
                         </div>
@@ -928,6 +978,19 @@ export default function ArtistConsolePage() {
                     </Surface>
                 </div>
             )}
+
+            <ProfileImageModal
+                isOpen={showProfileImageModal}
+                onClose={() => setShowProfileImageModal(false)}
+                currentImageUrl={displayAvatar}
+                mode="artist"
+                onSuccess={(newUrl) => {
+                    setMyProfile((prev) => prev ? { ...prev, profileImageUrl: newUrl } : prev);
+                    if (groupId === myId) {
+                        setGroupProfile((prev) => prev ? { ...prev, profileImageUrl: newUrl } : prev);
+                    }
+                }}
+            />
         </div>
     );
 }

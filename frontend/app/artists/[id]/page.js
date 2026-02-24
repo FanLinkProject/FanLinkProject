@@ -162,10 +162,12 @@ function ArtistDetailPageInner({ paramsId }) {
         attachmentPreviews: fanPostAttachmentPreviews,
         addAttachment: addFanPostAttachment,
         removeAttachment: removeFanPostAttachment,
+        setRepresentative: setFanPostRepresentative,
         resetAttachments: resetFanPostAttachments,
         canAddAttachment: canAddFanPostAttachment,
         uploading: fanPostUploading,
         uploadError: fanPostUploadError,
+        representativeMediaAssetId: fanPostRepresentativeId,
     } = usePostAttachments({
         postGroupId: groupId,
         postIdOrTemp: "tmp_fan_new",
@@ -539,6 +541,7 @@ function ArtistDetailPageInner({ paramsId }) {
                         title: "",
                         content: newPostContent.trim(),
                         mediaAssetIds: fanPostMediaAssetIds.length > 0 ? fanPostMediaAssetIds : null,
+                        representativeMediaAssetId: fanPostRepresentativeId,
                     },
                 });
                 const newPost = transformFanPost(created);
@@ -1077,9 +1080,13 @@ function ArtistDetailPageInner({ paramsId }) {
                         />
                         {/* 첨부파일 */}
                         <div className="mt-4">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-sm text-white/40">attach_file</span>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-white/55">첨부파일</span>
                                 <span className="text-[10px] font-bold text-white/40">{fanPostMediaAssetIds.length}/{MAX_POST_ATTACHMENTS}</span>
+                                {fanPostAttachmentPreviews.length > 1 && (
+                                    <span className="text-[9px] text-violet-400/70 ml-auto">클릭하여 대표 이미지 선택</span>
+                                )}
                             </div>
                             <input ref={fanPostFileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFanPostFileChange} />
                             {fanPostUploadError && (
@@ -1087,27 +1094,56 @@ function ArtistDetailPageInner({ paramsId }) {
                             )}
                             {fanPostAttachmentPreviews.length > 0 ? (
                                 <div className="space-y-3">
-                                    {fanPostAttachmentPreviews.map((p) => (
-                                        <div key={p.mediaAssetId} className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
-                                            {p.isVideo ? (
-                                                <div className="w-full h-40 bg-black/30 flex items-center justify-center">
-                                                    <span className="material-symbols-outlined text-5xl text-white/40">videocam</span>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {fanPostAttachmentPreviews.map((p, idx) => {
+                                            const isRepresentative = p.mediaAssetId === fanPostRepresentativeId;
+                                            return (
+                                                <div
+                                                    key={p.mediaAssetId}
+                                                    className={`relative rounded-2xl overflow-hidden border-2 cursor-pointer transition-colors ${
+                                                        isRepresentative
+                                                            ? "border-violet-500 ring-1 ring-violet-500/30"
+                                                            : "border-white/[0.08] hover:border-white/20"
+                                                    }`}
+                                                    onClick={() => !p.isVideo && setFanPostRepresentative(p.mediaAssetId)}
+                                                >
+                                                    {p.isVideo ? (
+                                                        <div className="w-full aspect-video bg-black/30 flex flex-col items-center justify-center gap-1">
+                                                            <span className="material-symbols-outlined text-4xl text-white/40">videocam</span>
+                                                            <span className="text-[9px] text-white/30 font-bold">VIDEO</span>
+                                                        </div>
+                                                    ) : (
+                                                        <img src={p.url} alt={`첨부 ${idx + 1}`} className="w-full aspect-video object-cover bg-black/20" />
+                                                    )}
+                                                    {isRepresentative && (
+                                                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-violet-600 text-[9px] font-bold text-white">대표</span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); removeFanPostAttachment(p.mediaAssetId); }}
+                                                        className="absolute top-2 right-2 size-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">close</span>
+                                                    </button>
                                                 </div>
-                                            ) : (
-                                                <img src={p.url} alt="미리보기" className="w-full max-h-40 object-contain bg-black/20" />
-                                            )}
-                                            <button type="button" onClick={() => removeFanPostAttachment(p.mediaAssetId)} className="absolute top-2 right-2 size-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            );
+                                        })}
+                                        {canAddFanPostAttachment && !fanPostUploading && (
+                                            <button
+                                                type="button"
+                                                onClick={() => fanPostFileInputRef.current?.click()}
+                                                className="aspect-video rounded-2xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] text-white/40 hover:border-violet-500/30 hover:text-violet-300/70 transition-colors flex flex-col items-center justify-center gap-1"
+                                            >
+                                                <span className="material-symbols-outlined text-2xl">add</span>
+                                                <span className="text-[10px] font-bold">추가</span>
                                             </button>
-                                        </div>
-                                    ))}
-                                    {canAddFanPostAttachment && !fanPostUploading && (
-                                        <button type="button" onClick={() => fanPostFileInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 text-sm">
-                                            + 추가
-                                        </button>
-                                    )}
+                                        )}
+                                    </div>
                                     {fanPostUploading && (
-                                        <p className="text-violet-300 text-xs py-2">업로드 중...</p>
+                                        <div className="flex items-center gap-2 py-2">
+                                            <div className="size-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                                            <span className="text-violet-300 text-xs font-medium">업로드 중...</span>
+                                        </div>
                                     )}
                                 </div>
                             ) : (
@@ -1119,6 +1155,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                 >
                                     <span className="material-symbols-outlined text-3xl">add_photo_alternate</span>
                                     <span className="text-xs font-bold">{fanPostUploading ? "업로드 중..." : "사진 또는 동영상 추가"}</span>
+                                    <span className="text-[10px] text-white/30">이미지·영상 최대 {MAX_POST_ATTACHMENTS}개</span>
                                 </button>
                             )}
                         </div>

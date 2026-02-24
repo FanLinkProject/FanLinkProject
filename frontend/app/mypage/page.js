@@ -12,6 +12,7 @@ import { redirectToGuestHome } from "@/lib/authRedirect";
 import { BASE_URL, request, getAuthHeaders } from "@/lib/api";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
+import ProfileImageModal from "@/components/common/ProfileImageModal";
 
 /** JWT payload에서 관리자 여부 판단 (API 호출 없이, 403 방지) */
 function getIsAdminFromToken() {
@@ -43,12 +44,7 @@ function MyPageContent() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMessage, setPwMessage] = useState("");
 
-  const [showProfileImageEdit, setShowProfileImageEdit] = useState(false);
-  const [profileImageMediaAssetId, setProfileImageMediaAssetId] = useState(null);
-  const [profileImagePreviewUrl, setProfileImagePreviewUrl] = useState(null);
-  const [profileImageLoading, setProfileImageLoading] = useState(false);
-  const [profileImageMessage, setProfileImageMessage] = useState("");
-  const fanProfileImageInputRef = useRef(null);
+  const [showProfileImageModal, setShowProfileImageModal] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -201,46 +197,12 @@ function MyPageContent() {
     }
   };
 
-  const handleFanProfileImageUpload = async (e) => {
-    const file = e?.target?.files?.[0];
-    if (!file || !file.type.startsWith("image/") || !uploadProfileImage) return;
-    const result = await uploadProfileImage(file);
-    if (result?.mediaAssetId && result?.url) {
-      setProfileImageMediaAssetId(result.mediaAssetId);
-      setProfileImagePreviewUrl(result.url);
-    }
-    e.target.value = "";
-  };
-
-  const handleProfileImageSubmit = async () => {
-    if (!profileImageMediaAssetId) return;
-    setProfileImageMessage("");
-    setProfileImageLoading(true);
-    try {
-      const headers = getAuthHeaders();
-      await axios.put(
-        `${BASE_URL}/api/user/profile`,
-        {
-          nickname: data?.profile?.nickname ?? "",
-          profileImageMediaAssetId,
-        },
-        { headers }
-      );
-      const newUrl = profileImagePreviewUrl;
-      setData((prev) =>
-        prev && prev.profile
-          ? { ...prev, profile: { ...prev.profile, profileImageUrl: newUrl } }
-          : prev
-      );
-      setProfileImageMessage("저장되었습니다.");
-      setShowProfileImageEdit(false);
-      setProfileImageMediaAssetId(null);
-      setProfileImagePreviewUrl(null);
-    } catch (e) {
-      setProfileImageMessage(e.response?.data?.message ?? "저장에 실패했습니다.");
-    } finally {
-      setProfileImageLoading(false);
-    }
+  const handleProfileImageSuccess = (newUrl) => {
+    setData((prev) =>
+      prev && prev.profile
+        ? { ...prev, profile: { ...prev.profile, profileImageUrl: newUrl } }
+        : prev
+    );
   };
 
   const handleNicknameSave = async () => {
@@ -466,12 +428,7 @@ function MyPageContent() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowProfileImageEdit(true);
-                    setProfileImageMediaAssetId(null);
-                    setProfileImagePreviewUrl(null);
-                    setProfileImageMessage("");
-                  }}
+                  onClick={() => setShowProfileImageModal(true)}
                   className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
                 >
                   사진 변경
@@ -746,12 +703,7 @@ function MyPageContent() {
             </div>
             <button
               type="button"
-              onClick={() => {
-                setShowProfileImageEdit(true);
-                setProfileImageMediaAssetId(null);
-                setProfileImagePreviewUrl(null);
-                setProfileImageMessage("");
-              }}
+              onClick={() => setShowProfileImageModal(true)}
               className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
             >
               사진 변경
@@ -789,49 +741,14 @@ function MyPageContent() {
         </>
       )}
 
-      {showProfileImageEdit && (
-        <Surface variant="primary" className="p-6 max-w-md">
-          <h3 className="text-lg font-semibold text-white mb-4">프로필 이미지 변경</h3>
-          <div className="space-y-3">
-            <input ref={fanProfileImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleFanProfileImageUpload} />
-            {profileImagePreviewUrl ? (
-              <div className="relative inline-block">
-                <img src={profileImagePreviewUrl} alt="미리보기" className="size-24 rounded-xl object-cover border border-white/10" />
-                <button type="button" onClick={() => { setProfileImagePreviewUrl(null); setProfileImageMediaAssetId(null); }} className="absolute -top-1 -right-1 size-6 rounded-full bg-red-500 text-white text-xs">×</button>
-              </div>
-            ) : (
-              <button type="button" onClick={() => fanProfileImageInputRef.current?.click()} className="py-4 px-6 rounded-xl border-2 border-dashed border-white/20 text-white/60 hover:border-violet-500/40 hover:text-violet-300 text-sm w-full">
-                사진 선택 (파일 탐색기)
-              </button>
-            )}
-            {profileImageMessage && (
-              <p className="text-xs text-white/70">{profileImageMessage}</p>
-            )}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="primary"
-                className="flex-1 py-2.5 text-xs"
-                onClick={handleProfileImageSubmit}
-                disabled={profileImageLoading || !profileImageMediaAssetId}
-              >
-                {profileImageLoading ? "저장 중..." : "저장"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="py-2.5 text-xs border border-white/10"
-                onClick={() => {
-                  setShowProfileImageEdit(false);
-                  setProfileImageMediaAssetId(null);
-                  setProfileImagePreviewUrl(null);
-                  setProfileImageMessage("");
-                }}
-              >
-                취소
-              </Button>
-            </div>
-          </div>
-        </Surface>
-      )}
+      <ProfileImageModal
+        isOpen={showProfileImageModal}
+        onClose={() => setShowProfileImageModal(false)}
+        currentImageUrl={profile?.profileImageUrl}
+        mode={isArtistAccount ? "artist" : "fan"}
+        nickname={data?.profile?.nickname ?? ""}
+        onSuccess={handleProfileImageSuccess}
+      />
 
       {!isFan && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
