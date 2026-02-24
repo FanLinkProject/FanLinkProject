@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import AdminNavBar from "@/components/navbar/AdminNavBar";
 import ArtistNavBar from "@/components/navbar/ArtistNavBar";
 import FanNavBar from "@/components/navbar/FanNavBar";
@@ -17,12 +17,15 @@ const AUTH_PREFIX = "/signup/";
 
 function getRoleFromToken() {
   if (typeof window === "undefined") return null;
+
   const raw = localStorage.getItem("accessToken");
   if (!raw) return null;
+
   try {
     const token = raw.replace(/^Bearer\s+/i, "").trim();
     const base64Url = token.split(".")[1];
     if (!base64Url) return null;
+
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
     const payload = JSON.parse(atob(padded));
@@ -32,10 +35,10 @@ function getRoleFromToken() {
   }
 }
 
-/** 경로·역할에 따라 nav/sidebar variant 반환 (admin | artist | group | fan) */
 function getLayoutVariant(pathname, role) {
   if (!pathname) return "fan";
   if (pathname.startsWith("/admin")) return "admin";
+
   if (
     pathname === "/home" ||
     pathname === "/mypage" ||
@@ -48,6 +51,7 @@ function getLayoutVariant(pathname, role) {
     if (role === "ROLE_ARTIST") return "artist";
     return "fan";
   }
+
   if (
     pathname.startsWith("/artist-console") ||
     pathname.startsWith("/milestone") ||
@@ -58,6 +62,7 @@ function getLayoutVariant(pathname, role) {
     if (role === "ROLE_GROUP") return "group";
     return "artist";
   }
+
   return "fan";
 }
 
@@ -65,18 +70,19 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [role, setRole] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setRole(getRoleFromToken());
   }, []);
+
   useEffect(() => {
     const tokenRole = getRoleFromToken();
     setRole(tokenRole);
 
     if (tokenRole != null) return;
     if (typeof window === "undefined") return;
+
     const token = localStorage.getItem("accessToken");
     const pure = token?.replace(/^Bearer\s+/i, "").trim();
     if (!pure) return;
@@ -99,45 +105,45 @@ export default function AppShell({ children }) {
     (pathname?.startsWith(AUTH_PREFIX) ?? false);
   const isLiveDetail = pathname?.startsWith("/live/");
   const showNavbar = !isAuthView;
-  const showSidebar =
-    mounted && pathname != null && !isAuthView && !isLiveDetail;
+  const showSidebar = mounted && pathname != null && !isAuthView && !isLiveDetail;
   const layoutVariant = getLayoutVariant(pathname, role);
+  const sidebarOpen = showSidebar;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0b0814] via-[#1a0f2e] to-[#0b0814] flex flex-col relative">
-      {/* 가장자리 비네팅 — 절제 */}
       <div
         className="pointer-events-none fixed inset-0 z-[100] shadow-[inset_0_0_80px_30px_rgba(0,0,0,0.25)]"
         aria-hidden
       />
+
       {showNavbar && (
         <>
           {layoutVariant === "admin" && (
             <AdminNavBar
-              showSidebarToggle={showSidebar}
+              showSidebarToggle={false}
               sidebarOpen={sidebarOpen}
-              onSidebarToggle={() => setSidebarOpen((v) => !v)}
+              onSidebarToggle={() => {}}
             />
           )}
           {layoutVariant === "artist" && (
             <ArtistNavBar
-              showSidebarToggle={showSidebar}
+              showSidebarToggle={false}
               sidebarOpen={sidebarOpen}
-              onSidebarToggle={() => setSidebarOpen((v) => !v)}
+              onSidebarToggle={() => {}}
             />
           )}
           {layoutVariant === "group" && (
             <GroupNavBar
-              showSidebarToggle={showSidebar}
+              showSidebarToggle={false}
               sidebarOpen={sidebarOpen}
-              onSidebarToggle={() => setSidebarOpen((v) => !v)}
+              onSidebarToggle={() => {}}
             />
           )}
           {layoutVariant === "fan" && (
             <FanNavBar
-              showSidebarToggle={showSidebar}
+              showSidebarToggle={false}
               sidebarOpen={sidebarOpen}
-              onSidebarToggle={() => setSidebarOpen((v) => !v)}
+              onSidebarToggle={() => {}}
             />
           )}
         </>
@@ -146,10 +152,8 @@ export default function AppShell({ children }) {
       <div className={`flex flex-1 relative ${showNavbar ? "pt-16" : ""}`}>
         {showSidebar && (
           <div
-            className={`fixed left-0 top-0 bottom-0 w-64 z-40 transition-[transform] duration-200 ease-in-out hidden md:block ${
-              sidebarOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
-            aria-hidden={!sidebarOpen}
+            className="fixed left-0 top-0 bottom-0 w-64 z-40 transition-[transform] duration-200 ease-in-out hidden md:block translate-x-0"
+            aria-hidden={false}
           >
             {layoutVariant === "admin" && <AdminSidebar />}
             {layoutVariant === "artist" && <ArtistSidebar />}
@@ -158,19 +162,11 @@ export default function AppShell({ children }) {
           </div>
         )}
 
-        {showSidebar && sidebarOpen && (
-          <button
-            type="button"
-            aria-label="사이드바 닫기"
-            onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 z-30 bg-black/40 md:left-64 md:top-16 md:bottom-0 md:right-0 md:bg-black/20"
-          />
-        )}
-
         <main
           className={`flex-1 overflow-y-auto custom-scrollbar relative transition-[padding] duration-200 ${
-            showSidebar ? (sidebarOpen ? "lg:pl-64" : "lg:pl-0") : ""
-          }`}>
+            showSidebar ? "lg:pl-64" : ""
+          }`}
+        >
           {children}
         </main>
       </div>
