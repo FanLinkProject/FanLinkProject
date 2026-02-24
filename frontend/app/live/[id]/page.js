@@ -559,38 +559,55 @@ export default function LiveSessionPage({ params }) {
                     {isEndedNoVod ? (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <div className="text-center">
-                <span className="material-symbols-outlined text-6xl text-white/20 block mb-3">
-                  video_off
-                </span>
-                                <p className="text-white/50 text-sm">
-                                    다시보기가 준비되지 않았습니다.
-                                </p>
+                                <span className="material-symbols-outlined text-6xl text-white/20 block mb-3">video_off</span>
+                                <p className="text-white/50 text-sm">다시보기가 준비되지 않았습니다.</p>
                             </div>
                         </div>
+                    ) : useApi && isLive && ivsToken?.playbackUrl && ivsToken?.token ? (
+                        <>
+                            <IvsPlayer
+                                playbackUrl={ivsToken.playbackUrl}
+                                token={ivsToken.token}
+                                className="aspect-video w-full"
+                            />
+                            <div className="absolute left-3 top-3 z-10 flex items-center gap-2 pointer-events-auto">
+                                <Link
+                                    href="/"
+                                    className="flex size-8 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
+                                    aria-label="뒤로"
+                                >
+                                    <span className="material-symbols-outlined text-lg">arrow_back</span>
+                                </Link>
+                                <span className="rounded bg-red-600/90 px-2 py-0.5 text-[10px] font-bold uppercase text-white">LIVE</span>
+                                {!!live.viewerCount && (
+                                    <span className="px-2 py-0.5 bg-black/40 text-white/90 text-[10px] font-medium rounded flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-xs">visibility</span>
+                                        {live.viewerCount}
+                                    </span>
+                                )}
+                                {wsStatus && (
+                                    <span className="rounded bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white/90">
+                                        {wsStatus === "Connected" ? "채팅 연결됨" : wsStatus}
+                                    </span>
+                                )}
+                            </div>
+                        </>
                     ) : (
                         <>
-                            {useApi && isLive && ivsToken?.playbackUrl && ivsToken?.token ? (
-                                <IvsPlayer
-                                    playbackUrl={ivsToken.playbackUrl}
-                                    token={ivsToken.token}
-                                    className="aspect-video w-full"
-                                />
-                            ) : (
-                                <img
-                                    src={live.thumbnail}
-                                    className="h-full w-full object-contain bg-black"
-                                    alt="Live stream"
-                                />
-                            )}
+                            <img
+                                src={live.thumbnail}
+                                className="h-full w-full object-contain bg-black"
+                                alt="Live stream"
+                            />
 
                             {isRecorded && (
                                 <div
                                     className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/40"
                                     onClick={() => setIsPlaying((p) => !p)}
                                 >
-                  <span className="material-symbols-outlined text-6xl text-white opacity-90">
-                    {isPlaying ? "pause_circle" : "play_circle"}
-                  </span>
+                                    <span className="material-symbols-outlined text-6xl text-white opacity-90">
+                                        {isPlaying ? "pause_circle" : "play_circle"}
+                                    </span>
                                 </div>
                             )}
 
@@ -600,28 +617,16 @@ export default function LiveSessionPage({ params }) {
                                     className="flex size-8 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
                                     aria-label="뒤로"
                                 >
-                  <span className="material-symbols-outlined text-lg">
-                    arrow_back
-                  </span>
+                                    <span className="material-symbols-outlined text-lg">arrow_back</span>
                                 </Link>
-
                                 {isLive && (
                                     <>
-                    <span className="rounded bg-red-600/90 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-                      LIVE
-                    </span>
+                                        <span className="rounded bg-red-600/90 px-2 py-0.5 text-[10px] font-bold uppercase text-white">LIVE</span>
                                         {!!live.viewerCount && (
                                             <span className="px-2 py-0.5 bg-black/40 text-white/90 text-[10px] font-medium rounded flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">
-                          visibility
-                        </span>
+                                                <span className="material-symbols-outlined text-xs">visibility</span>
                                                 {live.viewerCount}
-                      </span>
-                                        )}
-                                        {wsStatus && (
-                                            <span className="rounded bg-black/40 px-2 py-0.5 text-[10px] font-medium text-white/90">
-                        {wsStatus === "Connected" ? "채팅 연결됨" : wsStatus}
-                      </span>
+                                            </span>
                                         )}
                                     </>
                                 )}
@@ -634,9 +639,9 @@ export default function LiveSessionPage({ params }) {
                                     className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                                     aria-label={isPlaying ? "일시정지" : "재생"}
                                 >
-                  <span className="material-symbols-outlined text-xl">
-                    {isPlaying ? "pause" : "play_arrow"}
-                  </span>
+                                    <span className="material-symbols-outlined text-xl">
+                                        {isPlaying ? "pause" : "play_arrow"}
+                                    </span>
                                 </button>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -644,18 +649,14 @@ export default function LiveSessionPage({ params }) {
                                         className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                                         aria-label="볼륨"
                                     >
-                    <span className="material-symbols-outlined text-xl">
-                      volume_up
-                    </span>
+                                        <span className="material-symbols-outlined text-xl">volume_up</span>
                                     </button>
                                     <button
                                         type="button"
                                         className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
                                         aria-label="전체화면"
                                     >
-                    <span className="material-symbols-outlined text-xl">
-                      fullscreen
-                    </span>
+                                        <span className="material-symbols-outlined text-xl">fullscreen</span>
                                     </button>
                                 </div>
                             </div>
