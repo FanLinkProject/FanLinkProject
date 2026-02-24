@@ -45,7 +45,7 @@ export function getToken() {
 
 /**
  * axios 등에서 쓸 Authorization 헤더 객체.
- * 브라우저 외에서는 {} 반환..
+ * 브라우저 외에서는 {} 반환...
  */
 export function getAuthHeaders() {
     if (typeof window === "undefined") return {};
