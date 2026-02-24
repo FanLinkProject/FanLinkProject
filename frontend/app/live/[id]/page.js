@@ -153,12 +153,6 @@ export default function LiveSessionPage({ params }) {
     /** 403 시 모달 중복 오픈 방지 */
     const membershipModalShownRef = useRef(false);
 
-    /** 라이브 종료 시 UI만 전환 (배너 표시, 채팅 비활성화). ref로 최신 setLive 참조. */
-    const markLiveEndedRef = useRef(null);
-    markLiveEndedRef.current = () => {
-        setLive((prev) => (prev ? { ...prev, status: "ENDED" } : prev));
-    };
-
     const numericId = isNumericId(id) ? Number(id) : null;
     const useApi = numericId != null;
 
@@ -186,7 +180,7 @@ export default function LiveSessionPage({ params }) {
                             parsed.type === "SYSTEM" &&
                             parsed.event === "LIVE_ENDED"
                         ) {
-                            markLiveEndedRef.current?.();
+                            if (numericId != null) router.push(`/artist-console/live/${numericId}`);
                             return;
                         }
                         setChat((prev) => [...prev, parsed]);
@@ -209,7 +203,7 @@ export default function LiveSessionPage({ params }) {
                     typeof body === "string" &&
                     (body.includes("LIVE_SESSION_NOT_LIVE") || body.includes("LIVE_ENDED"))
                 ) {
-                    markLiveEndedRef.current?.();
+                    if (numericId != null) router.push(`/artist-console/live/${numericId}`);
                 }
                 setWsStatus("Disconnected");
             },
@@ -218,7 +212,7 @@ export default function LiveSessionPage({ params }) {
 
         stompRef.current = client;
         client.activate();
-    }, []);
+    }, [numericId, router]);
 
     const isMine = useCallback(
         (msg) => {
@@ -548,22 +542,7 @@ export default function LiveSessionPage({ params }) {
 
             <div className="flex min-w-0 flex-1 flex-col">
                 <section className="group relative w-full shrink-0 aspect-video bg-black">
-                    {useApi && !isLive && (
-                        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-center bg-black/60 py-2">
-                            <p className="text-xs font-semibold text-white">
-                                라이브가 종료되었습니다.
-                            </p>
-                        </div>
-                    )}
-
-                    {isEndedNoVod ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                                <span className="material-symbols-outlined text-6xl text-white/20 block mb-3">video_off</span>
-                                <p className="text-white/50 text-sm">다시보기가 준비되지 않았습니다.</p>
-                            </div>
-                        </div>
-                    ) : useApi && isLive && ivsToken?.playbackUrl && ivsToken?.token ? (
+                    {useApi && isLive && ivsToken?.playbackUrl && ivsToken?.token ? (
                         <>
                             <IvsPlayer
                                 playbackUrl={ivsToken.playbackUrl}
@@ -632,34 +611,6 @@ export default function LiveSessionPage({ params }) {
                                 )}
                             </div>
 
-                            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent p-3 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsPlaying((p) => !p)}
-                                    className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                                    aria-label={isPlaying ? "일시정지" : "재생"}
-                                >
-                                    <span className="material-symbols-outlined text-xl">
-                                        {isPlaying ? "pause" : "play_arrow"}
-                                    </span>
-                                </button>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                                        aria-label="볼륨"
-                                    >
-                                        <span className="material-symbols-outlined text-xl">volume_up</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="flex size-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-                                        aria-label="전체화면"
-                                    >
-                                        <span className="material-symbols-outlined text-xl">fullscreen</span>
-                                    </button>
-                                </div>
-                            </div>
                         </>
                     )}
                 </section>

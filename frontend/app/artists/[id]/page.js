@@ -563,6 +563,22 @@ function ArtistDetailPageInner({ paramsId }) {
                             <p className="text-white/55 font-medium mt-2">
                                 팔로우 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트 {Number(artist.postCount ?? 0).toLocaleString()}개
                             </p>
+                            {/* 그룹일 때만 프로필 카드 내 작은 멤버 표시 (가로 나열, 원형 아바타 + 이름) */}
+                            {artist?.members && artist.members.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-4 mt-3">
+                                    {artist.members.map((m) => (
+                                        <div key={m.id} className="flex flex-col items-center gap-1">
+                                            <img src={m.avatar || getDefaultAvatarUrl(m.name || "?")} className="size-8 rounded-full object-cover border border-white/[0.08]" alt="" />
+                                            <span className="text-[10px] font-medium text-white/70 truncate max-w-[72px]">{m.name}</span>
+                                            {m.dmProductId && (
+                                                <button type="button" onClick={() => handleDmConnectClick(m)} disabled={dmConnectCheckingId === Number(m.id)} className="text-[9px] text-violet-400 font-bold hover:underline disabled:opacity-60">
+                                                    {dmConnectCheckingId === Number(m.id) ? "..." : "DM"}
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="pb-1 flex items-center gap-3">
@@ -585,30 +601,8 @@ function ArtistDetailPageInner({ paramsId }) {
                 </Surface>
             </div>
 
-            {/* 예정 콘서트 */}
-            {artistConcerts.length > 0 && (() => {
-                const now = new Date();
-                return (
-                    <div className="max-w-6xl w-full mx-auto px-8 mt-12">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {artistConcerts.map((c, i) => {
-                                const concertId = getConcertId(c);
-                                const status = getConcertStatus(c, now);
-                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
-                                const badgeClass = { [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium", [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90", [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium", [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium" }[status.key] ?? "bg-white/20 text-white/90 font-medium";
-                                const key = concertId ?? `concert-${i}`;
-                                const cls = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
-                                const inner = (<><div className="aspect-[16/10] overflow-hidden relative"><img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /><span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{badgeLabel}</span></div><div className="p-5"><h4 className="font-bold text-white truncate">{c.title}</h4><p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span>{formatDateShort(c.startDateTime)}</span><span>•</span><span>{c.placeName || c.venueName}</span></p></div></>);
-                                return concertId ? <Link key={key} href={`/concerts/${concertId}`} className={cls}>{inner}</Link> : <div key={key} className={cls}>{inner}</div>;
-                            })}
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* 탭 — pill 스타일 + sticky */}
-            <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 mt-12">
+            {/* 탭 — pill 스타일 + sticky (배경 페이지 기본과 통일) */}
+            <div className="sticky top-16 bg-[#0b0814] z-20 mt-12">
                 <div className="max-w-6xl mx-auto px-8 py-3">
                     <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-2xl border border-white/[0.06] overflow-x-auto">
                         {tabs.map((tab) => (
@@ -628,8 +622,8 @@ function ArtistDetailPageInner({ paramsId }) {
                 </div>
             </div>
 
-            {/* 공지사항 */}
-            {(() => {
+            {/* 공지사항 — ARTIST 탭에서만 노출 */}
+            {activeTab === "ARTIST" && (() => {
                 const notices = isRealGroup ? artistNotices : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "NOTICE");
                 if (notices.length === 0) return null;
                 const latest = notices[0];
@@ -652,28 +646,6 @@ function ArtistDetailPageInner({ paramsId }) {
                     </div>
                 );
             })()}
-
-            {/* 소속 멤버 */}
-            {artist?.members && artist.members.length > 0 && (
-                <div className="max-w-6xl w-full mx-auto px-8 pt-8">
-                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-4">소속 멤버</h3>
-                    <div className="flex flex-wrap gap-4">
-                        {artist.members.map((m) => (
-                            <div key={m.id} className="flex items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-4 min-w-[200px]">
-                                <img src={m.avatar || getDefaultAvatarUrl(m.name || "?")} className="size-12 rounded-xl object-cover shrink-0" alt="" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-white font-bold truncate">{m.name}</p>
-                                    {m.dmProductId && (
-                                        <button type="button" onClick={() => handleDmConnectClick(m)} disabled={dmConnectCheckingId === Number(m.id)} className="text-[10px] text-violet-400 font-black hover:underline uppercase mt-1 inline-flex items-center gap-1 disabled:opacity-60">
-                                            {dmConnectCheckingId === Number(m.id) ? <span className="animate-pulse">확인 중...</span> : <><span className="material-symbols-outlined text-xs">mail</span>DM 연결하기</>}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             {/* 메인 콘텐츠 */}
             <div className="max-w-6xl w-full mx-auto px-8 py-10">
@@ -810,9 +782,30 @@ function ArtistDetailPageInner({ paramsId }) {
                         </div>
                     )}
 
-                    {/* CONCERT 탭 — 인라인 그리드 */}
+                    {/* CONCERT 탭 — UPCOMING CONCERTS + 전체 콘서트 그리드 */}
                     {activeTab === "CONCERT" && (
                         <div className="space-y-6">
+                            {/* UPCOMING CONCERTS — CONCERTS 탭 내부에서만 표시 */}
+                            {artistConcerts.length > 0 && (() => {
+                                const now = new Date();
+                                return (
+                                    <div>
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                            {artistConcerts.map((c, i) => {
+                                                const concertId = getConcertId(c);
+                                                const status = getConcertStatus(c, now);
+                                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
+                                                const badgeClass = { [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium", [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90", [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium", [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium" }[status.key] ?? "bg-white/20 text-white/90 font-medium";
+                                                const key = concertId ?? `concert-${i}`;
+                                                const cls = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                                                const inner = (<><div className="aspect-[16/10] overflow-hidden relative"><img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /><span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{badgeLabel}</span></div><div className="p-5"><h4 className="font-bold text-white truncate">{c.title}</h4><p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span>{formatDateShort(c.startDateTime)}</span><span>•</span><span>{c.placeName || c.venueName}</span></p></div></>);
+                                                return concertId ? <Link key={key} href={`/concerts/${concertId}`} className={cls}>{inner}</Link> : <div key={key} className={cls}>{inner}</div>;
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                             <h3 className="text-xs font-black uppercase tracking-widest text-white/40 px-1">Concert</h3>
                             {artistConcertsForTab.length === 0 ? (
                                 <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">공연이 없습니다.</p>
