@@ -94,6 +94,25 @@ export function usePostAttachments({ postGroupId, postIdOrTemp, initialAttachmen
     );
   }, []);
 
+  const setRepresentative = useCallback((mediaAssetId) => {
+    setMediaAssetIds((prev) => {
+      const idx = prev.indexOf(mediaAssetId);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      next.splice(idx, 1);
+      next.unshift(mediaAssetId);
+      return next;
+    });
+    setAttachmentPreviews((prev) => {
+      const idx = prev.findIndex((p) => p.mediaAssetId === mediaAssetId);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      const [item] = next.splice(idx, 1);
+      next.unshift(item);
+      return next;
+    });
+  }, []);
+
   const resetAttachments = useCallback(() => {
     setMediaAssetIds([]);
     setAttachmentPreviews([]);
@@ -106,6 +125,7 @@ export function usePostAttachments({ postGroupId, postIdOrTemp, initialAttachmen
     attachmentPreviews,
     addAttachment,
     removeAttachment,
+    setRepresentative,
     setAttachmentsFromApi,
     resetAttachments,
     canAddAttachment: canAdd,

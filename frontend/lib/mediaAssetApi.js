@@ -106,27 +106,34 @@ export async function uploadFile(file, presignItem) {
   }
   if (!presignResults?.[0]) throw new Error("Presign 응답이 비어 있습니다.");
   const { objectKey, uploadUrl, requiredHeaders } = presignResults[0];
-  // S3 presigned PUT: 서명에 포함된 헤더와 일치시켜야 403 방지. Content-Type은 requiredHeaders 값 우선.
-  const signedContentType =
-    (requiredHeaders && (requiredHeaders["Content-Type"] ?? requiredHeaders["content-type"])) || null;
+
+  // requiredHeaders에서 서명된 헤더를 구성 (Content-Type 포함)
   const putHeaders = {};
-  if (signedContentType) {
-    putHeaders["Content-Type"] = signedContentType;
-  } else {
+  if (requiredHeaders && typeof requiredHeaders === "object") {
+    for (const [k, v] of Object.entries(requiredHeaders)) {
+      if (k.toLowerCase() !== "host") {
+        putHeaders[k] = v;
+      }
+    }
+  }
+  if (!putHeaders["Content-Type"] && !putHeaders["content-type"]) {
     putHeaders["Content-Type"] = contentType;
   }
+
+  // File 객체를 Blob으로 변환하여 브라우저가 자동으로 Content-Type을 추가하는 것을 방지
+  const blob = new Blob([file], { type: putHeaders["Content-Type"] || contentType });
 
   let putRes = await fetch(uploadUrl, {
     method: "PUT",
     headers: putHeaders,
-    body: file,
+    body: blob,
   });
-  // 403 시: 백엔드가 Content-Type을 서명에 넣지 않은 경우, 헤더 없이 재시도(일부 환경에서만 필요)
-  if (putRes.status === 403 && putHeaders["Content-Type"]) {
+  // 403 재시도: Content-Type 없이 순수 바이너리로 전송
+  if (putRes.status === 403) {
+    const rawBlob = new Blob([file]);
     putRes = await fetch(uploadUrl, {
       method: "PUT",
-      headers: {},
-      body: file,
+      body: rawBlob,
     });
   }
   if (!putRes.ok) {
