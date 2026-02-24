@@ -108,7 +108,7 @@ function ArtistDetailPageInner({ paramsId }) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const tabParam = searchParams.get("tab");
-    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "MARKET", "MV"];
+    const VALID_TABS = ["ARTIST", "FAN", "LIVE", "CONCERT", "MARKET", "MV"];
 
     // 상태 관리
     const [artist, setArtist] = useState(null);

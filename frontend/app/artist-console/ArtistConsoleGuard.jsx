@@ -26,6 +26,7 @@ const GROUP_MEMBER_ALLOWED = [
   "/artist-console",
   "/artist-console/posts",
   "/artist-console/live",
+  "/artist-console/concerts",
   "/artist-console/settlement",
   "/artist-console/music-videos",
 ];

@@ -889,16 +889,33 @@ function PostDetailContent({ id }) {
                 </span>
                 <span>{likeCount}</span>
               </button>
-              {myUserId && post.writerId === myUserId && (
-                <button
-                  type="button"
-                  onClick={handleDeletePost}
-                  className="inline-flex items-center gap-1.5 text-sm font-bold text-white/25 hover:text-red-400 transition-colors focus:outline-none"
-                  aria-label="게시글 삭제"
-                >
-                  <span className="material-symbols-outlined text-lg">delete</span>
-                  <span>삭제</span>
-                </button>
+              {myUserId && Number(post.writerId) === Number(myUserId) && (
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (post.postType === "ARTIST") {
+                        router.push(`/artist-console/posts/${post.id}/edit`);
+                      } else {
+                        router.push(`/posts/${post.id}/edit?type=FAN&groupId=${groupId || ""}`);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 text-sm font-bold text-white/55 hover:text-violet-300 transition-colors focus:outline-none"
+                    aria-label="게시글 수정"
+                  >
+                    <span className="material-symbols-outlined text-lg">edit</span>
+                    <span>수정</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeletePost}
+                    className="inline-flex items-center gap-1.5 text-sm font-bold text-white/25 hover:text-red-400 transition-colors focus:outline-none"
+                    aria-label="게시글 삭제"
+                  >
+                    <span className="material-symbols-outlined text-lg">delete</span>
+                    <span>삭제</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
