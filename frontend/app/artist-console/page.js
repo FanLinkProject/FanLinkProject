@@ -890,10 +890,10 @@ export default function ArtistConsolePage() {
                                         </h4>
                                         <Button
                                             variant="primary"
-                                            href={live.id ? `/artist-console/live/${live.id}` : "#"}
+                                            href="/artist-console/live"
                                             className="w-full py-3 text-[10px] uppercase tracking-widest"
                                         >
-                                            다시보기
+                                            다시보기 관리
                                         </Button>
                                     </div>
                                 </Surface>

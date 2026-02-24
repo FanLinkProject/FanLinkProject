@@ -84,6 +84,7 @@ public class ReplayQueryService {
                 replay.getLiveSessionId(),
                 replay.getAccessType(),
                 replay.getStatus(),
+                replay.getTitle(),
                 playbackUrl,
                 pattern,
                 thumbnailUrl,

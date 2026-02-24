@@ -12,6 +12,7 @@ public record ReplayResponse(
         Long liveSessionId,
         ReplayAccessType accessType,
         ReplayStatus status,
+        String title,
         String playbackUrl,
         String playbackPathPattern,
         String thumbnailUrl,
