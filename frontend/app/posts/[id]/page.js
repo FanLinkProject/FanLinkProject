@@ -884,16 +884,17 @@ function PostDetailContent({ id }) {
     : "아티스트 페이지로 돌아가기";
 
   return (
-    <div className="max-w-6xl mx-auto p-8 flex flex-col lg:flex-row gap-8 min-h-full">
-      <div className="flex-1 space-y-6">
+    <div className="max-w-6xl mx-auto p-4 sm:p-8 flex flex-col md:flex-row gap-6 h-[calc(100vh-80px)]">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         <Link
           href={backHref}
-          className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4"
+          className="flex items-center gap-2 text-white/55 hover:text-violet-300 font-bold text-xs uppercase tracking-widest transition-all mb-4 shrink-0"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           {backLabel}
         </Link>
 
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
         <article className="bg-[#201a33] rounded-[2.5rem] border border-white/[0.08] overflow-hidden relative">
           {post.isMembershipOnly && (
             <span className="absolute top-6 right-6 z-10 px-3 py-1.5 rounded-lg bg-violet-500/25 text-violet-300 text-xs font-black uppercase tracking-widest border border-violet-400/30">
@@ -982,11 +983,12 @@ function PostDetailContent({ id }) {
             </div>
           </div>
         </article>
+        </div>
       </div>
 
       {post != null && !post.isNotice && (
-      <aside className="w-full lg:w-96 flex flex-col gap-6 shrink-0">
-        <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-[calc(100vh-160px)] sticky top-24">
+      <aside className="w-full md:w-96 shrink-0 min-h-0">
+        <div className="bg-[#201a33] rounded-3xl border border-white/[0.08] flex flex-col h-full">
           <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
             <h3 className="font-extrabold text-white">댓글</h3>
             <span className="text-xs font-bold text-white/55 uppercase tracking-widest">
