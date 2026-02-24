@@ -80,6 +80,7 @@ function transformFanPost(p) {
         writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
+        authorGradeName: p.writerGradeName ?? null,
         authorAvatar: p.writerProfileImageUrl || "",
         content: p.content || "",
         image: p.attachments?.[0]?.url || null,

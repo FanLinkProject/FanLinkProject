@@ -82,6 +82,7 @@ function transformFanPost(p) {
         writerId: p.writerId ?? null,
         authorName: p.writerNickname || "",
         authorMemberName: null,
+        authorGradeName: p.writerGradeName ?? null,
         authorAvatar: p.writerProfileImageUrl || "",
         content: p.content || "",
         image: p.attachments?.[0]?.url || null,
@@ -586,15 +587,17 @@ function ArtistDetailPageInner({ paramsId }) {
                         </div>
                     </div>
                     <div className="pb-1 flex items-center gap-3">
-                        {artist.isSubscribed ? (
+                        {artist.isFollowing ? (
                             <>
-                                <Button variant="ghost" className="px-8" disabled>구독 중</Button>
+                                {artist.isSubscribed ? (
+                                    <Button variant="ghost" className="px-8" disabled>구독 중</Button>
+                                ) : (
+                                    <Button variant="ghost" className="px-8" disabled>팔로우중</Button>
+                                )}
                                 <Button variant="primary" className="px-6" onClick={handleAttendance} disabled={attendanceLoading || attendanceDoneToday}>
                                     {attendanceLoading ? "..." : (attendanceDoneToday ? "오늘 출석 완료" : "출석")}
                                 </Button>
                             </>
-                        ) : artist.isFollowing ? (
-                            <Button variant="ghost" className="px-8" disabled>팔로우중</Button>
                         ) : (
                             <Button
                                 variant="primary"

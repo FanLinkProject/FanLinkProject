@@ -115,7 +115,7 @@ export default function MilestonePage() {
     }
   };
 
-  const [isGroupAccount, setIsGroupAccount] = useState(false);
+  const [canManageMilestone, setCanManageMilestone] = useState(false);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -125,9 +125,9 @@ export default function MilestonePage() {
     }
     const userData = parseJwt(token);
     const role = userData?.role;
-    const isGroup = role === "GROUP" || role === "ROLE_GROUP";
-    setIsGroupAccount(!!isGroup);
-    if (isGroup) {
+    const canManage = role === "GROUP" || role === "ROLE_GROUP" || role === "ARTIST" || role === "ROLE_ARTIST";
+    setCanManageMilestone(!!canManage);
+    if (canManage) {
       fetchMilestones();
     } else {
       setLoading(false);
@@ -212,11 +212,11 @@ export default function MilestonePage() {
     );
   }
 
-  if (!isGroupAccount) {
+  if (!canManageMilestone) {
     return (
       <div className="p-8 lg:p-12 max-w-5xl mx-auto flex flex-col items-center justify-center min-h-[50vh]">
         <p className="text-white/80 font-semibold text-lg">권한 없음</p>
-        <p className="text-white/55 text-sm mt-2">멤버 등급 관리는 그룹 계정에서만 이용할 수 있습니다.</p>
+        <p className="text-white/55 text-sm mt-2">멤버 등급 관리는 아티스트(그룹·개인) 계정에서만 이용할 수 있습니다.</p>
       </div>
     );
   }

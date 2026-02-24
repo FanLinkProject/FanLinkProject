@@ -54,6 +54,7 @@ public class CommentService {
      * 부모 댓글 목록 조회
      * - 유저 정보(닉네임, 역할, 프로필) Bulk Fetch
      * - 아티스트 답글 존재 여부 일괄 조회
+     * - 그룹 기준 댓글 작성자 칭호(writerGradeName) 일괄 조회
      */
     public Slice<CommentResponse> getComments(TargetType targetType, Long targetId, Long lastId, Pageable pageable) {
         Slice<Comment> comments = commentRepository.findRootComments(targetType, targetId, lastId, pageable);
@@ -64,12 +65,17 @@ public class CommentService {
         // 2. 아티스트 답글이 있는 부모 댓글 ID 일괄 조회
         Set<Long> artistRepliedParentIds = getArtistRepliedParentIds(comments.getContent());
 
-        // 3. DTO 변환
+        // 3. 그룹 기준 댓글 작성자 칭호 일괄 조회
+        Long groupId = getGroupIdFromTarget(targetType, targetId);
+        Map<Long, String> gradeNameByUserId = getWriterGradeNamesByUserIds(groupId, comments.getContent().stream().map(Comment::getUserId).distinct().toList());
+
+        // 4. DTO 변환
         List<CommentResponse> content = comments.getContent().stream()
                 .map(comment -> CommentResponse.of(
                         comment,
                         userMap.get(comment.getUserId()),
-                        artistRepliedParentIds.contains(comment.getId())
+                        artistRepliedParentIds.contains(comment.getId()),
+                        gradeNameByUserId.get(comment.getUserId())
                 ))
                 .toList();
 
@@ -78,14 +84,21 @@ public class CommentService {
 
     /**
      * 더보기 클릭 시 특정 부모의 대댓글 목록만 조회 (No-offset)
+     * - 부모 댓글의 target으로 그룹 ID를 구해 대댓글 작성자 칭호 일괄 조회
      */
     public Slice<CommentResponse> getReplies(Long parentId, Long lastId, Pageable pageable) {
+        Comment parent = commentRepository.findById(parentId)
+                .orElseThrow(() -> new CommentException(CommentErrorCode.PARENT_COMMENT_NOT_FOUND));
+
         Slice<Comment> replies = commentRepository.findReplies(parentId, lastId, pageable);
 
         Map<Long, User> userMap = getUserMap(replies.getContent());
 
+        Long groupId = getGroupIdFromTarget(parent.getTargetType(), parent.getTargetId());
+        Map<Long, String> gradeNameByUserId = getWriterGradeNamesByUserIds(groupId, replies.getContent().stream().map(Comment::getUserId).distinct().toList());
+
         List<CommentResponse> content = replies.getContent().stream()
-                .map(reply -> CommentResponse.ofReply(reply, userMap.get(reply.getUserId())))
+                .map(reply -> CommentResponse.ofReply(reply, userMap.get(reply.getUserId()), gradeNameByUserId.get(reply.getUserId())))
                 .toList();
 
         return new SliceImpl<>(content, pageable, replies.hasNext());
@@ -285,6 +298,20 @@ public class CommentService {
                         .orElse(null);
             }
         };
+    }
+
+    /**
+     * 그룹 기준 팬 프로필에서 작성자별 칭호(등급명) 일괄 조회
+     * - 댓글/대댓글 작성자 칭호 표시용
+     */
+    private Map<Long, String> getWriterGradeNamesByUserIds(Long groupId, List<Long> userIds) {
+        if (groupId == null || userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        List<FanProfile> profiles = fanProfileRepository.findByGroup_IdAndFan_IdIn(groupId, userIds);
+        return profiles.stream()
+                .filter(fp -> fp.getGrade() != null && fp.getGrade().getMilestone() != null)
+                .collect(Collectors.toMap(fp -> fp.getFan().getId(), fp -> fp.getGrade().getMilestone().getName(), (a, b) -> a));
     }
 
     /**
