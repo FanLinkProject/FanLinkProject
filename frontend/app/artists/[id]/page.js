@@ -155,6 +155,7 @@ function ArtistDetailPageInner({ paramsId }) {
                             avatar: m.profileImageUrl ?? m.avatar,
                             dmProductId: m.dmProductId,
                         })),
+                        bio: info.bio ?? "",
                         backendId: groupId,
                     });
                 })
@@ -552,7 +553,7 @@ function ArtistDetailPageInner({ paramsId }) {
             <div className="max-w-6xl w-full mx-auto px-8 relative -mt-20 z-10 shrink-0">
                 <Surface variant="primary" className="p-8 flex flex-col md:flex-row md:items-end justify-between gap-6 rounded-2xl border border-white/[0.06]">
                     <div className="flex items-end gap-6">
-                        <div className="rounded-2xl border-2 border-white/[0.08] shadow-2xl -mt-24 overflow-hidden bg-[#201a33] size-40">
+                        <div className="shrink-0 rounded-2xl border-2 border-white/[0.08] shadow-2xl -mt-24 overflow-hidden bg-[#201a33] size-40">
                             {artist.avatar ? <img src={artist.avatar} className="w-full h-full object-cover" alt={artist.name} /> : <div className="w-full h-full bg-white/10" />}
                         </div>
                         <div className="pb-1">
@@ -561,8 +562,9 @@ function ArtistDetailPageInner({ paramsId }) {
                                 <span className="material-symbols-outlined text-violet-300 text-2xl">verified</span>
                             </div>
                             <p className="text-white/55 font-medium mt-2">
-                                팔로우 {Number(artist.memberCount ?? 0).toLocaleString()} • 포스트 {Number(artist.postCount ?? 0).toLocaleString()}개
+                                팔로워 {artist.memberCount != null ? Number(artist.memberCount).toLocaleString() : "—"} • 포스트 {artist.postCount != null ? Number(artist.postCount).toLocaleString() : "—"}개
                             </p>
+                            {artist.bio && <p className="text-white/70 font-medium mt-2 whitespace-pre-wrap text-sm">{artist.bio}</p>}
                         </div>
                     </div>
                     <div className="pb-1 flex flex-col items-end gap-3">
@@ -603,7 +605,7 @@ function ArtistDetailPageInner({ paramsId }) {
             </div>
 
             {/* 탭 — pill 스타일 + sticky (배경 페이지 기본과 통일) */}
-            <div className="sticky top-16 bg-[#0b0814] z-20 mt-12">
+            <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 mt-12">
                 <div className="max-w-6xl mx-auto px-8 py-3">
                     <div className="flex items-center gap-2 p-1 bg-white/[0.04] rounded-2xl border border-white/[0.06] overflow-x-auto">
                         {tabs.map((tab) => (
@@ -640,7 +642,7 @@ function ArtistDetailPageInner({ paramsId }) {
                         <Link href={`/posts/${latest.id}?type=ARTIST&groupId=${groupId}`} className="block rounded-2xl border border-white/[0.08] bg-white/[0.03] hover:border-violet-500/30 hover:bg-white/[0.05] transition-all p-5">
                             <div className="flex gap-3 items-center mb-2">
                                 <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded font-bold">NOTICE</span>
-                                <span className="text-white/40 text-xs">{latest.timestamp || formatTimestamp(latest.createdAt)}</span>
+                                <span className="text-white/40 text-xs">{formatTimestamp(latest.createdAt)}</span>
                             </div>
                             <p className="text-white/80 font-medium line-clamp-2">{latest.title || (latest.content ? `${(latest.content || "").slice(0, 80)}${(latest.content || "").length > 80 ? "..." : ""}` : "공지")}</p>
                         </Link>
@@ -650,7 +652,7 @@ function ArtistDetailPageInner({ paramsId }) {
 
             {/* 메인 콘텐츠 */}
             <div className="max-w-6xl w-full mx-auto px-8 py-10">
-                <div className="w-full">
+                <div className="w-full space-y-6">
                     {/* ARTIST 탭 */}
                     {activeTab === "ARTIST" && (
                         !currentUser ? (
@@ -660,10 +662,10 @@ function ArtistDetailPageInner({ paramsId }) {
                                 <Button href="/login" variant="primary" className="px-8 py-3">로그인</Button>
                             </Surface>
                         ) : artistPostsLoading ? (
-                            <Surface className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
+                            <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
                         ) : (() => {
                             const posts = isRealGroup ? artistPosts : MOCK_POSTS.filter(p => p.artistId === paramsId && p.type === "ARTIST").map(p => ({ id: p.id, authorName: p.authorName, authorAvatar: p.authorAvatar, content: p.content, image: p.image, timestamp: p.timestamp, type: "ARTIST" }));
-                            if (posts.length === 0) return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">아티스트 게시글이 없습니다.</p>;
+                            if (posts.length === 0) return <Surface variant="primary" className="py-20 text-center"><p className="text-white/55 italic">아직 게시글이 없습니다.</p></Surface>;
                             return (
                                 <>
                                     <PostFeed
@@ -695,10 +697,10 @@ function ArtistDetailPageInner({ paramsId }) {
                                     </Button>
                                 </div>
                                 {fanPostsLoading ? (
-                                    <Surface className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
+                                    <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
                                 ) : (() => {
                                     const posts = isRealGroup ? fanPosts : [];
-                                    if (posts.length === 0) return <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">등록된 포스트가 없습니다.</p>;
+                                    if (posts.length === 0) return <Surface variant="primary" className="py-20 text-center"><p className="text-white/55 italic">팬 게시글이 없습니다.</p></Surface>;
                                     return (
                                         <>
                                             <PostFeed
@@ -729,7 +731,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                     <div className="grid gap-6">
                                         {liveSessions.map(session => (
                                             <button key={session.id} onClick={() => handleLiveCardClick(session)} className="relative aspect-video rounded-3xl overflow-hidden group">
-                                                <img src="https://picsum.photos/seed/live/800/450" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
+                                                <div className="w-full h-full bg-gradient-to-br from-violet-900/30 to-indigo-900/20" />
                                                 <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
                                                 <div className="absolute top-4 left-4 flex gap-2">
                                                     <span className="bg-red-600 px-3 py-1 text-[10px] font-black rounded text-white">LIVE</span>
@@ -830,7 +832,7 @@ function ArtistDetailPageInner({ paramsId }) {
                                         {currentUser && (
                                             <div className="flex gap-3 mb-4">
                                                 <input type="text" value={mvNewComment} onChange={(e) => setMvNewComment(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }} placeholder="댓글을 입력하세요..." className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30" />
-                                                <button type="button" className="px-4 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-500 transition-colors disabled:opacity-50 shrink-0" onClick={handleMvCommentSubmit} disabled={mvCommentSubmitting || !mvNewComment.trim()}>{mvCommentSubmitting ? "..." : "작성"}</button>
+                                                <Button variant="primary" className="px-4 py-2 text-xs shrink-0" onClick={handleMvCommentSubmit} disabled={mvCommentSubmitting || !mvNewComment.trim()}>{mvCommentSubmitting ? "..." : "작성"}</Button>
                                             </div>
                                         )}
                                         {mvCommentsLoading ? <p className="text-white/40 text-sm">댓글 로딩 중...</p> : mvComments.length === 0 ? <p className="text-white/40 text-sm">아직 댓글이 없습니다.</p> : (
@@ -864,16 +866,16 @@ function ArtistDetailPageInner({ paramsId }) {
                                 <h3 className="font-bold text-white">뮤직비디오</h3>
                                 <div className="relative">
                                     <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
-                                    <input type="text" value={mvSearchQuery} onChange={(e) => setMvSearchQuery(e.target.value)} placeholder="제목 또는 설명 검색" className="pl-9 pr-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm w-64 placeholder:text-white/30" />
+                                    <input type="text" value={mvSearchQuery} onChange={(e) => setMvSearchQuery(e.target.value)} placeholder="제목 또는 설명 검색" className="pl-9 pr-4 py-2 rounded-xl bg-[#16102a] border border-white/[0.08] text-white text-sm w-64 placeholder:text-white/30" />
                                 </div>
                             </div>
 
                             {musicVideosLoading ? (
-                                <p className="text-white/40">로딩 중...</p>
+                                <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
                             ) : musicVideos.length === 0 && mvSearchQuery.trim() ? (
-                                <p className="text-white/30 py-12 text-center bg-white/5 rounded-2xl">검색 결과가 없습니다.</p>
+                                <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">검색 결과가 없습니다.</p></Surface>
                             ) : musicVideos.length === 0 ? (
-                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">MV가 없습니다.</p>
+                                <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">등록된 뮤직비디오가 없습니다.</p></Surface>
                             ) : (
                                 <div className="grid grid-cols-2 gap-6">
                                     {musicVideos.map(mv => (
@@ -901,21 +903,24 @@ function ArtistDetailPageInner({ paramsId }) {
 
             {/* 팬 포스트 작성 모달 — 작성자 표시, 드래그앤드롭 + 대표이미지 선택 */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm">
-                    <Surface className="w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 sm:p-8">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
+                    <Surface variant="primary" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar p-6 sm:p-10">
                         <div className="flex justify-between items-center mb-6 sticky top-0 z-10">
-                            <h3 className="text-xl font-bold text-white">포스트 작성</h3>
+                            <h3 className="text-xl font-semibold text-white">포스트 작성</h3>
                             <button type="button" onClick={closeFanPostModal} className="size-8 rounded-full bg-white/[0.08] flex items-center justify-center text-white/80 hover:bg-white/[0.12] transition-colors">
                                 <span className="material-symbols-outlined text-lg">close</span>
                             </button>
                         </div>
                         {currentUser && (
                             <div className="flex items-center gap-3 mb-6">
-                                <img src={getDefaultAvatarUrl(currentUser.email?.split("@")[0] || "?")} className="size-10 rounded-full border border-white/[0.08]" alt="" />
-                                <p className="font-bold text-white text-sm">{currentUser.email?.split("@")[0] || "Me"}</p>
+                                <img src={currentUser.profileImageUrl || getDefaultAvatarUrl(currentUser.nickname || currentUser.email?.split("@")[0] || "?")} className="size-10 rounded-full border border-white/[0.08]" alt="" />
+                                <div>
+                                    <p className="font-bold text-white text-sm">{currentUser.nickname || currentUser.email?.split("@")[0] || "Me"}</p>
+                                    <p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Fan Post</p>
+                                </div>
                             </div>
                         )}
-                        <textarea className="w-full h-40 bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-violet-500/50" placeholder="아티스트에게 전할 메시지를 입력하세요..." value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} />
+                        <textarea className="w-full min-h-[180px] bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-violet-500/50 placeholder:text-white/40 font-medium resize-y" placeholder="아티스트에게 전할 메시지를 입력하세요..." value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} />
                         <div className="mt-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="material-symbols-outlined text-sm text-white/40">attach_file</span>
