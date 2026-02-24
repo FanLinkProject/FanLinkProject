@@ -6,19 +6,11 @@ import { useRouter } from "next/navigation";
 import { getProduct, updateProduct } from "@/lib/productApi";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
+import { computeTypeAndPayment } from "@/lib/productUtils";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 import Toggle from "@/components/ui/Toggle";
-
-function computeTypeAndPayment(artistId, price, candyPrice) {
-  const hasCash = price != null && price > 0;
-  const hasCandy = candyPrice != null && candyPrice > 0;
-  const paymentMethod = hasCash && !hasCandy ? "CASH_ONLY" : "CANDY_ONLY";
-  const baseType = paymentMethod === "CASH_ONLY" ? "CASH" : "CANDY";
-  const type = artistId ? `SETTLEMENT_${baseType}` : baseType;
-  return { type, paymentMethod };
-}
 
 export default function EditProductPage({ params }) {
   const resolvedParams = React.use(params);
@@ -28,6 +20,7 @@ export default function EditProductPage({ params }) {
   const [loading, setLoading] = useState(false);
   const [artistId, setArtistId] = useState(null);
   const fileInputRef = useRef(null);
+  const describeFileInputRef = useRef(null);
 
   const presignItem = form
     ? {
@@ -40,12 +33,29 @@ export default function EditProductPage({ params }) {
     : null;
   const { upload, loading: uploadLoading, error: uploadError } = useMediaUpload(presignItem);
 
+  const describePresignItem = form
+    ? {
+        category: MediaAssetCategory.PRODUCT_DESCRIBE_IMAGE,
+        scope: MediaAssetScope.PUBLIC,
+        artistId: artistId ?? form.artistId ?? undefined,
+        productIdOrTemp: String(id),
+        attachmentCountInProduct: (form.describeMediaAssetIds?.length ?? 0) + 1,
+      }
+    : null;
+  const { upload: uploadDescribe, loading: describeLoading, error: describeError } = useMediaUpload(describePresignItem);
+
   useEffect(() => {
     if (!id) return;
     getProduct(id)
       .then((p) => {
         setArtistId(p.artistId);
         const attachments = p.attachments || [];
+        const mainAttachments = attachments.filter(
+          (a) => a.category !== "PRODUCT_DESCRIBE_IMAGE"
+        );
+        const describeAttachments = attachments.filter(
+          (a) => a.category === "PRODUCT_DESCRIBE_IMAGE"
+        );
         setForm({
           artistId: p.artistId,
           name: p.name || "",
@@ -58,9 +68,14 @@ export default function EditProductPage({ params }) {
           isMembership: p.isMembership || false,
           isTicket: !!p.concertId,
           concertId: p.concertId ?? null,
-          mediaAssetIds: attachments.map((a) => a.mediaAssetId),
+          mediaAssetIds: mainAttachments.map((a) => a.mediaAssetId),
           representativeMediaAssetId: p.representativeMediaAssetId,
-          attachmentPreviews: attachments.map((a) => ({
+          attachmentPreviews: mainAttachments.map((a) => ({
+            mediaAssetId: a.mediaAssetId,
+            url: a.url,
+          })),
+          describeMediaAssetIds: describeAttachments.map((a) => a.mediaAssetId),
+          describePreviews: describeAttachments.map((a) => ({
             mediaAssetId: a.mediaAssetId,
             url: a.url,
           })),
@@ -112,6 +127,31 @@ export default function EditProductPage({ params }) {
     setForm((f) => ({ ...f, representativeMediaAssetId: mediaAssetId }));
   };
 
+  const handleAddDescribeImage = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !uploadDescribe || !form) return;
+    const result = await uploadDescribe(file);
+    if (result?.mediaAssetId) {
+      setForm((f) => ({
+        ...f,
+        describeMediaAssetIds: [...(f.describeMediaAssetIds || []), result.mediaAssetId],
+        describePreviews: [
+          ...(f.describePreviews || []),
+          { mediaAssetId: result.mediaAssetId, url: result.url },
+        ],
+      }));
+    }
+    e.target.value = "";
+  };
+
+  const handleRemoveDescribeImage = (mediaAssetId) => {
+    setForm((f) => ({
+      ...f,
+      describeMediaAssetIds: (f.describeMediaAssetIds || []).filter((id) => id !== mediaAssetId),
+      describePreviews: (f.describePreviews || []).filter((p) => p.mediaAssetId !== mediaAssetId),
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form) return;
@@ -136,6 +176,7 @@ export default function EditProductPage({ params }) {
     const { type, paymentMethod } = computeTypeAndPayment(artistId, price, candyPrice);
     setLoading(true);
     try {
+      const allMediaAssetIds = [...form.mediaAssetIds, ...(form.describeMediaAssetIds || [])];
       await updateProduct(id, {
         artistId: artistId ?? form.artistId,
         name: form.name.trim(),
@@ -149,7 +190,7 @@ export default function EditProductPage({ params }) {
         isExclusive: form.isExclusive,
         isMembership,
         concertId,
-        mediaAssetIds: form.mediaAssetIds,
+        mediaAssetIds: allMediaAssetIds,
         representativeMediaAssetId: form.representativeMediaAssetId,
       });
       router.push("/artist-console/market");
@@ -244,6 +285,53 @@ export default function EditProductPage({ params }) {
               />
             </div>
             {uploadError && <p className="text-xs text-red-400 mt-1">{uploadError}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-white/80 mb-2">상품 상세 이미지</label>
+            <p className="text-xs text-white/40 mb-2">상세 설명에 사용할 이미지를 추가하세요.</p>
+            <div className="flex flex-wrap gap-3">
+              {(form.describeMediaAssetIds || []).map((did) => {
+                const preview = (form.describePreviews || []).find((p) => p.mediaAssetId === did);
+                return (
+                  <div
+                    key={did}
+                    className="relative w-20 h-20 rounded-xl overflow-hidden bg-white/10 group"
+                  >
+                    {preview?.url ? (
+                      <img src={preview.url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="absolute inset-0 flex items-center justify-center text-white/60 text-xs">
+                        이미지
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDescribeImage(did)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500/80 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 z-10"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => describeFileInputRef.current?.click()}
+                disabled={describeLoading}
+                className="w-20 h-20 rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center text-white/50 hover:border-violet-500/50 hover:text-violet-300 transition-colors disabled:opacity-50"
+              >
+                {describeLoading ? "..." : "+"}
+              </button>
+              <input
+                ref={describeFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAddDescribeImage}
+              />
+            </div>
+            {describeError && <p className="text-xs text-red-400 mt-1">{describeError}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
