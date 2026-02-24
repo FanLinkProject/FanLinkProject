@@ -1290,6 +1290,15 @@ function MyPageContent() {
 }
 
 export default function MyPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) {
+    return (
+      <div className="p-8 lg:p-12 max-w-6xl mx-auto">
+        <p className="text-white/55">로딩 중...</p>
+      </div>
+    );
+  }
   return (
     <Suspense fallback={<div className="p-8 lg:p-12 max-w-6xl mx-auto"><p className="text-white/55">로딩 중...</p></div>}>
       <MyPageContent />
