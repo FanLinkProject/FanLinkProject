@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
@@ -34,7 +34,7 @@ function getIsAdminFromToken() {
   }
 }
 
-export default function MyPage() {
+function MyPageContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1286,5 +1286,13 @@ export default function MyPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MyPage() {
+  return (
+    <Suspense fallback={<div className="p-8 lg:p-12 max-w-6xl mx-auto"><p className="text-white/55">로딩 중...</p></div>}>
+      <MyPageContent />
+    </Suspense>
   );
 }
