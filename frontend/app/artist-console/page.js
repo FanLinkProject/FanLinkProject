@@ -127,7 +127,7 @@ export default function ArtistConsolePage() {
         category: MediaAssetCategory.POST_IMAGE,
         scope: MediaAssetScope.PUBLIC,
         artistId: groupId ?? undefined,
-        postIdOrTemp: "new",
+        postIdOrTemp: "tmp_new",
         attachmentCountInPost: newPostMediaAssetIds.length + 1,
     };
     const { upload: uploadNewPostImage } = useMediaUpload(newPostPresignItem);

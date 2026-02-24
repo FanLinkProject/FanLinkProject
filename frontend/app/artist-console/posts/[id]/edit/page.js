@@ -85,7 +85,7 @@ function EditPostContent() {
         category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
         scope: MediaAssetScope.PUBLIC,
         artistId: postGroupId,
-        postIdOrTemp: String(numericId),
+        postIdOrTemp: (numericId > 0 && !isNaN(numericId)) ? String(numericId) : "tmp_edit",
         attachmentCountInPost: mediaAssetIds.length + 1,
       };
       if (isVideo) presignItem.durationSecondsRequested = 600;
