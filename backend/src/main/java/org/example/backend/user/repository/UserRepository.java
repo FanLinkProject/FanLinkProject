@@ -21,6 +21,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
     boolean existsByNickname(String nickname);
     boolean existsByPhoneNumber(String phoneNumber);
+    /** 해당 전화번호를 쓰는 다른 유저(본인 제외)가 있는지 */
+    boolean existsByPhoneNumberAndIdNot(String phoneNumber, Long id);
     //Page<User> findByNicknameContaining(String nickname, Pageable pageable);
     
     // 역할 조회

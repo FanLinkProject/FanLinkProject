@@ -89,9 +89,9 @@ public class UserService {
 
         String currentPhone = normalizePhone(user.getPhoneNumber());
 
-        // 전화번호 중복 확인 (다른 사용자가 사용 중인지 확인)
+        // 전화번호 중복 확인 (다른 사용자가 사용 중인지 확인, 본인 제외)
         if (!currentPhone.equals(newPhone)
-                && userRepository.existsByPhoneNumber(newPhone)) {
+                && userRepository.existsByPhoneNumberAndIdNot(newPhone, user.getId())) {
             throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
         }
 
@@ -165,7 +165,7 @@ public class UserService {
                     || currentPhone.startsWith("naver_") || currentPhone.startsWith("instagram_");
             String normalizedCurrentPhone = isPlaceholder ? "" : normalizePhone(currentPhone);
             if (isPlaceholder || !normalizedCurrentPhone.equals(newPhone)) {
-                if (userRepository.existsByPhoneNumber(newPhone)) {
+                if (userRepository.existsByPhoneNumberAndIdNot(newPhone, currentUser.getId())) {
                     throw new BusinessException(UserErrorCode.PHONE_NUMBER_ALREADY_EXISTS);
                 }
                 if (!verificationCodeService.consumePhoneVerified(newPhone)) {
