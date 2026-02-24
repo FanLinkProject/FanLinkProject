@@ -69,7 +69,7 @@ export default function EditPostPage() {
         category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
         scope: MediaAssetScope.PUBLIC,
         artistId: postGroupId,
-        postIdOrTemp: id ?? "edit",
+        postIdOrTemp: (id && String(id).trim() !== "") ? String(id) : "tmp_edit",
         attachmentCountInPost: mediaAssetIds.length + 1,
       };
       if (isVideo) presignItem.durationSecondsRequested = 600;

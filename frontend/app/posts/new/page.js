@@ -53,7 +53,7 @@ export default function NewPostPage() {
         category: isVideo ? MediaAssetCategory.POST_VIDEO : MediaAssetCategory.POST_IMAGE,
         scope: MediaAssetScope.PUBLIC,
         artistId: postGroupId,
-        postIdOrTemp: "new",
+        postIdOrTemp: "tmp_new",
         attachmentCountInPost: mediaAssetIds.length + 1,
       };
       if (isVideo) presignItem.durationSecondsRequested = 600;
