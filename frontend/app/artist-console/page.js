@@ -103,6 +103,7 @@ export default function ArtistConsolePage() {
     const fanPostsBottomRef = useRef(null);
 
     const [endedLives, setEndedLives] = useState([]);
+    const [liveLoading, setLiveLoading] = useState(false);
     const [liveSessions, setLiveSessions] = useState([]);
     const [vodList, setVodList] = useState([]);
     const [vodLoading, setVodLoading] = useState(false);
@@ -161,9 +162,11 @@ export default function ArtistConsolePage() {
 
     useEffect(() => {
         if (!groupId) return;
+        setLiveLoading(true);
         request(`/api/live-sessions?artistId=${groupId}&status=LIVE`)
             .then((list) => setLiveSessions(Array.isArray(list) ? list : []))
-            .catch(() => setLiveSessions([]));
+            .catch(() => setLiveSessions([]))
+            .finally(() => setLiveLoading(false));
     }, [groupId]);
 
     useEffect(() => {
@@ -465,7 +468,7 @@ export default function ArtistConsolePage() {
         <div className="flex flex-col min-h-full relative pb-20">
             {/* 커버 — h-64 풀폭 배너 + 직접 업로드 */}
             <div className="h-64 w-full relative overflow-hidden shrink-0 group/cover">
-                {coverImageUrl ? <img src={coverImageUrl} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-gradient-to-br from-violet-900/40 to-indigo-900/30" />}
+                {coverImageUrl ? <img src={coverImageUrl} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full bg-white/5" />}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0814]/40 to-[#0b0814]" />
                 <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleCoverImageUpload} />
                 <button
@@ -509,49 +512,15 @@ export default function ArtistConsolePage() {
                             <div className="flex items-center gap-3 flex-wrap justify-end">
                                 {groupMembers.map((m) => (
                                     <div key={m.id} className="flex flex-col items-center gap-1">
-                                        <img src={m.avatar || ""} className="size-9 rounded-full object-cover border border-white/[0.08]" alt="" />
+                                        <img src={m.avatar || getDefaultAvatarUrl(m.name || "?")} className="size-9 rounded-full object-cover border border-white/[0.08]" alt="" />
                                         <span className="text-[10px] font-medium text-white/60 truncate max-w-[72px]">{m.name}</span>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        <div className="flex items-center gap-3">
-                            {activeTab === "POSTS" && (
-                                <Button variant="primary" className="text-xs uppercase tracking-widest px-6 py-3 shrink-0" onClick={() => setShowCreateModal(true)}>
-                                    <span className="material-symbols-outlined text-lg mr-1.5 align-middle">edit_note</span>새 글 작성
-                                </Button>
-                            )}
-                            {activeTab === "MV" && (
-                                <Button variant="primary" className="text-xs uppercase tracking-widest px-6 py-3 shrink-0" onClick={() => setMvShowForm((v) => !v)}>
-                                    <span className="material-symbols-outlined text-lg mr-1.5 align-middle">video_call</span>{mvShowForm ? "취소" : "영상 등록"}
-                                </Button>
-                            )}
-                        </div>
                     </div>
                 </Surface>
             </div>
-
-            {/* 예정 콘서트 */}
-            {activeTab !== "CONCERT" && artistConcerts.length > 0 && (() => {
-                const now = new Date();
-                return (
-                    <div className="max-w-6xl w-full mx-auto px-8 mt-12">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {artistConcerts.map((c, i) => {
-                                const concertId = getConcertId(c);
-                                const status = getConcertStatus(c, now);
-                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
-                                const badgeClass = { [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium", [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90", [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium", [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium", [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium" }[status.key] ?? "bg-white/20 text-white/90 font-medium";
-                                const key = concertId ?? `concert-${i}`;
-                                const cls = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
-                                const inner = (<><div className="aspect-[16/10] overflow-hidden relative"><img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /><span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{badgeLabel}</span></div><div className="p-5"><h4 className="font-bold text-white truncate">{c.title}</h4><p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><span>{formatDateShort(c.startDateTime)}</span><span>•</span><span>{c.placeName || c.venueName}</span></p></div></>);
-                                return concertId ? <Link key={key} href={`/concerts/${concertId}`} className={cls}>{inner}</Link> : <div key={key} className={cls}>{inner}</div>;
-                            })}
-                        </div>
-                    </div>
-                );
-            })()}
 
             {/* 탭 — pill 스타일 + sticky */}
             <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 mt-12">
@@ -593,7 +562,13 @@ export default function ArtistConsolePage() {
                 <div className="w-full space-y-6">
                     {/* POSTS (Artist) 탭 */}
                     {activeTab === "POSTS" && (
-                        artistPostsLoading ? (
+                        <div className="space-y-6">
+                            <div className="flex justify-end">
+                                <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+                                    <span className="material-symbols-outlined mr-2">edit_note</span> 새 글 작성
+                                </Button>
+                            </div>
+                        {artistPostsLoading ? (
                             <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
                         ) : artistPosts.length === 0 ? (
                             <Surface variant="primary" className="py-20 text-center"><p className="text-white/55 italic">아직 게시글이 없습니다.</p></Surface>
@@ -603,6 +578,7 @@ export default function ArtistConsolePage() {
                                 <div ref={artistPostsBottomRef} className="py-1">{artistPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}</div>
                             </>
                         )
+                        </div>
                     )}
 
                     {/* FAN_POSTS 탭 — 읽기 전용 (작성 버튼 없음) */}
@@ -619,47 +595,28 @@ export default function ArtistConsolePage() {
                         )
                     )}
 
-                    {/* LIVE 탭 — 진행 중 라이브 + 종료된 라이브 기록 */}
+                    {/* LIVE 탭 */}
                     {activeTab === "LIVE" && (
-                        <div className="space-y-12">
-                            {liveSessions.length > 0 && (
-                                <section>
-                                    <h3 className="text-xs font-black text-white/40 mb-6 uppercase tracking-widest">Live Now</h3>
-                                    <div className="grid gap-6">
-                                        {liveSessions.map(session => (
-                                            <div key={session.id} className="relative aspect-video rounded-3xl overflow-hidden">
-                                                <div className="w-full h-full bg-gradient-to-br from-violet-900/30 to-indigo-900/20" />
-                                                <div className="absolute inset-0 bg-black/40" />
-                                                <div className="absolute top-4 left-4 flex gap-2">
-                                                    <span className="bg-red-600 px-3 py-1 text-[10px] font-black rounded text-white">LIVE</span>
-                                                    {session.isPaid && <span className="bg-violet-600 px-3 py-1 text-[10px] font-black rounded text-white">MEMBERSHIP</span>}
-                                                </div>
-                                                <div className="absolute bottom-6 left-6 text-left"><h4 className="text-2xl font-bold text-white">{session.title}</h4></div>
+                        <div className="space-y-6">
+                            <h3 className="text-xs font-black text-white/40 mb-2 uppercase tracking-widest">Live Now</h3>
+                            {liveLoading ? <p className="text-white/40">로딩 중...</p> :
+                            liveSessions.length > 0 ? (
+                                <div className="grid gap-6">
+                                    {liveSessions.map(session => (
+                                        <div key={session.id} className="relative aspect-video rounded-3xl overflow-hidden">
+                                            <div className="w-full h-full bg-gradient-to-br from-violet-900/30 to-indigo-900/20" />
+                                            <div className="absolute inset-0 bg-black/40" />
+                                            <div className="absolute top-4 left-4 flex gap-2">
+                                                <span className="bg-red-600 px-3 py-1 text-[10px] font-black rounded text-white">LIVE</span>
+                                                {session.isPaid && <span className="bg-violet-600 px-3 py-1 text-[10px] font-black rounded text-white">MEMBERSHIP</span>}
                                             </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
-                            <section>
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-xs font-black text-white/40 uppercase tracking-widest">종료된 라이브</h3>
-                                    <Button variant="ghost" href="/artist-console/live" className="text-xs uppercase tracking-widest">다시보기 관리</Button>
+                                            <div className="absolute bottom-6 left-6 text-left"><h4 className="text-2xl font-bold text-white">{session.title}</h4></div>
+                                        </div>
+                                    ))}
                                 </div>
-                                {endedLives.length === 0 ? (
-                                    <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">종료된 라이브가 없습니다.</p>
-                                ) : (
-                                    <div className="grid grid-cols-2 gap-6">
-                                        {endedLives.map((live) => (
-                                            <Surface key={live.id} variant="card" className="overflow-hidden">
-                                                <div className="aspect-video relative overflow-hidden bg-white/5">
-                                                    {(live.thumbnailUrl || live.thumbnail) ? <img src={live.thumbnailUrl || live.thumbnail} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-white/30"><span className="material-symbols-outlined text-4xl">videocam_off</span></div>}
-                                                </div>
-                                                <div className="p-4"><h4 className="font-bold text-white truncate">{live.title || "제목 없음"}</h4></div>
-                                            </Surface>
-                                        ))}
-                                    </div>
-                                )}
-                            </section>
+                            ) : (
+                                <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">현재 진행 중인 라이브가 없습니다.</p>
+                            }
                         </div>
                     )}
 
@@ -667,7 +624,7 @@ export default function ArtistConsolePage() {
                     {activeTab === "REPLAY" && (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-xs font-black text-white/40 uppercase tracking-widest">Replay (VOD)</h3>
+                                <h3 className="text-xs font-black text-white/40 mb-2 uppercase tracking-widest">Replay (VOD)</h3>
                                 <Button variant="ghost" href="/artist-console/live" className="text-xs uppercase tracking-widest">다시보기 관리</Button>
                             </div>
                             {vodLoading ? (
@@ -721,7 +678,14 @@ export default function ArtistConsolePage() {
                     {/* MV 탭 — 등록/삭제 포함, 검색창 항상 노출 */}
                     {activeTab === "MV" && (
                         <div className="space-y-6">
-                            {mvError && <p className="text-red-400 text-sm">{mvError}</p>}
+                            <div className="flex items-center justify-between">
+                                {mvError && <p className="text-red-400 text-sm">{mvError}</p>}
+                                <div className="ml-auto">
+                                    <Button variant="primary" onClick={() => setMvShowForm((v) => !v)}>
+                                        <span className="material-symbols-outlined mr-2">video_call</span> {mvShowForm ? "취소" : "새 뮤직비디오 등록"}
+                                    </Button>
+                                </div>
+                            </div>
 
                             {mvShowForm && (
                                 <Surface variant="primary" className="p-6">
@@ -747,10 +711,12 @@ export default function ArtistConsolePage() {
                                     {mvSelectedVideo.description && <p className="text-white/60 text-sm mt-4 whitespace-pre-wrap line-clamp-4">{mvSelectedVideo.description}</p>}
                                     <div className="mt-6 border-t border-white/[0.06] pt-6">
                                         <h4 className="text-sm font-bold text-white/80 mb-4">댓글 {mvComments.length > 0 && `(${mvComments.length})`}</h4>
-                                        <div className="flex gap-3 mb-4">
-                                            <input type="text" value={mvNewComment} onChange={(e) => setMvNewComment(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }} placeholder="댓글을 입력하세요..." className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30" />
-                                            <Button variant="primary" className="px-4 py-2 text-xs shrink-0" onClick={handleMvCommentSubmit} disabled={mvCommentSubmitting || !mvNewComment.trim()}>{mvCommentSubmitting ? "..." : "작성"}</Button>
-                                        </div>
+                                        {currentUser && (
+                                            <div className="flex gap-3 mb-4">
+                                                <input type="text" value={mvNewComment} onChange={(e) => setMvNewComment(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleMvCommentSubmit(); } }} placeholder="댓글을 입력하세요..." className="flex-1 bg-[#16102a] border border-white/[0.08] rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/30" />
+                                                <Button variant="primary" className="px-4 py-2 text-xs shrink-0" onClick={handleMvCommentSubmit} disabled={mvCommentSubmitting || !mvNewComment.trim()}>{mvCommentSubmitting ? "..." : "작성"}</Button>
+                                            </div>
+                                        )}
                                         {mvCommentsLoading ? <p className="text-white/40 text-sm">댓글 로딩 중...</p> : mvComments.length === 0 ? <p className="text-white/40 text-sm">아직 댓글이 없습니다.</p> : (
                                             <div className="space-y-3 max-h-80 overflow-y-auto">
                                                 {mvComments.map((c) => (
@@ -765,7 +731,7 @@ export default function ArtistConsolePage() {
                                                             </div>
                                                             <p className="text-sm text-white/70 break-words">{c.content}</p>
                                                         </div>
-                                                        {c.userId === myId && <button type="button" onClick={() => handleMvCommentDelete(c.id)} className="text-white/30 hover:text-red-400 transition-colors shrink-0" title="삭제"><span className="material-symbols-outlined text-sm">delete</span></button>}
+                                                        {currentUser && c.userId === myId && <button type="button" onClick={() => handleMvCommentDelete(c.id)} className="text-white/30 hover:text-red-400 transition-colors shrink-0" title="삭제"><span className="material-symbols-outlined text-sm">delete</span></button>}
                                                     </div>
                                                 ))}
                                             </div>
@@ -774,9 +740,8 @@ export default function ArtistConsolePage() {
                                 </Surface>
                             )}
 
-                            <div>
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-bold text-white">등록된 뮤직비디오</h3>
+                                    <h3 className="font-bold text-white">뮤직비디오</h3>
                                     <div className="relative">
                                         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-lg">search</span>
                                         <input type="text" value={mvSearchQuery} onChange={(e) => setMvSearchQuery(e.target.value)} placeholder="제목 또는 설명 검색" className="pl-9 pr-4 py-2 rounded-xl bg-[#16102a] border border-white/[0.08] text-white text-sm w-64 placeholder:text-white/30" />
@@ -785,9 +750,9 @@ export default function ArtistConsolePage() {
                                 {mvLoading ? (
                                     <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
                                 ) : mvList.length === 0 && mvSearchQuery.trim() ? (
-                                    <Surface variant="primary" className="p-12 text-center"><p className="text-white/55">검색 결과가 없습니다.</p></Surface>
+                                    <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">검색 결과가 없습니다.</p></Surface>
                                 ) : mvList.length === 0 ? (
-                                    <Surface variant="primary" className="p-12 text-center"><p className="text-white/55 font-medium">등록된 영상이 없습니다.</p></Surface>
+                                    <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">등록된 뮤직비디오가 없습니다.</p></Surface>
                                 ) : (
                                     <div className="grid grid-cols-2 gap-6">
                                         {mvList.map((v) => (
@@ -799,14 +764,13 @@ export default function ArtistConsolePage() {
                                                     </div>
                                                 </button>
                                                 <div className="p-4 flex items-start justify-between gap-2">
-                                                    <div className="min-w-0 flex-1"><h4 className="font-bold text-white truncate">{v.title}</h4><p className="text-sm text-white/50 truncate mt-0.5">{v.description}</p></div>
+                                                    <div className="min-w-0 flex-1"><h4 className="font-bold text-white truncate">{v.title}</h4>{v.description && <p className="text-sm text-white/50 truncate mt-0.5">{v.description}</p>}</div>
                                                     <button type="button" className="size-8 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/20 transition-colors shrink-0" onClick={(e) => { e.stopPropagation(); handleMvDelete(v.id); }} title="삭제"><span className="material-symbols-outlined text-sm">delete</span></button>
                                                 </div>
                                             </Surface>
                                         ))}
                                     </div>
                                 )}
-                            </div>
                         </div>
                     )}
                 </div>
@@ -826,7 +790,7 @@ export default function ArtistConsolePage() {
                                 <div><p className="font-bold text-white text-sm">{displayName}</p><p className="text-[10px] text-white/55 font-black uppercase tracking-widest">Official Artist</p></div>
                             </div>
                         )}
-                        <textarea value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} autoFocus className="w-full min-h-[180px] bg-[#201a33] rounded-2xl p-4 border border-white/[0.06] outline-none focus:ring-2 focus:ring-violet-500/20 text-white placeholder:text-white/40 font-medium resize-y" placeholder="팬들에게 전할 말을 적어주세요." />
+                        <textarea value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} autoFocus className="w-full min-h-[180px] bg-white/5 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-violet-500/50 placeholder:text-white/40 font-medium resize-y" placeholder="팬들에게 전할 말을 적어주세요." />
                         <label className="flex items-center gap-3 mt-4 cursor-pointer w-fit">
                             <div className={`relative w-10 h-5 rounded-full transition-colors ${newPostIsMembershipOnly ? "bg-violet-500" : "bg-white/[0.12]"}`} onClick={() => setNewPostIsMembershipOnly((v) => !v)}>
                                 <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${newPostIsMembershipOnly ? "translate-x-5" : "translate-x-0.5"}`} />
