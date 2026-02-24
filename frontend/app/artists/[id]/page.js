@@ -15,7 +15,10 @@ import {
     concertIncludesArtist,
     formatArtists,
     getArtistNamesArray,
-    formatDateShort
+    formatDateShort,
+    getConcertStatus,
+    getConcertStatusBadgeLabel,
+    CONCERT_STATUS_KEYS
 } from "@/lib/concertUtils";
 
 // 컴포넌트
@@ -146,8 +149,9 @@ function ArtistDetailPageInner({ paramsId }) {
     const [myGroupId, setMyGroupId] = useState(null);
     const [createPostLoading, setCreatePostLoading] = useState(false);
 
-    // 참여 공연 / MV / 라이브
+    // 참여 공연: 상단 섹션용(다가오는 것만), 공연 탭용(다가오는+종료된, 백엔드 includeEnded 지원 시)
     const [artistConcerts, setArtistConcerts] = useState([]);
+    const [artistConcertsForTab, setArtistConcertsForTab] = useState([]);
     const [artistConcertsLoading, setArtistConcertsLoading] = useState(false);
     const [musicVideos, setMusicVideos] = useState([]);
     const [musicVideosLoading, setMusicVideosLoading] = useState(false);
@@ -203,17 +207,21 @@ function ArtistDetailPageInner({ paramsId }) {
         }
     }, [paramsId, groupId, isRealGroup]);
 
-    // 2. 참여 공연 정보 로드
+    // 2. 참여 공연 정보 로드 (상단: 다가오는 공연만, 공연 탭: 다가오는+종료된. 백엔드가 includeEnded 지원 시 종료 공연 포함)
     useEffect(() => {
         if (!artist?.name) return;
         setArtistConcertsLoading(true);
-        apiGet("/api/concerts")
+        apiGet("/api/concerts", { query: { includeEnded: "true" } })
             .then((data) => {
                 const list = Array.isArray(data) ? data : [];
-                const filtered = list.filter(c => isUpcoming(c) && concertIncludesArtist(c, artist.name));
-                setArtistConcerts(filtered);
+                const forArtist = list.filter(c => concertIncludesArtist(c, artist.name));
+                setArtistConcerts(forArtist.filter(c => isUpcoming(c)));
+                setArtistConcertsForTab(forArtist);
             })
-            .catch(() => setArtistConcerts([]))
+            .catch(() => {
+                setArtistConcerts([]);
+                setArtistConcertsForTab([]);
+            })
             .finally(() => setArtistConcertsLoading(false));
     }, [artist?.name]);
 
@@ -566,7 +574,7 @@ function ArtistDetailPageInner({ paramsId }) {
         { id: "ARTIST", label: "Artist" },
         { id: "FAN", label: "Fan" },
         { id: "LIVE", label: "Live" },
-        { id: "CONCERT", label: "공연" },
+        { id: "CONCERT", label: "Concert" },
         { id: "MARKET", label: "Market" },
         { id: "MV", label: "MV" },
     ];
@@ -635,42 +643,60 @@ function ArtistDetailPageInner({ paramsId }) {
                 </Surface>
             </div>
 
-            {/* 참여 공연 섹션 */}
-            {artistConcerts.length > 0 && (
-                <div className="max-w-6xl w-full mx-auto px-8 mt-12">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {artistConcerts.map((c, i) => {
-                            const concertId = getConcertId(c);
-                            if (!concertId) {
-                                if (typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
-                            }
-                            const cardContent = (
-                                <>
-                                    <div className="aspect-[16/10] overflow-hidden">
-                                        <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            {/* 참여 공연 섹션 (다가오는 공연만, 상태/D-Day 동일 스타일) */}
+            {artistConcerts.length > 0 && (() => {
+                const now = new Date();
+                return (
+                    <div className="max-w-6xl w-full mx-auto px-8 mt-12">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-white/40 mb-5 px-1">Upcoming Concerts</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {artistConcerts.map((c, i) => {
+                                const concertId = getConcertId(c);
+                                if (!concertId && typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
+                                const status = getConcertStatus(c, now);
+                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
+                                const badgeClass = {
+                                    [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium",
+                                    [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90",
+                                    [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium",
+                                    [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium",
+                                    [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium",
+                                    [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium",
+                                }[status.key] ?? "bg-white/20 text-white/90 font-medium";
+                                const cardContent = (
+                                    <>
+                                        <div className="aspect-[16/10] overflow-hidden relative">
+                                            <img src={c.concertImageUrl || c.posterImageUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                            <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+                                                {badgeLabel}
+                                            </span>
+                                        </div>
+                                        <div className="p-5">
+                                            <h4 className="font-bold text-white truncate">{c.title}</h4>
+                                            <p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                <span>{formatDateShort(c.startDateTime)}</span>
+                                                <span>•</span>
+                                                <span>{c.placeName || c.venueName}</span>
+                                            </p>
+                                        </div>
+                                    </>
+                                );
+                                const key = concertId ?? `concert-${i}`;
+                                const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                                return concertId ? (
+                                    <Link key={key} href={`/concerts/${concertId}`} className={className}>
+                                        {cardContent}
+                                    </Link>
+                                ) : (
+                                    <div key={key} className={className} aria-disabled="true">
+                                        {cardContent}
                                     </div>
-                                    <div className="p-5">
-                                        <h4 className="font-bold text-white truncate">{c.title}</h4>
-                                        <p className="text-white/50 text-xs mt-2">{formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}</p>
-                                    </div>
-                                </>
-                            );
-                            const key = concertId ?? `concert-${i}`;
-                            const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
-                            return concertId ? (
-                                <Link key={key} href={`/concerts/${concertId}`} className={className}>
-                                    {cardContent}
-                                </Link>
-                            ) : (
-                                <div key={key} className={className} aria-disabled="true">
-                                    {cardContent}
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* 탭 메뉴 */}
             <div className="sticky top-16 bg-[#0b0814]/95 backdrop-blur-md z-20 border-b border-white/[0.06] mt-12">
@@ -896,36 +922,67 @@ function ArtistDetailPageInner({ paramsId }) {
                     {activeTab === "CONCERT" && (
                         <div className="space-y-6">
                             <h3 className="text-xs font-black uppercase tracking-widest text-white/40 px-1">
-                                Upcoming Concerts
+                                Concert
                             </h3>
-                            {artistConcerts.length === 0 ? (
+                            {artistConcertsForTab.length === 0 ? (
                                 <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">
-                                    예정된 공연이 없습니다.
+                                    공연이 없습니다.
                                 </p>
                             ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                    {artistConcerts.map((c, i) => (
-                                        <Link
-                                            key={c.id ?? `concert-${i}`}
-                                            href={`/concerts/${c.id}`}
-                                            className="group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden"
-                                        >
-                                            <div className="aspect-[16/10] overflow-hidden">
-                                                <img
-                                                    src={c.concertImageUrl || c.posterImageUrl}
-                                                    alt=""
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                />
-                                            </div>
-                                            <div className="p-5">
-                                                <h4 className="font-bold text-white truncate">{c.title}</h4>
-                                                <p className="text-white/50 text-xs mt-2">
-                                                    {formatDateShort(c.startDateTime)} • {c.placeName || c.venueName}
-                                                </p>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
+                                (() => {
+                                    const now = new Date();
+                                    return (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                            {artistConcertsForTab.map((c, i) => {
+                                                const concertId = getConcertId(c);
+                                                if (!concertId && typeof console !== "undefined" && console.warn) console.warn("Concert id missing", c);
+                                                const key = concertId ?? `concert-${i}`;
+                                                const status = getConcertStatus(c, now);
+                                                const badgeLabel = getConcertStatusBadgeLabel(c, now);
+                                                const badgeClass = {
+                                                    [CONCERT_STATUS_KEYS.LIVE]: "bg-amber-500/90 text-black font-medium",
+                                                    [CONCERT_STATUS_KEYS.ENDED]: "bg-white/20 text-white/90",
+                                                    [CONCERT_STATUS_KEYS.SALE]: "bg-violet-500/90 text-white font-medium",
+                                                    [CONCERT_STATUS_KEYS.PRESALE]: "bg-violet-400/80 text-white font-medium",
+                                                    [CONCERT_STATUS_KEYS.SALE_UPCOMING]: "bg-amber-500/90 text-white font-medium",
+                                                    [CONCERT_STATUS_KEYS.UPCOMING]: "bg-white/10 text-white/80 border border-white/20 font-medium",
+                                                }[status.key] ?? "bg-white/20 text-white/90 font-medium";
+                                                const className = "group block rounded-2xl border border-white/5 bg-white/[0.03] hover:border-violet-500/40 transition-all overflow-hidden";
+                                                const cardContent = (
+                                                    <>
+                                                        <div className="aspect-[16/10] overflow-hidden relative">
+                                                            <img
+                                                                src={c.concertImageUrl || c.posterImageUrl}
+                                                                alt=""
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                            />
+                                                            <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+                                                                {badgeLabel}
+                                                            </span>
+                                                        </div>
+                                                        <div className="p-5">
+                                                            <h4 className="font-bold text-white truncate">{c.title}</h4>
+                                                            <p className="text-white/50 text-xs mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                                <span>{formatDateShort(c.startDateTime)}</span>
+                                                                <span>•</span>
+                                                                <span>{c.placeName || c.venueName}</span>
+                                                            </p>
+                                                        </div>
+                                                    </>
+                                                );
+                                                return concertId ? (
+                                                    <Link key={key} href={`/concerts/${concertId}`} className={className}>
+                                                        {cardContent}
+                                                    </Link>
+                                                ) : (
+                                                    <div key={key} className={className} aria-disabled="true">
+                                                        {cardContent}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })()
                             )}
                         </div>
                     )}

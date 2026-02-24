@@ -148,10 +148,6 @@ export default function ArtistConsolePage() {
 
     const [endedLives, setEndedLives] = useState([]);
 
-    // Concerts 탭 (인라인 목록)
-    const [concertsList, setConcertsList] = useState([]);
-    const [concertsLoading, setConcertsLoading] = useState(false);
-
     // 프로필 조회 → myId, groupId
     useEffect(() => {
         const user = getCurrentUser();
@@ -197,16 +193,6 @@ export default function ArtistConsolePage() {
             .then((list) => setEndedLives(Array.isArray(list) ? list : []))
             .catch(() => setEndedLives([]));
     }, [groupId]);
-
-    // Concerts 탭 활성화 시 공연 목록 로드 (그룹/소속 아티스트면 그룹 공연 전체, 아니면 본인 공연만)
-    useEffect(() => {
-        if (activeTab !== "CONCERTS") return;
-        setConcertsLoading(true);
-        request("/api/artist/concerts")
-            .then((data) => setConcertsList(Array.isArray(data) ? data : []))
-            .catch(() => setConcertsList([]))
-            .finally(() => setConcertsLoading(false));
-    }, [activeTab]);
 
     // 팔로워 수 (아티스트 마이페이지 API에서 조회)
     useEffect(() => {
@@ -554,7 +540,6 @@ export default function ArtistConsolePage() {
                         { id: "POSTS", label: "My Posts" },
                         { id: "FAN_POSTS", label: "Fan Posts" },
                         { id: "LIVE", label: "Live History" },
-                        { id: "CONCERTS", label: "Concerts" },
                         { id: "MV", label: "MV", href: "/artist-console/music-videos" },
                     ].map((tab) =>
                         tab.href ? (
@@ -713,58 +698,6 @@ export default function ArtistConsolePage() {
                                     </div>
                                 </Surface>
                             ))
-                        )}
-                    </div>
-                )}
-
-                {/* CONCERTS 탭 — 인라인 목록 */}
-                {activeTab === "CONCERTS" && (
-                    <div className="space-y-4">
-                        {concertsLoading ? (
-                            <Surface variant="primary" className="py-12 text-center">
-                                <p className="text-white/55">로딩 중...</p>
-                            </Surface>
-                        ) : concertsList.length === 0 ? (
-                            <Surface variant="primary" className="p-12 text-center">
-                                <p className="text-white/55 font-medium">등록된 공연이 없습니다.</p>
-                            </Surface>
-                        ) : (
-                            concertsList.map((concert) => {
-                                const id = concert.concertId ?? concert.id;
-                                const placeName = concert.placeName ?? concert.venueName;
-                                const imageUrl = concert.concertImageUrl ?? concert.posterImageUrl;
-                                return (
-                                    <Surface key={id} variant="primary" className="p-8 hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-shadow">
-                                        <div className="flex items-start justify-between gap-6">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-4 mb-4">
-                                                    {imageUrl && (
-                                                        <img src={imageUrl} className="size-24 rounded-xl object-cover border border-white/[0.08]" alt="" />
-                                                    )}
-                                                    <div className="flex-1">
-                                                        <h3 className="text-xl font-bold text-white mb-2">{concert.title}</h3>
-                                                        {concert.artistNames?.length > 0 && (
-                                                            <p className="text-sm text-white/60 mb-2">{concert.artistNames.join(" · ")}</p>
-                                                        )}
-                                                        <div className="flex flex-wrap gap-4 text-xs text-white/55">
-                                                            <span><span className="font-bold">장소:</span> {placeName ?? "-"}</span>
-                                                            <span><span className="font-bold">시작:</span> {formatConcertDateTime(concert.startDateTime)}</span>
-                                                            <span><span className="font-bold">종료:</span> {formatConcertDateTime(concert.endDateTime)}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                href={`/artist-console/concerts/${id}/edit`}
-                                                className="px-4 py-2 text-xs uppercase tracking-widest shrink-0"
-                                            >
-                                                수정
-                                            </Button>
-                                        </div>
-                                    </Surface>
-                                );
-                            })
                         )}
                     </div>
                 )}

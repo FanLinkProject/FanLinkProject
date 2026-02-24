@@ -54,4 +54,12 @@ public interface ConcertRepository extends JpaRepository<Concert, Long> {
     @Query("select distinct c from Concert c left join fetch c.location join c.artists ca where ca.artist.id in :artistIds and c.endDateTime > :now order by c.startDateTime asc")
     List<Concert> findUpcomingConcertsByArtistIdsIn(@Param("artistIds") List<Long> artistIds, @Param("now") Instant now);
 
+    /** 종료된 공연만 (endDateTime <= now), endDateTime 내림차순 */
+    @Query("select c from Concert c left join fetch c.location where c.endDateTime <= :now order by c.endDateTime desc")
+    List<Concert> findEndedConcerts(@Param("now") Instant now);
+
+    /** 특정 아티스트(들)가 참여한 종료된 공연만 (endDateTime <= now), endDateTime 내림차순 */
+    @Query("select distinct c from Concert c left join fetch c.location join c.artists ca where ca.artist.id in :artistIds and c.endDateTime <= :now order by c.endDateTime desc")
+    List<Concert> findEndedConcertsByArtistIdsIn(@Param("artistIds") List<Long> artistIds, @Param("now") Instant now);
+
 }
