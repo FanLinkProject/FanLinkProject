@@ -157,6 +157,7 @@ function PostDetailContent({ id }) {
           writerId: postData.writerId ?? null,
           authorName: postData.writerNickname || "",
           authorAvatar: postData.writerProfileImageUrl || "",
+          authorGradeName: postData.writerGradeName || null,
           content: postData.content || "",
           image: postData.attachments?.[0]?.url || null,
           timestamp: formatTimestamp(postData.createdAt),
@@ -728,7 +729,12 @@ function PostDetailContent({ id }) {
                 alt=""
               />
               <div>
-                <h4 className="text-lg font-extrabold text-white">{post.authorName}</h4>
+                <h4 className="text-lg font-extrabold text-white flex items-center gap-1.5 flex-wrap">
+                  {post.authorGradeName && (
+                    <span className="text-amber-300/90 text-sm font-bold shrink-0">[{post.authorGradeName}]</span>
+                  )}
+                  {post.authorName}
+                </h4>
                 <p className="text-xs text-white/55 font-semibold uppercase tracking-wider">
                   {post.timestamp}
                   {post.postType === "ARTIST" && " • 공식 업데이트"}
@@ -814,7 +820,10 @@ function PostDetailContent({ id }) {
                           alt=""
                         />
                         <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            {!isDeleted && c.writerGradeName && (
+                              <span className="text-amber-300/90 text-xs font-bold shrink-0">[{c.writerGradeName}]</span>
+                            )}
                             <span className={`text-sm font-bold ${isDeleted ? "text-white/35" : "text-white"}`}>
                               {isDeleted ? "알 수 없음" : (c.nickname || "익명")}
                             </span>
@@ -991,7 +1000,10 @@ function PostDetailContent({ id }) {
                                   alt=""
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
+                                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                    {!rDeleted && r.writerGradeName && (
+                                      <span className="text-amber-300/90 text-[11px] font-bold shrink-0">[{r.writerGradeName}]</span>
+                                    )}
                                     <span className={`text-xs font-bold ${rDeleted ? "text-white/35" : "text-white"}`}>
                                       {rDeleted ? "알 수 없음" : (r.nickname || "익명")}
                                     </span>

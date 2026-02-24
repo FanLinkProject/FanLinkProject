@@ -19,6 +19,7 @@ export default function PostCard({
   className = "",
 }) {
   const displayName = post.authorMemberName ?? post.authorName ?? "";
+  const gradeName = post.authorGradeName ?? null;
   const likes = likeCount ?? post.likes ?? 0;
   const comments = commentCount ?? post.comments ?? 0;
   const likeNum = typeof likes === "string" ? likes : String(likes);
@@ -56,6 +57,9 @@ export default function PostCard({
         <img src={post.authorAvatar} className="size-12 rounded-full border border-white/[0.08] shrink-0" alt="" />
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-white flex items-center gap-1.5 leading-none">
+            {gradeName && (
+              <span className="text-amber-300/90 text-sm font-bold shrink-0">[{gradeName}]</span>
+            )}
             {displayName}
             {showVerified && (
               <span className="material-symbols-outlined text-violet-300 text-lg fill-icon shrink-0" aria-hidden>verified</span>

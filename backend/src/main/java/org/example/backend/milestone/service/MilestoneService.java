@@ -34,11 +34,11 @@ public class MilestoneService {
      */
     public MilestoneResponse createMilestone(MilestoneRequest request) {
 
-        // ========== 1) 그룹 계정 조회 ==========
+        // ========== 1) 그룹 계정 또는 개인 아티스트 조회 ==========
         User group = userRepository.findById(request.getGroupId())
                 .orElseThrow(() -> new MilestoneException(MilestoneErrorCode.GROUP_NOT_FOUND));
 
-        if (!group.getRole().equals(UserRole.GROUP)) {
+        if (group.getRole() != UserRole.GROUP && group.getRole() != UserRole.ARTIST) {
             throw new MilestoneException(MilestoneErrorCode.NOT_GROUP_USER);
         }
 

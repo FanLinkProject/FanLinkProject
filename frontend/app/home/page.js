@@ -184,6 +184,8 @@ export default function UserHomePage() {
 
   const [feedPosts, setFeedPosts] = useState([]);
   const [feedPostsLoading, setFeedPostsLoading] = useState(false);
+  const [feedLikeCountMap, setFeedLikeCountMap] = useState({});
+  const [feedCommentCountMap, setFeedCommentCountMap] = useState({});
 
   // 홈 데이터: 비로그인 → GuestHomeResponse / 로그인 → UserHome 또는 ArtistHome
   useEffect(() => {
@@ -347,7 +349,7 @@ export default function UserHomePage() {
         }).catch(() => [])
       )
     )
-      .then((arrays) => {
+      .then(async (arrays) => {
         const merged = arrays.flat();
         merged.sort((a, b) => {
           const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -355,6 +357,17 @@ export default function UserHomePage() {
           return tb - ta;
         });
         setFeedPosts(merged);
+        if (merged.length > 0) {
+          const ids = merged.map((p) => p.id).join(",");
+          try {
+            const [likeRes, commentRes] = await Promise.all([
+              request("/api/likes/counts", { query: { targetType: "ARTIST_POST", targetIds: ids } }).catch(() => ({})),
+              request("/api/comments/counts", { query: { targetType: "ARTIST", targetIds: ids } }).catch(() => ({})),
+            ]);
+            setFeedLikeCountMap((prev) => ({ ...prev, ...(likeRes || {}) }));
+            setFeedCommentCountMap((prev) => ({ ...prev, ...(commentRes || {}) }));
+          } catch (_) {}
+        }
       })
       .catch(() => setFeedPosts([]))
       .finally(() => setFeedPostsLoading(false));
@@ -688,6 +701,8 @@ export default function UserHomePage() {
                   showVerified={true}
                   isLocked={post.isLockedByServer ?? false}
                   showCommentButton={!post.isNotice}
+                  likeCount={feedLikeCountMap[post.id] ?? feedLikeCountMap[String(post.id)]}
+                  commentCount={feedCommentCountMap[post.id] ?? feedCommentCountMap[String(post.id)]}
                 />
               ))}
             </div>
