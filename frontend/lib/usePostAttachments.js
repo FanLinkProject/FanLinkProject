@@ -94,12 +94,20 @@ export function usePostAttachments({ postGroupId, postIdOrTemp, initialAttachmen
     );
   }, []);
 
+  const resetAttachments = useCallback(() => {
+    setMediaAssetIds([]);
+    setAttachmentPreviews([]);
+    setUploading(false);
+    setUploadError("");
+  }, []);
+
   return {
     mediaAssetIds,
     attachmentPreviews,
     addAttachment,
     removeAttachment,
     setAttachmentsFromApi,
+    resetAttachments,
     canAddAttachment: canAdd,
     uploading,
     uploadError,

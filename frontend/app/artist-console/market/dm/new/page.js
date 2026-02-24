@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { request } from "@/lib/api";
 import { createProduct, getProducts } from "@/lib/productApi";
 import Surface from "@/components/ui/Surface";
 import SectionTitle from "@/components/ui/SectionTitle";
@@ -32,14 +33,7 @@ export default function NewDmProductPage() {
   }, [existingProducts]);
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    const authHeader = token.startsWith("Bearer") ? token : `Bearer ${token}`;
-    fetch("http://localhost:8080/api/artist/mypage", { headers: { Authorization: authHeader } })
-      .then((r) => r.json())
+    request("/api/artist/mypage")
       .then((data) => {
         setMypage(data);
         if (data?.teamInfo?.type !== "GROUP") {

@@ -67,9 +67,6 @@ public class ReplayCommandService {
         if (!request.artistId().equals(session.artistId())) {
             throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
         }
-        if (!userId.equals(session.artistId())) {
-            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
-        }
         if (!isRecordedOrReady(session.status())) {
             throw new ReplayException(ReplayErrorCode.INVALID_SESSION_STATE);
         }
@@ -77,20 +74,24 @@ public class ReplayCommandService {
                 || session.recordingS3Prefix() == null || session.recordingS3Prefix().isBlank()) {
             throw new ReplayException(ReplayErrorCode.RECORDING_NOT_READY);
         }
-        if (replayRepository.existsByLiveSessionId(request.liveSessionId())) {
-            throw new ReplayException(ReplayErrorCode.DUPLICATE_PUBLISH);
-        }
-
         Instant now = Instant.now();
-        Replay replay = new Replay(
-                request.artistId(),
-                request.liveSessionId(),
-                request.accessType(),
-                ReplayStatus.PUBLISHED,
-                session.recordingS3Bucket(),
-                session.recordingS3Prefix(),
-                now
-        );
+        Replay replay = replayRepository.findByLiveSessionId(request.liveSessionId()).orElse(null);
+        if (replay != null) {
+            if (replay.getStatus() == ReplayStatus.PUBLISHED) {
+                throw new ReplayException(ReplayErrorCode.DUPLICATE_PUBLISH);
+            }
+            replay.markPublished(now);
+        } else {
+            replay = new Replay(
+                    request.artistId(),
+                    request.liveSessionId(),
+                    request.accessType(),
+                    ReplayStatus.PUBLISHED,
+                    session.recordingS3Bucket(),
+                    session.recordingS3Prefix(),
+                    now
+            );
+        }
         replayRepository.save(replay);
 
         if (request.thumbnailMediaAssetId() != null) {

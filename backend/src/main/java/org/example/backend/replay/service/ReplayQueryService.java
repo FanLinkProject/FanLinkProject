@@ -13,6 +13,8 @@ import org.example.backend.replay.gateway.LiveSessionRecordingInfo;
 import org.example.backend.replay.gateway.LiveSessionRecordingStatus;
 import org.example.backend.replay.repository.ReplayRepository;
 import org.example.backend.replay.util.PlaybackUrlCalculator;
+import static org.example.backend.replay.util.PlaybackUrlCalculator.normalizeDomain;
+import static org.example.backend.replay.util.PlaybackUrlCalculator.trimLeadingSlash;
 import org.example.backend.user.enums.UserRole;
 import org.example.backend.user.service.ArtistPermissionService;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -99,8 +101,7 @@ public class ReplayQueryService {
         if (domain == null || domain.isBlank()) {
             return null;
         }
-        domain = domain.replace("https://", "").replace("http://", "").trim();
-        return "https://" + domain + "/" + (key.startsWith("/") ? key.substring(1) : key);
+        return "https://" + normalizeDomain(domain) + "/" + trimLeadingSlash(key);
     }
 
     // 후보 라이브 세션 응답을 구성한다.
