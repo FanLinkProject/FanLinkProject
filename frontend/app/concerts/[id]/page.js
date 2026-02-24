@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiGet } from "@/lib/api";
+import { apiGet, request } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import { ConcertHero } from "@/components/concert/ConcertHero";
 import { ConcertInfoCards } from "@/components/concert/ConcertInfoCards";
 import { ConcertArtistList } from "@/components/concert/ConcertArtistList";
 import { LocationSection } from "@/components/concert/LocationSection";
+import { getProductsByConcert } from "@/lib/productApi";
+import { getEligibleTicketProduct } from "@/lib/concertUtils";
+import MembershipOnlyModal from "@/components/common/MembershipOnlyModal";
 
 export default function ConcertDetailPage() {
   const params = useParams();
@@ -17,6 +20,10 @@ export default function ConcertDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const [membershipModalArtistId, setMembershipModalArtistId] = useState(null);
+  const [membershipModalArtistName, setMembershipModalArtistName] = useState("");
+  const [bookingLoading, setBookingLoading] = useState(false);
   const DESC_PREVIEW_LEN = 200;
 
   useEffect(() => {
@@ -98,6 +105,46 @@ export default function ConcertDetailPage() {
       ? `/concerts?mode=map&lat=${location.latitude}&lng=${location.longitude}`
       : "/concerts?mode=map";
 
+  const handleBookClick = async (concertData) => {
+    if (!concertData || bookingLoading) return;
+    const concertId = concertData.concertId ?? concertData.id;
+    const artistId = concertData?.artists?.[0]?.id ?? concertData?.artistId;
+    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    setBookingLoading(true);
+    try {
+      const products = await getProductsByConcert(concertId);
+      const product = getEligibleTicketProduct(concertData, products);
+      if (!product) {
+        alert("예매 가능한 상품이 없습니다.");
+        return;
+      }
+      if (product.isMembershipOnly) {
+        const targetArtistId = product.artistId ?? artistId;
+        const dashboard = await request(`/api/user/artists/${targetArtistId}/dashboard`);
+        const hasMembership = dashboard?.membershipInfo?.hasActiveMembership ?? false;
+        if (!hasMembership) {
+          setMembershipModalArtistId(targetArtistId);
+          setMembershipModalArtistName(dashboard?.artistInfo?.nickname ?? concert?.title ?? "");
+          setShowMembershipModal(true);
+          return;
+        }
+      }
+      const returnPath = `/concerts/${concertId}`;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("checkoutReturnPath", returnPath);
+      }
+      router.push(`/checkout?productId=${product.id}&quantity=1&returnPath=${encodeURIComponent(returnPath)}`);
+    } catch (e) {
+      alert(e?.message || "예매 정보를 불러오지 못했습니다.");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   const handleBack = () => {
     if (typeof document !== "undefined" && document.referrer) {
       const ref = document.referrer;
@@ -138,7 +185,7 @@ export default function ConcertDetailPage() {
       <ConcertHero concert={concertForDisplay} onBack={handleBack} onShare={handleShare} />
 
       <div className="mt-8 space-y-0">
-        <ConcertInfoCards concert={concertForDisplay} />
+        <ConcertInfoCards concert={concertForDisplay} onBookClick={handleBookClick} bookingLoading={bookingLoading} />
         <ConcertArtistList artists={concert.artists} />
 
         {concert.description && (
@@ -167,6 +214,14 @@ export default function ConcertDetailPage() {
             )}
           </section>
         )}
+
+        <MembershipOnlyModal
+          isOpen={showMembershipModal}
+          onClose={() => setShowMembershipModal(false)}
+          artistId={membershipModalArtistId}
+          artistName={membershipModalArtistName}
+          contentLabel="선예매"
+        />
 
         <div className="mt-12">
           <LocationSection

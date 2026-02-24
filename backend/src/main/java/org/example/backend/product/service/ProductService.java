@@ -87,6 +87,17 @@ public class ProductService {
     }
 
     /**
+     * 공연별 티켓 상품 조회 (선예매/일반 예매).
+     */
+    public List<ProductDetailResponse> getProductsByConcertId(Long concertId) {
+        if (concertId == null) {
+            return List.of();
+        }
+        List<Product> products = productRepository.findByConcertId(concertId);
+        return products.stream().map(this::toSummaryResponse).toList();
+    }
+
+    /**
      * 아티스트/그룹 ID로 상품 목록 조회.
      * 그룹인 경우 그룹+멤버 상품, 개인 아티스트인 경우 해당 아티스트 상품만 반환.
      */

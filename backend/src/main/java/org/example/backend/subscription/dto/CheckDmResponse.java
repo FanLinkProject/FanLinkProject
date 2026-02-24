@@ -6,13 +6,18 @@ package org.example.backend.subscription.dto;
  */
 public record CheckDmResponse(
         boolean hasSubscription,
-        Long roomId
+        Long roomId,
+        String error
 ) {
     public static CheckDmResponse notSubscribed() {
-        return new CheckDmResponse(false, null);
+        return new CheckDmResponse(false, null, null);
     }
 
     public static CheckDmResponse subscribed(Long roomId) {
-        return new CheckDmResponse(true, roomId);
+        return new CheckDmResponse(true, roomId, null);
+    }
+
+    public static CheckDmResponse error(String errorMessage) {
+        return new CheckDmResponse(false, null, errorMessage);
     }
 }

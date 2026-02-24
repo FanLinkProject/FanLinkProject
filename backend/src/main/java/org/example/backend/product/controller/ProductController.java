@@ -21,15 +21,20 @@ public class ProductController {
 
     /**
      * 상품 목록을 조회합니다.
+     * - concertId: 해당 공연의 티켓 상품 (선예매/일반)
      * - artistId: 아티스트 상품 관리용 (artist-console)
      * - artistIds: 그룹+멤버 상품 목록 (쉼표 구분, 팬 마켓 페이지)
      * - 없음: 전체 상품
      */
     @GetMapping
     public ResponseEntity<List<ProductDetailResponse>> getProducts(
+            @RequestParam(required = false) Long concertId,
             @RequestParam(required = false) Long artistId,
             @RequestParam(required = false) List<Long> artistIds,
             @RequestParam(required = false) Boolean market) {
+        if (concertId != null) {
+            return ResponseEntity.ok(productService.getProductsByConcertId(concertId));
+        }
         if (artistId != null) {
             return ResponseEntity.ok(productService.getProductsByArtistId(artistId));
         }

@@ -68,12 +68,21 @@ public class ArtistDashboardService {
 
         // 2) 팔로우 상태
         boolean isFollowing = false;
+        boolean isFollowingGroup = false;
         if (viewer != null) {
             isFollowing = followRepository.existsByFollowerAndArtist(viewer, artist);
+            // 소속 멤버인 경우: 그룹 팔로우 시에도 구매 가능
+            var groupMembership = groupMemberRepository.findByMember(artist).orElse(null);
+            if (groupMembership != null && groupMembership.getGroup() != null) {
+                isFollowingGroup = followRepository.existsByFollowerAndArtist(viewer, groupMembership.getGroup());
+            } else {
+                isFollowingGroup = isFollowing; // 그룹/솔로: 동일
+            }
         }
         ArtistDashboardResponse.FollowStatus followStatus = new ArtistDashboardResponse.FollowStatus(
                 isFollowing,
-                isFollowing ? "팔로우 취소" : "팔로우"
+                isFollowing ? "팔로우 취소" : "팔로우",
+                isFollowingGroup
         );
 
         // 3) 그룹 소속 여부 (GROUP 계정 자신이거나, 해당 그룹의 소속 ARTIST인 경우)
@@ -215,7 +224,8 @@ public class ArtistDashboardService {
         } else {
             var membership = groupMemberRepository.findByMember(artist).orElse(null);
             if (membership == null || membership.getGroup() == null) {
-                return List.of();
+                // 개인 아티스트(그룹 미소속): 본인만 멤버로 노출하여 DM 연결하기 표시
+                return List.of(toMemberItem(artist));
             }
             groupUser = membership.getGroup();
             members = groupMemberRepository.findByGroup(groupUser);
@@ -223,21 +233,22 @@ public class ArtistDashboardService {
         Long groupUserId = groupUser.getId();
         return members.stream()
                 .filter(gm -> !gm.getMember().getId().equals(groupUserId))
-                .map(gm -> {
-                    var member = gm.getMember();
-                    Long dmProductId = null;
-                    List<Product> dmProducts = productRepository.findByArtistIdAndPaymentMethod(
-                            member.getId(), ProductPaymentMethod.CANDY_ONLY);
-                    if (!dmProducts.isEmpty()) {
-                        dmProductId = dmProducts.get(0).getId();
-                    }
-                    return new ArtistDashboardResponse.MemberItem(
-                            member.getId(),
-                            member.getNickname(),
-                            member.getProfileImageUrl(),
-                            dmProductId
-                    );
-                })
+                .map(gm -> toMemberItem(gm.getMember()))
                 .collect(Collectors.toList());
+    }
+
+    private ArtistDashboardResponse.MemberItem toMemberItem(User member) {
+        Long dmProductId = null;
+        List<Product> dmProducts = productRepository.findByArtistIdAndPaymentMethod(
+                member.getId(), ProductPaymentMethod.CANDY_ONLY);
+        if (!dmProducts.isEmpty()) {
+            dmProductId = dmProducts.get(0).getId();
+        }
+        return new ArtistDashboardResponse.MemberItem(
+                member.getId(),
+                member.getNickname(),
+                member.getProfileImageUrl(),
+                dmProductId
+        );
     }
 }

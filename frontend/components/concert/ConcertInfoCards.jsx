@@ -11,14 +11,18 @@ function formatDateRange(concert, startCamel, endCamel, startSnake, endSnake) {
   return `${formatDateTime(startVal)} ~ ${formatDateTime(endVal)}`;
 }
 
-export function ConcertInfoCards({ concert }) {
+export function ConcertInfoCards({ concert, onBookClick, bookingLoading }) {
   if (!concert) return null;
   const status = getTicketStatus(concert);
   const upcomingLabel = formatUpcomingSaleDday(concert);
 
   const ctaLabel =
-    status === "OPEN" ? "예매하기" : status === "UPCOMING" ? (upcomingLabel ?? "예매 예정") : formatClosedLabel(concert);
-  const ctaDisabled = status === "CLOSED";
+    status === "OPEN"
+      ? (bookingLoading ? "확인 중..." : "예매하기")
+      : status === "UPCOMING"
+        ? (upcomingLabel ?? "예매 예정")
+        : formatClosedLabel(concert);
+  const ctaDisabled = status !== "OPEN" || bookingLoading;
 
   const presaleRange = formatDateRange(
     concert,
@@ -55,7 +59,8 @@ export function ConcertInfoCards({ concert }) {
           variant="primary"
           className="mt-4 w-full"
           disabled={ctaDisabled}
-          href={ctaDisabled ? undefined : "#"}
+          href={ctaDisabled ? undefined : undefined}
+          onClick={ctaDisabled ? undefined : () => onBookClick?.(concert)}
         >
           {ctaLabel}
         </Button>

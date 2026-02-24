@@ -50,6 +50,7 @@ export default function ProductDetailPage({ params }) {
   const [candyModalLoading, setCandyModalLoading] = useState(false);
   const [candyPaying, setCandyPaying] = useState(false);
   const [isFollowing, setIsFollowing] = useState(null); // null: 로딩/플랫폼상품, true/false: 아티스트 상품
+  const [isFollowingGroup, setIsFollowingGroup] = useState(false); // 소속 멤버 상품: 그룹 팔로우 시 구매 가능
   const [concert, setConcert] = useState(null); // 티켓 상품일 때 공연 기간 정보
   const [hidePurchaseUI, setHidePurchaseUI] = useState(false); // 그룹/아티스트 계정: 구매·장바구니·팔로우 안내 숨김
 
@@ -87,18 +88,27 @@ export default function ProductDetailPage({ params }) {
   }, [id]);
 
   // 아티스트 상품인 경우 팔로우 여부 조회 (artistId가 null이면 플랫폼 상품 → 구매 가능)
+  // 소속 멤버 DM: 그룹 팔로우 시에도 구매 가능 (isFollowingGroup)
   useEffect(() => {
     if (!product) {
       setIsFollowing(null);
+      setIsFollowingGroup(false);
       return;
     }
     if (product.artistId == null) {
-      setIsFollowing(true); // 플랫폼 상품은 항상 구매 가능
+      setIsFollowing(true);
+      setIsFollowingGroup(false);
       return;
     }
     request(`/api/user/artists/${product.artistId}/dashboard`)
-      .then((data) => setIsFollowing(data?.followStatus?.isFollowing ?? false))
-      .catch(() => setIsFollowing(false));
+      .then((data) => {
+        setIsFollowing(data?.followStatus?.isFollowing ?? false);
+        setIsFollowingGroup(data?.followStatus?.isFollowingGroup ?? false);
+      })
+      .catch(() => {
+        setIsFollowing(false);
+        setIsFollowingGroup(false);
+      });
   }, [product?.id, product?.artistId]);
 
   const handleBack = () => {
@@ -120,8 +130,8 @@ export default function ProductDetailPage({ params }) {
         : "예매 기간 확인 중..."
       : null;
 
-  const canPurchase = (product?.artistId == null || isFollowing === true) && ticketPeriodAllowed;
-  const followTooltip = "해당 아티스트(그룹)를 팔로우한 후 구매 및 장바구니 담기가 가능합니다.";
+  const canPurchase = (product?.artistId == null || isFollowing === true || isFollowingGroup === true) && ticketPeriodAllowed;
+  const followTooltip = "해당 아티스트 또는 소속 그룹을 팔로우한 후 구매 및 장바구니 담기가 가능합니다.";
   const purchaseDisabledTooltip = ticketDisabledMessage || (!canPurchase ? followTooltip : undefined);
 
   const handleAddToCart = () => {

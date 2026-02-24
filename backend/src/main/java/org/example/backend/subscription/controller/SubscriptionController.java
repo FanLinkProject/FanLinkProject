@@ -1,6 +1,7 @@
 package org.example.backend.subscription.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.backend.chat.entity.ChatRoom;
 import org.example.backend.chat.repository.ChatRoomRepository;
 import org.example.backend.chat.service.ChatDMService;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.example.backend.global.security.details.PrincipalDetails;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/subscriptions")
 @RequiredArgsConstructor
@@ -105,6 +107,7 @@ public class SubscriptionController {
         /**
          * 해당 아티스트와의 DM 구독 여부 및 채팅방 ID 조회.
          * 구독 중이면 채팅방 입장을 위해 join 후 roomId를 반환합니다.
+         * DM 방이 없을 경우 에러 응답 및 로그 기록.
          */
         @GetMapping("/check-dm")
         public ResponseEntity<CheckDmResponse> checkDmSubscription(
@@ -114,11 +117,16 @@ public class SubscriptionController {
                 if (!subscriptionService.hasActiveDmSubscription(userId, artistId)) {
                         return ResponseEntity.ok(CheckDmResponse.notSubscribed());
                 }
-                chatDMService.joinChatDMRoom(userId, artistId);
-                User artist = userRepository.findById(artistId)
-                        .orElseThrow(() -> new IllegalArgumentException("아티스트를 찾을 수 없습니다."));
-                ChatRoom room = chatRoomRepository.findByOwner(artist)
-                        .orElseThrow(() -> new IllegalStateException("DM 채팅방을 찾을 수 없습니다."));
-                return ResponseEntity.ok(CheckDmResponse.subscribed(room.getId()));
+                try {
+                        chatDMService.joinChatDMRoom(userId, artistId);
+                        User artist = userRepository.findById(artistId)
+                                .orElseThrow(() -> new IllegalArgumentException("아티스트를 찾을 수 없습니다."));
+                        ChatRoom room = chatRoomRepository.findByOwner(artist)
+                                .orElseThrow(() -> new IllegalStateException("DM 채팅방을 찾을 수 없습니다."));
+                        return ResponseEntity.ok(CheckDmResponse.subscribed(room.getId()));
+                } catch (Exception e) {
+                        log.warn("[DM] 아티스트(artistId={})의 DM 방이 존재하지 않습니다. 사용자에게 관리자 문의 안내.", artistId, e);
+                        return ResponseEntity.ok(CheckDmResponse.error("오류가 발생했습니다. 관리자에게 문의해 주세요."));
+                }
         }
 }

@@ -32,6 +32,7 @@ import org.example.backend.payment.service.PaymentService;
 import org.example.backend.product.enums.ProductPaymentMethod;
 import org.example.backend.user.service.ArtistPermissionService;
 import org.example.backend.user.repository.FollowRepository;
+import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.subscription.repository.SubscriptionRepository;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -52,6 +53,7 @@ public class OrderService {
         private final PaymentService paymentService;
         private final ArtistPermissionService artistPermissionService;
         private final FollowRepository followRepository;
+        private final GroupMemberRepository groupMemberRepository;
 
         /**
          * 인증된 사용자의 요청으로 주문을 생성합니다.
@@ -287,9 +289,16 @@ public class OrderService {
                 if (artist == null) {
                         return;
                 }
-                if (!followRepository.existsByFollowerAndArtist(user, artist)) {
-                        throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
+                if (followRepository.existsByFollowerAndArtist(user, artist)) {
+                        return; // 아티스트(멤버) 팔로우 시 구매 가능
                 }
+                // 소속 멤버 상품: 그룹 팔로우 시에도 구매 가능
+                var groupMembership = groupMemberRepository.findByMember(artist).orElse(null);
+                if (groupMembership != null && groupMembership.getGroup() != null
+                                && followRepository.existsByFollowerAndArtist(user, groupMembership.getGroup())) {
+                        return;
+                }
+                throw new OrderException(OrderErrorCode.FOLLOW_REQUIRED);
         }
 
         private void validateShippingRequest(OrderRequestDto request) {
