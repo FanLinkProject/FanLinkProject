@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.backend.payment.config.TossPaymentConfig;
 import org.example.backend.payment.dto.PaymentConfirmResult;
+import org.example.backend.payment.dto.PaymentStatusResponse;
 import org.example.backend.payment.dto.TossPaymentDto;
 import org.example.backend.payment.enums.PaymentMethod;
 import org.example.backend.payment.exception.PaymentErrorCode;
@@ -94,7 +95,8 @@ public class TossPaymentAdapter implements PaymentAdapter {
     }
 
     private PaymentConfirmResult toPaymentConfirmResult(TossPaymentDto.PaymentConfirmResponse r) {
-        if (r == null) return null;
+        if (r == null)
+            return null;
         return PaymentConfirmResult.builder()
                 .paymentKey(r.getPaymentKey())
                 .amount(r.getTotalAmount())
@@ -117,14 +119,20 @@ public class TossPaymentAdapter implements PaymentAdapter {
 
     /**
      * 주문 번호로 결제 정보를 조회합니다. (Pending 주문 정리 스케줄러에서 사용)
-     * Toss 전용 메서드이므로 PaymentAdapter 인터페이스에는 포함하지 않음.
      */
-    public TossPaymentDto.PaymentConfirmResponse getPaymentByOrderNo(String orderNo) {
+    @Override
+    public PaymentStatusResponse getPaymentStatus(String orderNo) {
         String url = tossPaymentConfig.getBaseUrl() + "/payments/orders/" + orderNo;
         try {
             HttpEntity<?> entity = new HttpEntity<>(getHeaders());
-            return restTemplate.exchange(url, org.springframework.http.HttpMethod.GET, entity,
-                    TossPaymentDto.PaymentConfirmResponse.class).getBody();
+            TossPaymentDto.PaymentConfirmResponse response = restTemplate
+                    .exchange(url, org.springframework.http.HttpMethod.GET, entity,
+                            TossPaymentDto.PaymentConfirmResponse.class)
+                    .getBody();
+            if (response != null) {
+                return PaymentStatusResponse.of(orderNo, response.getStatus());
+            }
+            return null;
         } catch (Exception e) {
             log.warn("Toss 결제 조회 실패 (orderNo={}): {}", orderNo, e.getMessage());
             return null; // 조회 실패 시 null 반환 (404 등)

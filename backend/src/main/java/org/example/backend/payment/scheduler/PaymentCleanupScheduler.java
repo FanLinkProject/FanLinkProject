@@ -6,8 +6,8 @@ import org.example.backend.order.entity.Order;
 import org.example.backend.order.enums.OrderStatus;
 import org.example.backend.order.repository.OrderRepository;
 import org.example.backend.order.service.OrderService;
-import org.example.backend.payment.adapter.TossPaymentAdapter;
-import org.example.backend.payment.dto.TossPaymentDto;
+import org.example.backend.payment.adapter.PaymentAdapter;
+import org.example.backend.payment.dto.PaymentStatusResponse;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +21,7 @@ import java.util.List;
 public class PaymentCleanupScheduler {
 
     private final OrderRepository orderRepository;
-    private final TossPaymentAdapter tossPaymentAdapter;
+    private final PaymentAdapter paymentAdapter;
     private final OrderService orderService;
 
     /**
@@ -48,9 +48,8 @@ public class PaymentCleanupScheduler {
 
     private void checkAndCancelOrder(Order order) {
         try {
-            // Toss API로 결제 정보 조회
-            TossPaymentDto.PaymentConfirmResponse paymentInfo = tossPaymentAdapter
-                    .getPaymentByOrderNo(order.getOrderNo());
+            // PG API로 결제 정보 조회
+            PaymentStatusResponse paymentInfo = paymentAdapter.getPaymentStatus(order.getOrderNo());
 
             if (paymentInfo == null
                     || "READY".equals(paymentInfo.getStatus())
