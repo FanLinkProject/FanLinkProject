@@ -37,6 +37,7 @@ import org.example.backend.user.repository.UserRepository;
 import org.example.backend.user.repository.GroupMemberRepository;
 import org.example.backend.order.entity.Order;
 import org.example.backend.order.repository.OrderRepository;
+import org.example.backend.product.enums.ProductType;
 import org.example.backend.post.entity.ArtistPost;
 import org.example.backend.post.entity.FanPost;
 import org.example.backend.post.repository.ArtistPostRepository;
@@ -441,20 +442,30 @@ public class UserService {
                 .filter(v -> v != null)
                 .toList();
 
-        // 5) 멤버십 상태 (활성 구독만)
+        // 5) 구독 중인 상품 (활성 구독만)
         List<Subscription> activeSubscriptions = subscriptionRepository
                 .findByUserIdAndIsActive(user.getId(), true);
         var memberships = activeSubscriptions.stream()
-                .map(sub -> new UserMyPageResponse.MembershipStatus(
-                        sub.getId(),
-                        sub.getProduct().getName(),
-                        sub.getIsActive(),
-                        sub.getEndDate().toString()
-                ))
+                .map(sub -> {
+                    var product = sub.getProduct();
+                    String nextPaymentStr = sub.getNextPaymentDate() != null
+                            ? sub.getNextPaymentDate().toString()
+                            : null;
+                    return new UserMyPageResponse.MembershipStatus(
+                            sub.getId(),
+                            product.getName(),
+                            product.getCandyPrice(),
+                            product.getPrice(),
+                            sub.getIsActive(),
+                            sub.getEndDate().toString(),
+                            nextPaymentStr
+                    );
+                })
                 .toList();
 
-        // 6) 구매 내역 (페이징)
-        Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable);
+        // 6) 구매 내역 (페이징) - SETTLEMENT_CANDY만 포함된 주문 제외
+        Page<Order> ordersPage = orderRepository.findByUserIdOrderByCreatedAtDescExcludingSettlementCandyOnly(
+                user.getId(), ProductType.SETTLEMENT_CANDY, pageable);
         var purchaseHistory = ordersPage.map(order -> new UserMyPageResponse.PurchaseHistory(
                 order.getId(),
                 order.getDelivery() != null ? order.getDelivery().getId() : null,

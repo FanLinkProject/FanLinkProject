@@ -8,7 +8,7 @@ import { getMypage } from "@/lib/userApi";
 
 const TABS = [
   { id: "CANDY_RECHARGE", label: "캔디 충전" },
-  { id: "MEMBERSHIP_USE", label: "멤버십 사용" },
+  { id: "MEMBERSHIP_USE", label: "구독 중인 상품" },
   { id: "GOODS_BUY", label: "상품 구매" },
 ];
 
@@ -39,13 +39,25 @@ export default function PaymentHistoryPage() {
   }, []);
 
   const candyRechargeList = []; // 캔디 충전 전용 API 없음
-  const membershipList = memberships.map((m) => ({
-    id: `SUB-${m.subscriptionId}`,
-    date: formatDate(m.endDate),
-    name: m.productName,
-    amount: "- 캔디",
-    status: m.isActive ? "구독 중" : "만료",
-  }));
+  const membershipList = memberships.map((m) => {
+    const candyPrice = m.candyPrice ?? m.candy_price;
+    const price = m.price;
+    const amountStr =
+      candyPrice != null
+        ? `${Number(candyPrice).toLocaleString()} 캔디`
+        : price != null && price > 0
+          ? `${Number(price).toLocaleString()}원`
+          : "—";
+    const nextPaymentRaw = m.nextPaymentDate ?? m.next_payment_date;
+    return {
+      id: `SUB-${m.subscriptionId}`,
+      date: formatDate(m.endDate),
+      name: m.productName,
+      candyPriceStr: amountStr,
+      nextPaymentDate: nextPaymentRaw ? formatDate(nextPaymentRaw) : null,
+      status: m.isActive ? "구독 중" : "만료",
+    };
+  });
   const goodsList = purchaseHistory.map((o) => ({
     id: o.orderNo,
     date: formatDate(o.createdAt),
@@ -106,26 +118,24 @@ export default function PaymentHistoryPage() {
             className="p-8 flex flex-col md:flex-row justify-between md:items-center gap-6"
           >
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-black text-white/45 uppercase tracking-[0.2em]">
-                  {item.date}
-                </span>
-                <span className="text-[10px] font-black text-violet-300 uppercase tracking-widest">
-                  #{item.id}
-                </span>
-              </div>
+              {activeTab !== "MEMBERSHIP_USE" && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-[10px] font-black text-white/45 uppercase tracking-[0.2em]">
+                    {item.date}
+                  </span>
+                  <span className="text-[10px] font-black text-violet-300 uppercase tracking-widest">
+                    #{item.id}
+                  </span>
+                </div>
+              )}
               <h4 className="text-lg font-bold text-white">{item.name}</h4>
-              <p
-                className={`font-black text-xl ${
-                  activeTab === "MEMBERSHIP_USE"
-                    ? "text-red-400/90"
-                    : "text-white/90"
-                }`}
-              >
-                {item.amount}
-              </p>
+              {activeTab === "MEMBERSHIP_USE" ? (
+                <p className="text-sm font-bold text-violet-300">{item.candyPriceStr}</p>
+              ) : (
+                <p className="font-black text-xl text-white/90">{item.amount}</p>
+              )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col items-end gap-2">
               <span
                 className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
                   ["배송 완료", "충전 완료", "구독 완료"].includes(item.status)
@@ -135,6 +145,11 @@ export default function PaymentHistoryPage() {
               >
                 {item.status}
               </span>
+              {activeTab === "MEMBERSHIP_USE" && item.nextPaymentDate && (
+                <p className="text-xs text-white/55 font-medium">
+                  다음 결제일: {item.nextPaymentDate}
+                </p>
+              )}
             </div>
           </Surface>
         ))}
