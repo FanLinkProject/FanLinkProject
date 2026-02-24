@@ -93,7 +93,7 @@ function EditPostContent() {
           representativeMediaAssetId: attachments.representativeMediaAssetId,
         },
       });
-      router.push("/artist-console/posts");
+      router.back();
     } catch (err) {
       console.error("수정 실패", err);
     } finally {

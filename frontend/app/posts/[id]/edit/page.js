@@ -66,7 +66,7 @@ export default function EditPostPage() {
           representativeMediaAssetId: attachments.representativeMediaAssetId,
         },
       });
-      router.push(artistId ? "/posts" : "/home");
+      router.back();
     } catch (err) {
       console.error(err);
       alert(err?.data?.message ?? err?.message ?? "수정에 실패했습니다.");
