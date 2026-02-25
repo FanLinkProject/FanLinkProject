@@ -34,7 +34,7 @@ function useHls(videoRef, playbackUrl) {
 }
 
 export default function ReplayWatchPage({ params }) {
-    const resolvedParams = typeof params?.then === "function" ? null : params;
+    const resolvedParams = React.use(params);
     const replayId = resolvedParams?.replayId ? Number(resolvedParams.replayId) : null;
 
     const [replay, setReplay] = useState(null);
