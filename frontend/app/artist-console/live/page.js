@@ -10,7 +10,7 @@ import SectionTitle from "@/components/ui/SectionTitle";
 import Button from "@/components/ui/Button";
 
 import { apiGet, getToken, normalizeToken, WS_CHAT_URL } from "@/lib/api";
-import { publish, createManualReplay, publishManualReplay, getReplay, ReplayAccessType } from "@/lib/replayApi";
+import { publish, createManualReplay, publishManualReplay, getReplay, getCandidates, deleteReplay, ReplayAccessType } from "@/lib/replayApi";
 import { useMediaUpload } from "@/lib/useMediaUpload";
 import { MediaAssetCategory, MediaAssetScope } from "@/lib/mediaAssetApi";
 
@@ -56,7 +56,7 @@ export default function ArtistLivePage() {
 
         const [liveResult, replayResult] = await Promise.allSettled([
             apiGet("/api/live-sessions", { query: { artistId: numericArtistId, status: "LIVE" } }),
-            apiGet("/api/live-sessions", { query: { artistId: numericArtistId } }),
+            getCandidates(numericArtistId),
         ]);
 
         if (liveResult.status === "fulfilled") {
@@ -128,12 +128,9 @@ export default function ArtistLivePage() {
         };
     }, []);
 
-    const normalizedReplayCandidates = replayCandidates.filter((session) => {
-        if (!session || typeof session !== "object") return false;
-        const status = session.status;
-        if (!status) return true;
-        return status === "RECORDED" || status === "READY";
-    });
+    const normalizedReplayCandidates = replayCandidates.filter(
+        (c) => c && typeof c === "object"
+    );
 
     // --- replay publish (Replay API) ---
     const [publishForm, setPublishForm] = useState({
@@ -419,53 +416,36 @@ export default function ArtistLivePage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {normalizedReplayCandidates.map((session) => {
-                            const status = session.status;
-                            const isRecorded = status === "RECORDED";
-                            const isReady = status === "READY";
-                            const badgeLabel = isRecorded || isReady ? status : "다시보기 후보";
-                            const badgeClass = isRecorded
-                                ? "bg-white/10 text-white"
-                                : isReady
-                                    ? "bg-violet-500/80 text-white"
-                                    : "bg-white/10 text-white/80";
-                            const isSelected = String(publishForm.liveSessionId) === String(session.id);
+                        {normalizedReplayCandidates.map((candidate) => {
+                            const sid = candidate.liveSessionId ?? candidate.id;
+                            const isSelected = String(publishForm.liveSessionId) === String(sid);
 
                             return (
                                 <Surface
-                                    key={session.id}
+                                    key={sid}
                                     variant="card"
                                     className={`overflow-hidden transition-all ${isSelected ? "ring-2 ring-violet-500" : ""}`}
                                 >
-                                    <div className="aspect-video relative overflow-hidden bg-white/5">
-                                        <img
-                                            src="https://picsum.photos/seed/vod/800/450"
-                                            className="w-full h-full object-cover"
-                                            alt=""
-                                        />
+                                    <div className="aspect-video relative overflow-hidden bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30">
                                         <div className="absolute top-3 left-3">
-                      <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${badgeClass}`}
-                      >
-                        {badgeLabel}
-                      </span>
+                                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-violet-500/80 text-white">
+                                                발행 가능
+                                            </span>
                                         </div>
                                     </div>
 
                                     <div className="p-6">
-                                        <h4 className="font-bold text-white truncate mb-1">
-                                            {session.title ?? "라이브 다시보기"}
-                                        </h4>
+                                        <h4 className="font-bold text-white truncate mb-1">라이브 다시보기</h4>
                                         <p className="text-[10px] text-white/50 mb-4">
-                                            세션 #{session.id} · {session.isPaid ? "유료" : "무료"}
-                                            {session.endedAt && ` · ${new Date(session.endedAt).toLocaleDateString("ko-KR")}`}
+                                            세션 #{sid} · {candidate.isPaid ? "유료" : "무료"}
+                                            {candidate.endedAt && ` · ${new Date(candidate.endedAt).toLocaleDateString("ko-KR")}`}
                                         </p>
                                         <Button
                                             type="button"
                                             variant={isSelected ? "ghost" : "primary"}
                                             className="w-full py-3 text-[10px] uppercase tracking-widest"
                                             onClick={() => {
-                                                setPublishForm((f) => ({ ...f, liveSessionId: String(session.id) }));
+                                                setPublishForm((f) => ({ ...f, liveSessionId: String(sid) }));
                                                 document.getElementById("replay-publish-section")?.scrollIntoView({ behavior: "smooth" });
                                             }}
                                         >

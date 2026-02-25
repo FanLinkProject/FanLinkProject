@@ -245,6 +245,15 @@ public class ReplayCommandService {
         );
     }
 
+    public void deleteReplay(Long replayId, Long userId, UserRole role) {
+        Replay replay = replayRepository.findById(replayId)
+                .orElseThrow(() -> new ReplayException(ReplayErrorCode.REPLAY_NOT_FOUND));
+        if (!artistPermissionService.canManagePage(replay.getArtistId(), userId, role, true)) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
+        }
+        replayRepository.delete(replay);
+    }
+
     // RECORDED/READY 상태만 통과시킨다.
     private boolean isRecordedOrReady(LiveSessionRecordingStatus status) {
         return status == LiveSessionRecordingStatus.RECORDED
