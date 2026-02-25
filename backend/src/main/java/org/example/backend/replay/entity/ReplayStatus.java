@@ -10,6 +10,6 @@ public enum ReplayStatus {
     READY,
     /** 공개 발행됨 */
     PUBLISHED,
-    /** 변환 실패 등으로 거부됨 */
+    /** 변환 실패 등으로 거부됨 .*/
     REJECTED
 }
