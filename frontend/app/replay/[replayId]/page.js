@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { getReplay, access } from "@/lib/replayApi";
+import { useRouter } from "next/navigation";
+import { getReplay, access, deleteReplay } from "@/lib/replayApi";
 import { request } from "@/lib/api";
 import { getDefaultAvatarUrl } from "@/lib/avatar";
 import { getCurrentUser } from "@/lib/postUtils";
@@ -48,6 +49,7 @@ function useHls(videoRef, playbackUrl, cfSigningParams) {
 export default function ReplayWatchPage({ params }) {
     const resolvedParams = React.use(params);
     const replayId = resolvedParams?.replayId ? Number(resolvedParams.replayId) : null;
+    const router = useRouter();
 
     const [replay, setReplay] = useState(null);
     const [playbackUrl, setPlaybackUrl] = useState(null);
@@ -58,6 +60,8 @@ export default function ReplayWatchPage({ params }) {
 
     const [currentUser, setCurrentUser] = useState(null);
     const [artistInfo, setArtistInfo] = useState(null);
+    const [canManage, setCanManage] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const [comments, setComments] = useState([]);
     const [commentsLoading, setCommentsLoading] = useState(false);
@@ -68,6 +72,19 @@ export default function ReplayWatchPage({ params }) {
     const [isLiked, setIsLiked] = useState(false);
 
     useEffect(() => { setCurrentUser(getCurrentUser()); }, []);
+
+    useEffect(() => {
+        if (!currentUser || !replay?.artistId) { setCanManage(false); return; }
+        const role = currentUser.role;
+        if (role !== "ARTIST" && role !== "GROUP") { setCanManage(false); return; }
+        request("/api/user/profile")
+            .then((profile) => {
+                const myId = profile?.id;
+                const myGroupId = profile?.groupId;
+                setCanManage(myId === replay.artistId || myGroupId === replay.artistId);
+            })
+            .catch(() => setCanManage(false));
+    }, [currentUser, replay?.artistId]);
 
     useEffect(() => {
         if (!replayId) { setError("replayId가 없습니다."); setLoading(false); return; }
@@ -150,6 +167,20 @@ export default function ReplayWatchPage({ params }) {
     const handleCommentDelete = async (commentId) => {
         try { await request(`/api/comments/${commentId}`, { method: "DELETE" }); loadComments(); }
         catch (err) { console.error("댓글 삭제 실패", err); }
+    };
+
+    const handleReplayDelete = async () => {
+        if (!replayId || deleting) return;
+        if (!confirm("이 다시보기를 삭제하시겠습니까?\n삭제하면 다시 발행 가능 목록에 나타납니다.")) return;
+        setDeleting(true);
+        try {
+            await deleteReplay(replayId);
+            const dest = replay?.artistId ? `/artists/${replay.artistId}?tab=REPLAY` : "/";
+            router.push(dest);
+        } catch (err) {
+            alert(err?.message || "삭제에 실패했습니다.");
+            setDeleting(false);
+        }
     };
 
     useHls(videoRef, playbackUrl, cfSigningParams);
@@ -246,12 +277,25 @@ export default function ReplayWatchPage({ params }) {
                                         </span>
                                     </div>
                                 </div>
-                                {currentUser && (
-                                    <button type="button" onClick={handleLike} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border transition-all text-sm font-bold ${isLiked ? "bg-violet-500/20 border-violet-400/30 text-violet-300" : "bg-white/[0.04] border-white/[0.08] text-white/60 hover:text-white/80"}`}>
-                                        <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: isLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
-                                        {likeCount > 0 && <span>{likeCount}</span>}
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {currentUser && (
+                                        <button type="button" onClick={handleLike} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border transition-all text-sm font-bold ${isLiked ? "bg-violet-500/20 border-violet-400/30 text-violet-300" : "bg-white/[0.04] border-white/[0.08] text-white/60 hover:text-white/80"}`}>
+                                            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: isLiked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+                                            {likeCount > 0 && <span>{likeCount}</span>}
+                                        </button>
+                                    )}
+                                    {canManage && (
+                                        <button
+                                            type="button"
+                                            onClick={handleReplayDelete}
+                                            disabled={deleting}
+                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all text-sm font-bold disabled:opacity-50"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                            {deleting ? "삭제 중..." : "삭제"}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}

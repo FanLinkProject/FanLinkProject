@@ -14,6 +14,7 @@ import org.example.backend.replay.dto.ReplayCreateManualRequest;
 import org.example.backend.replay.dto.ReplayCreateManualResponse;
 import org.example.backend.replay.dto.ReplayPublishRequest;
 import org.example.backend.replay.dto.ReplayPublishResponse;
+import org.example.backend.replay.dto.ReplayUpdateRequest;
 import org.example.backend.replay.entity.Replay;
 import org.example.backend.replay.entity.ReplayAccessType;
 import org.example.backend.replay.entity.ReplayStatus;
@@ -243,6 +244,21 @@ public class ReplayCommandService {
                 playbackUrl,
                 replay.getPublishedAt()
         );
+    }
+
+    public Replay updateReplay(Long replayId, ReplayUpdateRequest req, Long userId, UserRole role) {
+        Replay replay = replayRepository.findById(replayId)
+                .orElseThrow(() -> new ReplayException(ReplayErrorCode.REPLAY_NOT_FOUND));
+        if (!artistPermissionService.canManagePage(replay.getArtistId(), userId, role, true)) {
+            throw new ReplayException(ReplayErrorCode.FORBIDDEN_OPERATION);
+        }
+        if (req.title() != null) {
+            replay.updateTitle(req.title().trim());
+        }
+        if (req.accessType() != null) {
+            replay.updateAccessType(req.accessType());
+        }
+        return replayRepository.save(replay);
     }
 
     public void deleteReplay(Long replayId, Long userId, UserRole role) {
