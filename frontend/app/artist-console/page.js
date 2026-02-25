@@ -568,16 +568,16 @@ export default function ArtistConsolePage() {
                                     <span className="material-symbols-outlined mr-2">edit_note</span> 새 글 작성
                                 </Button>
                             </div>
-                        {artistPostsLoading ? (
-                            <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
-                        ) : artistPosts.length === 0 ? (
-                            <Surface variant="primary" className="py-20 text-center"><p className="text-white/55 italic">아직 게시글이 없습니다.</p></Surface>
-                        ) : (
-                            <>
-                                <PostFeed posts={artistPosts} postLinkBase="/posts" postLinkQuery={`type=ARTIST&groupId=${groupId}&from=artist-console`} showVerifiedByType={true} isLikedMap={artistIsLikedMap} likeCountMap={artistLikeCountMap} commentCountMap={artistCommentCountMap} onLike={handleArtistPostLike} onComment={(postId) => router.push(`/posts/${postId}?type=ARTIST&groupId=${groupId}&from=artist-console`)} onEdit={handleEditArtistPost} onDelete={handleDeleteArtistPost} canEditSet={myId ? new Set(artistPosts.filter((p) => Number(p.writerId) === Number(myId)).map((p) => p.id)) : undefined} canDeleteSet={myId ? new Set(artistPosts.filter((p) => Number(p.writerId) === Number(myId)).map((p) => p.id)) : undefined} />
-                                <div ref={artistPostsBottomRef} className="py-1">{artistPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}</div>
-                            </>
-                        )
+                            {artistPostsLoading ? (
+                                <Surface variant="primary" className="py-12 text-center"><p className="text-white/55">로딩 중...</p></Surface>
+                            ) : artistPosts.length === 0 ? (
+                                <Surface variant="primary" className="py-20 text-center"><p className="text-white/55 italic">아직 게시글이 없습니다.</p></Surface>
+                            ) : (
+                                <>
+                                    <PostFeed posts={artistPosts} postLinkBase="/posts" postLinkQuery={`type=ARTIST&groupId=${groupId}&from=artist-console`} showVerifiedByType={true} isLikedMap={artistIsLikedMap} likeCountMap={artistLikeCountMap} commentCountMap={artistCommentCountMap} onLike={handleArtistPostLike} onComment={(postId) => router.push(`/posts/${postId}?type=ARTIST&groupId=${groupId}&from=artist-console`)} onEdit={handleEditArtistPost} onDelete={handleDeleteArtistPost} canEditSet={myId ? new Set(artistPosts.filter((p) => Number(p.writerId) === Number(myId)).map((p) => p.id)) : undefined} canDeleteSet={myId ? new Set(artistPosts.filter((p) => Number(p.writerId) === Number(myId)).map((p) => p.id)) : undefined} />
+                                    <div ref={artistPostsBottomRef} className="py-1">{artistPostsLoadingMore && <p className="text-white/40 text-xs text-center py-4">불러오는 중...</p>}</div>
+                                </>
+                            )}
                         </div>
                     )}
 
