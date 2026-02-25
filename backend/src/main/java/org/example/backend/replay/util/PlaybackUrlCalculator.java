@@ -19,7 +19,7 @@ public class PlaybackUrlCalculator {
         if (prefix == null || prefix.isBlank()) {
             return null;
         }
-        return "https://" + domain + "/" + trimTrailingSlash(prefix) + "/master.m3u8";
+        return "https://" + domain + "/" + trimTrailingSlash(prefix) + "/media/hls/master.m3u8";
     }
 
     /**
