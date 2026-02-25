@@ -8,29 +8,40 @@ import { getDefaultAvatarUrl } from "@/lib/avatar";
 import { getCurrentUser } from "@/lib/postUtils";
 import Surface from "@/components/ui/Surface";
 
-function useHls(videoRef, playbackUrl) {
+function useHls(videoRef, playbackUrl, cfSigningParams) {
     useEffect(() => {
         if (!playbackUrl || !videoRef?.current) return;
         const isHls = playbackUrl.includes(".m3u8");
         if (!isHls) return;
         let hls = null;
+        const qs = cfSigningParams
+            ? `Policy=${cfSigningParams.policy}&Signature=${cfSigningParams.signature}&Key-Pair-Id=${cfSigningParams.keyPairId}`
+            : null;
+        const signedUrl = qs ? `${playbackUrl}${playbackUrl.includes("?") ? "&" : "?"}${qs}` : playbackUrl;
         const loadHls = async () => {
             try {
                 const Hls = (await import("hls.js")).default;
                 if (Hls.isSupported()) {
-                    hls = new Hls({ enableWorker: true });
-                    hls.loadSource(playbackUrl);
+                    const hlsConfig = { enableWorker: true };
+                    if (qs) {
+                        hlsConfig.xhrSetup = (xhr, url) => {
+                            const sep = url.includes("?") ? "&" : "?";
+                            xhr.open("GET", `${url}${sep}${qs}`, true);
+                        };
+                    }
+                    hls = new Hls(hlsConfig);
+                    hls.loadSource(signedUrl);
                     hls.attachMedia(videoRef.current);
                 } else if (videoRef.current?.canPlayType?.("application/vnd.apple.mpegurl")) {
-                    videoRef.current.src = playbackUrl;
+                    videoRef.current.src = signedUrl;
                 }
             } catch {
-                videoRef.current.src = playbackUrl;
+                videoRef.current.src = signedUrl;
             }
         };
         loadHls();
         return () => { if (hls) hls.destroy(); };
-    }, [playbackUrl, videoRef]);
+    }, [playbackUrl, videoRef, cfSigningParams]);
 }
 
 export default function ReplayWatchPage({ params }) {
@@ -39,6 +50,7 @@ export default function ReplayWatchPage({ params }) {
 
     const [replay, setReplay] = useState(null);
     const [playbackUrl, setPlaybackUrl] = useState(null);
+    const [cfSigningParams, setCfSigningParams] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const videoRef = useRef(null);
@@ -67,7 +79,13 @@ export default function ReplayWatchPage({ params }) {
     useEffect(() => {
         if (!replay || playbackUrl) return;
         access(replayId)
-            .then((result) => setPlaybackUrl(result?.playbackUrl ?? result?.response?.playbackUrl ?? replay.playbackUrl ?? null))
+            .then((result) => {
+                setPlaybackUrl(result?.playbackUrl ?? result?.response?.playbackUrl ?? replay.playbackUrl ?? null);
+                const p = result?.cfPolicy ?? result?.response?.cfPolicy;
+                const s = result?.cfSignature ?? result?.response?.cfSignature;
+                const k = result?.cfKeyPairId ?? result?.response?.cfKeyPairId;
+                if (p && s && k) setCfSigningParams({ policy: p, signature: s, keyPairId: k });
+            })
             .catch((e) => setError(e?.data?.message || e.message || "접근 권한이 없거나 구독이 필요합니다."))
             .finally(() => setLoading(false));
     }, [replay, replayId, playbackUrl]);
@@ -133,7 +151,7 @@ export default function ReplayWatchPage({ params }) {
         catch (err) { console.error("댓글 삭제 실패", err); }
     };
 
-    useHls(videoRef, playbackUrl);
+    useHls(videoRef, playbackUrl, cfSigningParams);
     const isHls = playbackUrl?.includes(".m3u8");
     const videoSrc = !isHls ? playbackUrl : undefined;
 
