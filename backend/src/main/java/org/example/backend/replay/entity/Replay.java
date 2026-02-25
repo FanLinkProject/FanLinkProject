@@ -151,6 +151,10 @@ public class Replay {
         this.title = title;
     }
 
+    public void updateAccessType(ReplayAccessType accessType) {
+        this.accessType = accessType;
+    }
+
     public void markPublished(Instant at) {
         this.status = ReplayStatus.PUBLISHED;
         this.publishedAt = at;

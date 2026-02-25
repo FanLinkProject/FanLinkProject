@@ -10,6 +10,7 @@ import org.example.backend.replay.dto.ReplayCreateManualResponse;
 import org.example.backend.replay.dto.ReplayPublishRequest;
 import org.example.backend.replay.dto.ReplayPublishResponse;
 import org.example.backend.replay.dto.ReplayResponse;
+import org.example.backend.replay.dto.ReplayUpdateRequest;
 import org.example.backend.replay.service.ReplayCommandService;
 import org.example.backend.replay.service.ReplayQueryService;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -89,6 +91,18 @@ public class ReplayController {
     // Replay 단건을 조회한다.
     @GetMapping("/{replayId}")
     public ResponseEntity<ReplayResponse> getReplay(@PathVariable Long replayId) {
+        return ResponseEntity.ok(replayQueryService.getReplay(replayId));
+    }
+
+    @PatchMapping("/{replayId}")
+    public ResponseEntity<ReplayResponse> updateReplay(
+            @PathVariable Long replayId,
+            @RequestBody ReplayUpdateRequest request,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        replayCommandService.updateReplay(replayId, request, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
         return ResponseEntity.ok(replayQueryService.getReplay(replayId));
     }
 
