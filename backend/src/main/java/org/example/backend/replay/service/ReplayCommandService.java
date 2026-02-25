@@ -161,10 +161,25 @@ public class ReplayCommandService {
         } catch (RuntimeException ex) {
             throw new ReplayException(ReplayErrorCode.COOKIE_ISSUE_FAILED);
         }
+        String cfPolicy = null;
+        String cfSignature = null;
+        String cfKeyPairId = null;
+        for (String cookie : cookies) {
+            String[] parts = cookie.split(";")[0].split("=", 2);
+            if (parts.length < 2) continue;
+            switch (parts[0].trim()) {
+                case "CloudFront-Policy" -> cfPolicy = parts[1].trim();
+                case "CloudFront-Signature" -> cfSignature = parts[1].trim();
+                case "CloudFront-Key-Pair-Id" -> cfKeyPairId = parts[1].trim();
+            }
+        }
         ReplayAccessResponse response = new ReplayAccessResponse(
                 playbackUrl,
                 pathPattern,
-                Instant.now().plusSeconds(ttl.getSeconds())
+                Instant.now().plusSeconds(ttl.getSeconds()),
+                cfPolicy,
+                cfSignature,
+                cfKeyPairId
         );
         return new ReplayAccessResult(response, cookies);
     }

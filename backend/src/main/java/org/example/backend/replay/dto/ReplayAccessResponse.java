@@ -6,6 +6,9 @@ import java.time.Instant;
 public record ReplayAccessResponse(
         String playbackUrl,
         String playbackPathPattern,
-        Instant expiresAt
+        Instant expiresAt,
+        String cfPolicy,
+        String cfSignature,
+        String cfKeyPairId
 ) {
 }
