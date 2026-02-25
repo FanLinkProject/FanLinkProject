@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 
 /**
  * LiveSession 도메인 전용 에러 코드.
- * (code, httpStatus, message) 형태..
+ * (code, httpStatus, message) 형태...
  */
 public enum LiveSessionErrorCode implements ErrorCode {
 
