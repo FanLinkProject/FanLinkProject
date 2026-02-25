@@ -72,8 +72,10 @@ public class IvsRecordingEventListener {
 
     private void handleMessage(Message message) {
         try {
+            log.info("IVS recording raw SQS body: {}", message.body());
             Map<String, Object> payload = parseMessageBody(message.body());
             Map<String, Object> detail = asMap(payload.get("detail"));
+            log.info("IVS recording parsed — payload keys={}, detail keys={}", payload.keySet(), detail.keySet());
             String channelArn = firstNonBlank(
                     getString(detail, "channel_arn"),
                     getString(detail, "channelArn"),
