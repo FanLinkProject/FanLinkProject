@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 
 /**
  * LiveSession 도메인 전용 에러 코드.
- * (code, httpStatus, message) 형태.
+ * (code, httpStatus, message) 형태..
  */
 public enum LiveSessionErrorCode implements ErrorCode {
 
@@ -15,6 +15,7 @@ public enum LiveSessionErrorCode implements ErrorCode {
 
 	LIVE_SESSION_NOT_LIVE(HttpStatus.BAD_REQUEST, "LIVE_SESSION_NOT_LIVE", "현재 LIVE 상태가 아닌 라이브 세션입니다."),
 	LIVE_SESSION_SUBSCRIPTION_REQUIRED(HttpStatus.FORBIDDEN,"LIVE_SESSION_SUBSCRIPTION_REQUIRED", "유료 라이브는 구독자만 이용할 수 있습니다."),
+	LIVE_SESSION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "LIVE_SESSION_ALREADY_ACTIVE", "이미 진행 중인 라이브가 있습니다."),
 
 	;
 
