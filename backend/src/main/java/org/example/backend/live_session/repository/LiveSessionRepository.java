@@ -25,6 +25,6 @@ public interface LiveSessionRepository extends JpaRepository<LiveSession, Long> 
 		@Param("statuses") List<LiveSessionStatus> statuses,
 		@Param("now") Instant now);
 
-	// channelArn으로 LiveSession을 조회한다.
-	Optional<LiveSession> findByChannelArn(String channelArn);
+	// channelArn으로 가장 최근 LiveSession을 조회한다 (채널 재사용 대비).
+	Optional<LiveSession> findFirstByChannelArnOrderByCreatedAtDesc(String channelArn);
 }

@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -37,21 +37,23 @@ public class IvsRecordingEventListener {
     private final LiveSessionRepository liveSessionRepository;
     private final ReplayRepository replayRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public IvsRecordingEventListener(
             @Qualifier("ivsRecordingSqsClient") SqsClient sqsClient,
             IvsRecordingEventProperties properties,
             LiveSessionRepository liveSessionRepository,
             ReplayRepository replayRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate) {
         this.sqsClient = sqsClient;
         this.properties = properties;
         this.liveSessionRepository = liveSessionRepository;
         this.replayRepository = replayRepository;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    // IVS 녹화 이벤트 SQS를 폴링한다.
     @Scheduled(fixedDelayString = "${ivs.recording-events.poll-fixed-delay-ms:5000}")
     public void poll() {
         if (properties.getQueueUrl() == null || properties.getQueueUrl().isBlank()) {
@@ -68,8 +70,7 @@ public class IvsRecordingEventListener {
         }
     }
 
-    @Transactional
-    protected void handleMessage(Message message) {
+    private void handleMessage(Message message) {
         try {
             Map<String, Object> payload = parseMessageBody(message.body());
             Map<String, Object> detail = asMap(payload.get("detail"));
@@ -98,17 +99,20 @@ public class IvsRecordingEventListener {
                 return;
             }
 
-            Optional<LiveSession> optionalSession = liveSessionRepository.findByChannelArn(channelArn);
-            if (optionalSession.isEmpty()) {
-                log.warn("No LiveSession found for channelArn={}. messageId={}", channelArn, message.messageId());
-                deleteMessage(message);
-                return;
-            }
+            transactionTemplate.executeWithoutResult(status -> {
+                Optional<LiveSession> optionalSession =
+                        liveSessionRepository.findFirstByChannelArnOrderByCreatedAtDesc(channelArn);
+                if (optionalSession.isEmpty()) {
+                    log.warn("No LiveSession found for channelArn={}. messageId={}", channelArn, message.messageId());
+                    return;
+                }
 
-            LiveSession session = optionalSession.get();
-            session.markRecorded(recordingBucket, recordingPrefix);
-            liveSessionRepository.save(session);
-            createReplayIfAbsent(session);
+                LiveSession session = optionalSession.get();
+                session.markRecorded(recordingBucket, recordingPrefix);
+                liveSessionRepository.save(session);
+                createReplayIfAbsent(session);
+            });
+
             deleteMessage(message);
         } catch (Exception ex) {
             log.error("Failed to handle IVS recording event. messageId={}", message.messageId(), ex);
@@ -150,7 +154,6 @@ public class IvsRecordingEventListener {
                 .build());
     }
 
-    // 자동 녹화본에 대한 Replay를 생성한다(존재하면 스킵).
     private void createReplayIfAbsent(LiveSession session) {
         if (session == null || session.getId() == null) {
             return;

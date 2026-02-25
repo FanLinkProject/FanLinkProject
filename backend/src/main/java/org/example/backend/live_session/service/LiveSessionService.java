@@ -53,6 +53,12 @@ public class LiveSessionService {
 		if (loginUser.getRole() != UserRole.ARTIST) {
 			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_FORBIDDEN_NOT_ARTIST);
 		}
+		boolean hasActiveLive = !liveSessionRepository
+			.findByArtistIdAndStatusInAndNotExpired(loginUser.getId(), List.of(LiveSessionStatus.LIVE), Instant.now())
+			.isEmpty();
+		if (hasActiveLive) {
+			throw new LiveSessionException(LiveSessionErrorCode.LIVE_SESSION_ALREADY_ACTIVE);
+		}
 		LiveSession session = LiveSession.builder()
 			.artistId(loginUser.getId())
 			.channelArn(request.getChannelArn())
