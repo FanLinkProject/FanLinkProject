@@ -17,7 +17,6 @@ function useHls(videoRef, playbackUrl, cfSigningParams) {
         const qs = cfSigningParams
             ? `Policy=${cfSigningParams.policy}&Signature=${cfSigningParams.signature}&Key-Pair-Id=${cfSigningParams.keyPairId}`
             : null;
-        const signedUrl = qs ? `${playbackUrl}${playbackUrl.includes("?") ? "&" : "?"}${qs}` : playbackUrl;
         const loadHls = async () => {
             try {
                 const Hls = (await import("hls.js")).default;
@@ -30,13 +29,15 @@ function useHls(videoRef, playbackUrl, cfSigningParams) {
                         };
                     }
                     hls = new Hls(hlsConfig);
-                    hls.loadSource(signedUrl);
+                    hls.loadSource(playbackUrl);
                     hls.attachMedia(videoRef.current);
                 } else if (videoRef.current?.canPlayType?.("application/vnd.apple.mpegurl")) {
-                    videoRef.current.src = signedUrl;
+                    const nativeUrl = qs ? `${playbackUrl}?${qs}` : playbackUrl;
+                    videoRef.current.src = nativeUrl;
                 }
             } catch {
-                videoRef.current.src = signedUrl;
+                const fallbackUrl = qs ? `${playbackUrl}?${qs}` : playbackUrl;
+                videoRef.current.src = fallbackUrl;
             }
         };
         loadHls();
