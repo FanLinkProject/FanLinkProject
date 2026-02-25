@@ -616,7 +616,7 @@ export default function ArtistConsolePage() {
                                 </div>
                             ) : (
                                 <p className="text-white/30 py-20 text-center bg-white/5 rounded-2xl">현재 진행 중인 라이브가 없습니다.</p>
-                            }
+                            )}
                         </div>
                     )}
 
