@@ -35,6 +35,10 @@ export function getReplay(replayId) {
   return request(`/api/replays/${replayId}`);
 }
 
+export function deleteReplay(replayId) {
+  return request(`/api/replays/${replayId}`, { method: "DELETE" });
+}
+
 /**
  * Access Gate. credentials: 'include'로 호출하면 서버가 Set-Cookie로 쿠키 발급.
  * @param {number} replayId

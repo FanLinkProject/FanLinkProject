@@ -15,6 +15,7 @@ import org.example.backend.replay.service.ReplayQueryService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -89,6 +90,17 @@ public class ReplayController {
     @GetMapping("/{replayId}")
     public ResponseEntity<ReplayResponse> getReplay(@PathVariable Long replayId) {
         return ResponseEntity.ok(replayQueryService.getReplay(replayId));
+    }
+
+    @DeleteMapping("/{replayId}")
+    public ResponseEntity<Void> deleteReplay(
+            @PathVariable Long replayId,
+            @AuthenticationPrincipal PrincipalDetails principalDetails
+    ) {
+        Long userId = principalDetails != null ? principalDetails.getUserId() : null;
+        replayCommandService.deleteReplay(replayId, userId,
+                principalDetails != null ? principalDetails.getUser().getRole() : null);
+        return ResponseEntity.noContent().build();
     }
 
     // Replay 접근 게이트를 처리한다.
