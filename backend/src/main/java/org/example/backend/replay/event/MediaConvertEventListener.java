@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -34,18 +34,21 @@ public class MediaConvertEventListener {
     private final ReplayRepository replayRepository;
     private final MediaConvertJobService jobService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     public MediaConvertEventListener(
             @Qualifier("mediaConvertSqsClient") SqsClient sqsClient,
             MediaConvertProperties properties,
             ReplayRepository replayRepository,
             MediaConvertJobService jobService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate) {
         this.sqsClient = sqsClient;
         this.properties = properties;
         this.replayRepository = replayRepository;
         this.jobService = jobService;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
     }
 
     // MediaConvert 완료 이벤트 SQS를 폴링한다.
@@ -66,8 +69,7 @@ public class MediaConvertEventListener {
         }
     }
 
-    @Transactional
-    protected void handleMessage(Message message) {
+    private void handleMessage(Message message) {
         try {
             Map<String, Object> payload = parseMessageBody(message.body());
             Map<String, Object> detail = asMap(payload.get("detail"));
@@ -86,31 +88,33 @@ public class MediaConvertEventListener {
                 return;
             }
 
-            Optional<Replay> optionalReplay = replayRepository.findByMediaConvertJobId(jobId);
-            if (optionalReplay.isEmpty()) {
-                log.warn("No Replay found for MediaConvert jobId={}. messageId={}", jobId, message.messageId());
-                deleteMessage(message);
-                return;
-            }
+            transactionTemplate.executeWithoutResult(txStatus -> {
+                Optional<Replay> optionalReplay = replayRepository.findByMediaConvertJobId(jobId);
+                if (optionalReplay.isEmpty()) {
+                    log.warn("No Replay found for MediaConvert jobId={}. messageId={}", jobId, message.messageId());
+                    return;
+                }
 
-            Replay replay = optionalReplay.get();
-            if (isSuccessStatus(status)) {
-                replay.changeStatus(ReplayStatus.READY);
-                String manifestKey = extractMasterManifestKey(detail);
-                if (manifestKey == null || manifestKey.isBlank()) {
-                    manifestKey = jobService.buildDerivedMasterKey(replay.getId());
+                Replay replay = optionalReplay.get();
+                if (isSuccessStatus(status)) {
+                    replay.changeStatus(ReplayStatus.READY);
+                    String manifestKey = extractMasterManifestKey(detail);
+                    if (manifestKey == null || manifestKey.isBlank()) {
+                        manifestKey = jobService.buildDerivedMasterKey(replay.getId());
+                    }
+                    if (manifestKey == null || manifestKey.isBlank()) {
+                        log.warn("MediaConvert success but manifest not resolved. replayId={}, jobId={}",
+                                replay.getId(), jobId);
+                    } else {
+                        replay.updateHlsMasterManifestKey(manifestKey);
+                    }
+                    replay.updateRejectReason(null);
+                } else if (status != null) {
+                    replay.markRejected("MediaConvert status=" + status);
                 }
-                if (manifestKey == null || manifestKey.isBlank()) {
-                    log.warn("MediaConvert success but manifest not resolved. replayId={}, jobId={}",
-                            replay.getId(), jobId);
-                } else {
-                    replay.updateHlsMasterManifestKey(manifestKey);
-                }
-                replay.updateRejectReason(null);
-            } else if (status != null) {
-                replay.markRejected("MediaConvert status=" + status);
-            }
-            replayRepository.save(replay);
+                replayRepository.save(replay);
+            });
+
             deleteMessage(message);
         } catch (Exception ex) {
             log.error("Failed to handle MediaConvert event. messageId={}", message.messageId(), ex);

@@ -72,15 +72,14 @@ public class IvsRecordingEventListener {
 
     private void handleMessage(Message message) {
         try {
-            log.info("IVS recording raw SQS body: {}", message.body());
             Map<String, Object> payload = parseMessageBody(message.body());
             Map<String, Object> detail = asMap(payload.get("detail"));
-            log.info("IVS recording parsed — payload keys={}, detail keys={}", payload.keySet(), detail.keySet());
             String channelArn = firstNonBlank(
                     getString(detail, "channel_arn"),
                     getString(detail, "channelArn"),
                     getString(payload, "channel_arn"),
-                    getString(payload, "channelArn")
+                    getString(payload, "channelArn"),
+                    extractArnFromResources(payload.get("resources"))
             );
             String recordingBucket = firstNonBlank(
                     getString(detail, "recording_s3_bucket_name"),
@@ -144,6 +143,17 @@ public class IvsRecordingEventListener {
         for (String value : values) {
             if (value != null && !value.isBlank()) {
                 return value;
+            }
+        }
+        return null;
+    }
+
+    private String extractArnFromResources(Object resources) {
+        if (resources instanceof java.util.List<?> list) {
+            for (Object item : list) {
+                if (item instanceof String s && s.contains(":channel/")) {
+                    return s;
+                }
             }
         }
         return null;
